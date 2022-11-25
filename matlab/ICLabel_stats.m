@@ -1,0 +1,49 @@
+% Get ICLabel statistics from all subjects:
+% * Number of ICs per class
+% * Min, Max, and mean legth of ICs
+eeglab; close;
+% Move to folder where this file is located
+if(~isdeployed)
+    cd(fileparts(which(mfilename)));
+end
+
+data_dir = '../data/ds003004';
+file_list = dir(fullfile(data_dir, 'sub-*/eeg/*.set'));
+
+ICLabels = {...
+    'Brain', 'Muscle', 'Eye', 'Heart',...
+    'Line Noise', 'Channel Noise', 'Other'};
+
+prob_thr = [0.5, 0.6, 0.7, 0.8, 0.9];
+class_count = zeros(7, length(prob_thr));
+ic_length = zeros(length(file_list), 1);
+ic_count = zeros(length(file_list), 1);
+
+for ii = 1:length(file_list)
+    EEG = pop_loadset(...
+        'filename', file_list(ii).name, ...
+        'filepath', file_list(ii).folder, ...
+        'loadmode', 'info',...
+        'check', 'off',...
+        'verbose', 'off');
+    for jj = 1:length(prob_thr)
+        [r, c] = find(EEG.etc.ic_classification.ICLabel.classifications > prob_thr(jj));
+        [C,ia,ic] = unique(c);
+        a_counts = accumarray(ic,1);
+        class_count(C, jj) = class_count(C, jj) + a_counts;
+    end
+    ic_count(ii) = EEG.nbchan;
+    ic_length(ii) = EEG.pnts;    
+end
+
+var_names = arrayfun(@(x) num2str(x), prob_thr,'UniformOutput', false);
+row_names = [ICLabels, 'Total'];
+tab_data = [class_count; sum(class_count, 1)];
+components_per_class = array2table(tab_data, 'RowNames', row_names, 'VariableNames', var_names);
+disp(components_per_class);
+
+tab_data = [ic_count, ic_length];
+% row_names = file_list;
+var_names = {'Count', 'Length'};
+components_size = array2table(tab_data, 'VariableNames', var_names);
+disp(components_size);

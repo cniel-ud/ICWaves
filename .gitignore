@@ -1,0 +1,7 @@
+_private/
+results/
+data/
+__pycache__/
+*.asv
+.vscode/
+*.egg-info/
