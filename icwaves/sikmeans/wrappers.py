@@ -54,7 +54,7 @@ def si_euclidean_distances(centroids, X, X_norm_squared,
     return distances
 
 
-def si_pairwise_distances_argmin_min(X, centroids, metric, x_squared_norms):
+def si_pairwise_distances_argmin_min(X, centroids, metric, x_squared_norms, n_jobs=1):
     """
     Shift-invariant wrapper of http://bit.ly/argmin_min_sklearn
     """
@@ -69,7 +69,7 @@ def si_pairwise_distances_argmin_min(X, centroids, metric, x_squared_norms):
     centroid_length = centroids.shape[1]
     n_shifts = sample_length - centroid_length + 1
 
-    best_labels = np.empty((n_shifts, n_samples), dtype=np.int)
+    best_labels = np.empty((n_shifts, n_samples), dtype=int)
     best_distances = np.empty((n_shifts, n_samples))
 
     if metric == 'euclidean':
@@ -88,7 +88,11 @@ def si_pairwise_distances_argmin_min(X, centroids, metric, x_squared_norms):
                 pairwise_distances_argmin_min(
                     X=X[:, shift:shift+centroid_length],
                     Y=centroids,
-                    metric=metric)
+                    metric=metric,
+                    # XXX: Fix also in 'euclidean'
+                    # How to (can we) handle multithreading?..
+                    metric_kwargs={'n_jobs':n_jobs}
+                )
     else:
         sys.exit('%s metric not implemented' % metric)
 

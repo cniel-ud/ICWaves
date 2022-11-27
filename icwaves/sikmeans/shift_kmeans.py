@@ -266,7 +266,7 @@ def _random_energy_init(X, n_clusters, centroid_length, rng):
 # Main algorithm
 
 def shift_invariant_k_means(X, n_clusters, centroid_length, metric='euclidean',\
-    init='k-means++', n_init=10, max_iter=300, tol=1e-4, rng=None, verbose=False):
+    init='k-means++', n_init=10, max_iter=300, tol=1e-4, rng=None, verbose=False, n_jobs=1):
     """
     Shift-invariant k-means algorithm
 
@@ -346,7 +346,7 @@ def shift_invariant_k_means(X, n_clusters, centroid_length, metric='euclidean',\
     for seed in streams:
         # run a shift-invariant k-means once
         centroids, labels, shifts, distances, inertia, n_iter_ = si_kmeans_single(
-            X, n_clusters, centroid_length, metric=metric, init=init, max_iter=max_iter, tol=tol, x_squared_norms=x_squared_norms, rng=seed, verbose=verbose)
+            X, n_clusters, centroid_length, metric=metric, init=init, max_iter=max_iter, tol=tol, x_squared_norms=x_squared_norms, rng=seed, verbose=verbose, n_jobs=n_jobs)
         # determine if these results are the best so far
         if best_inertia is None or inertia < best_inertia:
             best_centroids = centroids.copy()
@@ -370,7 +370,7 @@ def shift_invariant_k_means(X, n_clusters, centroid_length, metric='euclidean',\
 
 
 def si_kmeans_single(X, n_clusters, centroid_length, metric='euclidean',\
-    init='k-means++', max_iter=300, tol=1e-3, x_squared_norms=None, rng=None, verbose=False):
+    init='k-means++', max_iter=300, tol=1e-3, x_squared_norms=None, rng=None, verbose=False, n_jobs=1):
     """
     Single run of shift-invariant k-means
     """
@@ -395,7 +395,7 @@ def si_kmeans_single(X, n_clusters, centroid_length, metric='euclidean',\
     for iteration in range(max_iter):
         centroids_old = centroids.copy()
         labels, shifts, distances = _asignment_step(
-            X, centroids, metric, x_squared_norms)
+            X, centroids, metric, x_squared_norms, n_jobs=n_jobs)
         centroids = _centroids_update_step(
             X, centroid_length, n_clusters, labels, shifts)
 
@@ -423,13 +423,13 @@ def si_kmeans_single(X, n_clusters, centroid_length, metric='euclidean',\
         # rerun asingment step in case of non-convergence so that predicted
         # labels match cluster centers
         best_labels, best_shifts, distances = _asignment_step(
-            X, best_centroids, metric, x_squared_norms)
+            X, best_centroids, metric, x_squared_norms, n_jobs=n_jobs)
         best_inertia = distances.sum()
 
     return best_centroids, best_labels, best_shifts, best_distances, best_inertia, iteration+1
 
 
-def _asignment_step(X, centroids, metric, x_squared_norms):
+def _asignment_step(X, centroids, metric, x_squared_norms, n_jobs=1):
     """
     Find the index of the shifted centroid that is closest to each sample
 
@@ -455,7 +455,7 @@ def _asignment_step(X, centroids, metric, x_squared_norms):
 
     labels, shifts, distances =\
         wrappers.si_pairwise_distances_argmin_min(
-            X, centroids, metric, x_squared_norms)
+            X, centroids, metric, x_squared_norms, n_jobs=n_jobs)
 
     # Samples whose distance to the silent waveform (i.e, their own norm) is
     # smaller than the smallest distance to one cluster are left unassigned.
