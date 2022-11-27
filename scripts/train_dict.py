@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     srate, win_len = 256, args.window_len
 
-    data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
+    data_dir = Path(args.root, 'data/ds003004/icact_iclabel')    
     file_list = data_dir.glob(f'train_subj-*.mat')
 
     icaact_list = []
@@ -86,7 +86,8 @@ if __name__ == '__main__':
     stop = perf_counter()
     print(f'Time running sikmeans: {stop-start:.3f} seconds')
 
-    out_file = data_dir.joinpath(
+    dict_dir = Path(args.root, 'results/dictionaries')
+    out_file = dict_dir.joinpath(
         f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
         f'_class-{args.class_label}.npz'
     )
