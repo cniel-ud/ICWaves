@@ -1,8 +1,10 @@
+import datetime
+import time
 from pprint import pprint
-
 
 import numpy as np
 from threadpoolctl import threadpool_info
+from tqdm import tqdm
 
 from icwaves.sikmeans.shift_kmeans import _asignment_step
 
@@ -31,7 +33,9 @@ def bag_of_waves(raw_ics, codebooks, metric='cosine', n_jobs=1):
 
     X = np.zeros((n_ics, n_features), dtype=codebooks[0].dtype)
     x_squared_norms = None
-    for i_ic in range(n_ics):
+    total_elapsed_time  = 0
+    for i_ic in tqdm(range(n_ics)):
+        t_start_ic = time.time()
         for r in np.arange(n_codebooks):
             nu, _, _ = _asignment_step(
                 raw_ics[i_ic], codebooks[r], metric,
@@ -40,5 +44,15 @@ def bag_of_waves(raw_ics, codebooks, metric='cosine', n_jobs=1):
             # centroid index->feature index
             i_feature = nu + r * n_centroids
             X[i_ic, i_feature] = counts
+
+        t_end_ic = time.time()
+        t_elapsed_ic = t_end_ic-t_start_ic
+        total_elapsed_time += t_elapsed_ic
+        t_elapsed_ic_str = str(datetime.timedelta(seconds=t_elapsed_ic))
+        print(f'Time spent encoding IC-{i_ic}: {t_elapsed_ic_str} [hh:mm:ss]')
+    print(
+        f'Total time spent encoding the ICs with Bag-of-Waves: {i_ic}:'
+        f'{str(datetime.timedelta(seconds=total_elapsed_time))} [hh:mm:ss]'
+        )
 
     return X
