@@ -19,7 +19,7 @@ def load_raw_train_set(args, rng):
     minutes_per_window = (args.window_len/args.srate/60)
     n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
 
-    # XXX: Note float32. ICs were saved in matlab as single.
+    # NOTE: float32. ICs were saved in matlab as single.
     X = np.zeros((n_ics, n_win_per_ic, args.window_len), dtype=np.float32)
     y = -1 * np.ones(n_ics, dtype=int)
 
