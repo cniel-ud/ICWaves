@@ -45,7 +45,7 @@ for ii = 1:length(file_list)
     for jj =1:length(expert_label_fields)
         n_labels = length(EEG.(expert_label_fields{jj}));
         expert_labels_count(ii, jj) = n_labels;
-    end   
+    end
 end
 
 var_names = arrayfun(@(x) num2str(x), prob_thr,'UniformOutput', false);

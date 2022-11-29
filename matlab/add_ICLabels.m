@@ -8,7 +8,7 @@ end
 data_dir = '../data/ds003004';
 file_list = dir(fullfile(data_dir, 'sub-*/eeg/*.set'));
 
-for i = 1:length(file_list)    
+for i = 1:length(file_list)
     EEG = pop_loadset(file_list(i).name, file_list(i).folder);
     if isfield(EEG.etc, 'ic_classification')
         fprintf('Found %d labeled ICs in %s\n', ...
