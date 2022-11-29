@@ -1,3 +1,4 @@
+import copy
 import time
 from collections import defaultdict
 from functools import partial
@@ -94,7 +95,7 @@ def grid_search_cv(
     )
     best_index = results["rank_test_scores"].argmin()
     best_score = results[f"mean_test_scores"][best_index]
-    best_params = results["params"][best_index]
+    best_params = copy.deepcopy(results["params"][best_index])
     best_expert_weight = best_params.pop('expert_weight', 1)
     best_estimator = clone(
         clone(estimator).set_params(**best_params)
