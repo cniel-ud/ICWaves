@@ -106,4 +106,10 @@ def grid_search_cv(
     refit_end_time = time.time()
     refit_time = refit_end_time - refit_start_time
 
-    return results, best_estimator, best_score, refit_time
+    results.update({
+        'best_estimator': best_estimator,
+        'best_score': best_score,
+        'refit_time': refit_time
+    })
+
+    return results
