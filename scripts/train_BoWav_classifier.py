@@ -1,8 +1,7 @@
 # %%
-import os
+import pickle
 from argparse import ArgumentParser
 from pathlib import Path
-import pickle
 
 import numpy as np
 from numpy.random import default_rng
@@ -32,6 +31,10 @@ parser.add_argument('--n-jobs', type=int,
                     default=1, help='Value for n_jobs (sklearn)')
 parser.add_argument('--minutes-per-ic', type=float,
                     default=15, help='Number of minutes per IC to extract BagOfWaves features')
+parser.add_argument('--regularization-factor', type=float, nargs='+',
+                    default=[0.1, 1, 10], help='Regularization factor used by the classifier. In LogisticRegression, it is the value of C.')
+parser.add_argument('--expert-weight', type=float, nargs='+',
+                    default=[1, 2, 4], help='Sample weight given to ICs with expert labels.')
 
 
 if __name__ == '__main__':
@@ -80,8 +83,8 @@ if __name__ == '__main__':
     pipe.set_params(**clf_params)
 
     candidate_params = dict(
-        clf__C=[1e-2, 1e-1, 1, 1e1, 1e2],
-        expert_weight=[1, 2, 4, 8]
+        clf__C=args.regularization_factor,
+        expert_weight=args.expert_weight
     )
     results = grid_search_cv(
         pipe,
