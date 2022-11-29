@@ -4,7 +4,7 @@ from functools import partial
 from itertools import product
 
 import numpy as np
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_backend
 from numpy.ma import MaskedArray
 from sklearn.base import clone
 from sklearn.metrics import balanced_accuracy_score
@@ -27,32 +27,33 @@ def grid_search_cv(
     ):
 
     n_splits = cv.get_n_splits(X, y, groups=groups)
-    parallel = Parallel(n_jobs=n_jobs)
 
-    with parallel:
+    with parallel_backend("loky", inner_max_num_threads=1):
+        parallel = Parallel(n_jobs=n_jobs)
+        with parallel:
 
-        candidate_params = list(ParameterGrid(candidate_params))
-        n_candidates = len(candidate_params)
-        all_out = []
+            candidate_params = list(ParameterGrid(candidate_params))
+            n_candidates = len(candidate_params)
+            all_out = []
 
-        out = parallel(
-            delayed(_fit_and_score)(
-                clone(estimator),
-                X,
-                y,
-                expert_label_mask,
-                train=train,
-                test=test,
-                parameters=parameters,
-                scorer=balanced_accuracy_score,
-                split_progress=(split_idx, n_splits),
-                candidate_progress=(cand_idx, n_candidates)
+            out = parallel(
+                delayed(_fit_and_score)(
+                    clone(estimator),
+                    X,
+                    y,
+                    expert_label_mask,
+                    train=train,
+                    test=test,
+                    parameters=parameters,
+                    scorer=balanced_accuracy_score,
+                    split_progress=(split_idx, n_splits),
+                    candidate_progress=(cand_idx, n_candidates)
+                )
+                for (cand_idx, parameters), (split_idx, (train, test)) in product(
+                    enumerate(candidate_params), enumerate(cv.split(X, y, groups))
+                )
             )
-            for (cand_idx, parameters), (split_idx, (train, test)) in product(
-                enumerate(candidate_params), enumerate(cv.split(X, y, groups))
-            )
-        )
-        all_out.extend(out)
+            all_out.extend(out)
 
     all_out = _aggregate_score_dicts(all_out)
     fit_time_dict = _store('fit_time', all_out['fit_time'], n_splits, n_candidates)
