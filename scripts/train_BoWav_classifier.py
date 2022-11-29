@@ -100,6 +100,6 @@ if __name__ == '__main__':
         f'clf-lr_penalty-l1_solver-saga_C-{C_str}'
         f'_expert_weight-{ew_str}.pickle'
     )
-    fpath = Path(args.root, fname)
+    fpath = Path(args.root, 'results/classifier', fname)
     with fpath.open('wb') as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
