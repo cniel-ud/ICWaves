@@ -2,11 +2,18 @@ import re
 from pathlib import Path
 import numpy as np
 from scipy.io import loadmat
+from tqdm import tqdm
 
-def load_raw_train_set(args, rng):
+EXPERT_ANNOTATED_CLASSES = [1, 2, 3]  # brain, muscle, eye (Matlab indexing)
 
+CLASS_LABELS = ['Brain', 'Muscle', 'Eye', 'Heart',
+                'Line Noise', 'Channel Noise', 'Other']
+
+def load_raw_set(args, rng, train=True):
+
+    file_prefix = 'train' if train else 'test'
     data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
-    file_list = list(data_dir.glob(f'train_subj-*.mat'))
+    file_list = list(data_dir.glob(f'{file_prefix}_subj-*.mat'))
 
     n_ics_per_subj = []
     for file in file_list:
@@ -26,14 +33,16 @@ def load_raw_train_set(args, rng):
     cum_ic_ind = 0
     expert_label_mask = np.full(n_ics, False)
     subj_ind_ar = np.zeros(n_ics, dtype=int)
-    p = re.compile(r'.+train_subj-(?P<subjID>\d{2}).mat')
-    for file in file_list:
+    noisy_labels_ar = []
+    p = re.compile(f'.+{file_prefix}_subj-(?P<subjID>\d{{2}}).mat')
+    for file in tqdm(file_list):
         with file.open('rb') as f:
             matdict = loadmat(f)
             expert_labels = matdict['expert_labels']
             icaact = matdict['icaact']
             noisy_labels = matdict['noisy_labels']
 
+        noisy_labels_ar.append(noisy_labels)
         m = p.search(str(file))
         subjID = int(m.group('subjID'))
 
@@ -55,7 +64,55 @@ def load_raw_train_set(args, rng):
                 y[cum_ic_ind] = noisy_label
             cum_ic_ind += 1
 
-    return X, y, expert_label_mask, subj_ind_ar
+    noisy_labels_ar = np.vstack(noisy_labels_ar)
+
+    return X, y, expert_label_mask, subj_ind_ar, noisy_labels_ar
+
+
+def load_raw_train_set_per_class(args):
+
+    data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
+    file_list = data_dir.glob(f'train_subj-*.mat')
+
+    icaact_list = []
+    for file in file_list:
+        with file.open('rb') as f:
+            matdict = loadmat(f)
+            icaact = matdict['icaact']
+            noisy_labels = matdict['noisy_labels']
+            expert_labels = matdict['expert_labels']
+
+        if args.class_label in EXPERT_ANNOTATED_CLASSES:
+            ic_ind = (expert_labels == args.class_label).nonzero()[0]
+        else:
+            winner_class = np.argmax(noisy_labels, axis=1)
+            winner_class = winner_class + 1  # python to matlab indexing base
+            ic_ind = (winner_class == args.class_label).nonzero()[0]
+
+        icaact_list.append(icaact[ic_ind])
+
+    # ICs from different subjects have different lenths, so we don't
+    # concatenate into a single array
+    ic_shape = np.array(list(map(lambda x: x.shape, icaact_list)))
+    n_ics_per_subj = ic_shape[:, 0]
+    ic_lenght = ic_shape[:, 1]
+    n_ics = np.sum(n_ics_per_subj)
+    n_win_per_ic = ic_lenght // args.window_len
+    tot_win = n_win_per_ic.sum()
+    tot_hrs = tot_win * args.window_len / args.srate / 3600
+    print(f"Training ICs for '{CLASS_LABELS[args.class_label]}': {n_ics}")
+    print(f"Number of training hours: {tot_hrs:.2f}")
+
+    X = np.zeros((tot_win, args.window_len), dtype=icaact_list[0].dtype)
+    win_start = 0
+    for i_subj, ics in enumerate(icaact_list):
+        for ic in ics:
+            time_idx = np.arange(0, ic.size-args.window_len+1, args.window_len)
+            time_idx = time_idx[:, None] + np.arange(args.window_len)[None, :]
+            X[win_start:win_start+n_win_per_ic[i_subj]] = ic[time_idx]
+            win_start += n_win_per_ic[i_subj]
+
+    return X
 
 
 def load_codebooks(args):
