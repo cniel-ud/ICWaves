@@ -10,7 +10,8 @@ from icwaves.data_loaders import load_raw_train_set_per_class
 from icwaves.sikmeans.shift_kmeans import shift_invariant_k_means
 
 parser = ArgumentParser()
-parser.add_argument("--root", help="Path to root folder", default=os.getcwd())
+parser.add_argument(
+    "--root", help="Path to root folder of the project", required=True)
 parser.add_argument("--class-label", type=int, default=1,
                     choices=[1, 2, 3, 4, 5, 6, 7], help="ICLabel index")
 parser.add_argument('--srate', type=float,
