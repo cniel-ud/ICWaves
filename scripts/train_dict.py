@@ -30,6 +30,9 @@ parser.add_argument('--n-jobs', type=int,
                     default=1, help='Value for n_jobs (sklearn)')
 parser.add_argument('--minutes-per-ic', type=float,
                     default=None, help='Number of minutes per IC to train the class-specific codebook')
+parser.add_argument('--ics-per-subject', type=int,
+                    default=2, help='Maximum number of ICs for training per subject')
+
 
 
 EXPERT_ANNOTATED_CLASSES = [1, 2, 3] # brain, muscle, eye

@@ -72,15 +72,16 @@ def load_raw_set(args, rng, train=True):
 def load_raw_train_set_per_class(args, rng):
 
     data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
-    file_list = data_dir.glob(f'train_subj-*.mat')
+    file_list = list(data_dir.glob(f'train_subj-*.mat'))
 
-    icaact_list = []
-    for file in file_list:
+    ic_ind_per_subj = []
+    subj_with_no_ic = []
+    for i_subj, file in enumerate(file_list):
         with file.open('rb') as f:
-            matdict = loadmat(f)
-            icaact = matdict['icaact']
-            noisy_labels = matdict['noisy_labels']
+            matdict = loadmat(f, variable_names=[
+                              'expert_labels', 'noisy_labels'])
             expert_labels = matdict['expert_labels']
+            noisy_labels = matdict['noisy_labels']
 
         if args.class_label in EXPERT_ANNOTATED_CLASSES:
             ic_ind = (expert_labels == args.class_label).nonzero()[0]
@@ -89,18 +90,39 @@ def load_raw_train_set_per_class(args, rng):
             winner_class = winner_class + 1  # python to matlab indexing base
             ic_ind = (winner_class == args.class_label).nonzero()[0]
 
-        icaact_list.append(icaact[ic_ind])
+        if ic_ind.size > 0: # subject has IC class
+            ic_ind_per_subj.append(ic_ind)
+        else:
+            subj_with_no_ic.append(i_subj)
+
+    file_list = [file for i, file in \
+        enumerate(file_list) if i not in subj_with_no_ic]
+
+    n_subj = len(ic_ind_per_subj)
+    n_ics_per_subj = np.array(list(map(lambda x: x.size, ic_ind_per_subj)))
+    subj_with_ic_excess = (n_ics_per_subj > args.ics_per_subject).nonzero()[0]
+    n_ics_per_subj[subj_with_ic_excess] = args.ics_per_subject
+    n_ics = np.sum(n_ics_per_subj)
+
+    for i_subj in subj_with_ic_excess:
+        ic_ind_per_subj[i_subj] = rng.choice(
+            ic_ind_per_subj[i_subj], size=args.ics_per_subject, replace=False)
+
+    icaact_list = [None] * n_subj
+    for i_subj, file in enumerate(file_list):
+        with file.open('rb') as f:
+            matdict = loadmat(f, variable_names='icaact')
+            icaact = matdict['icaact']
+
+        icaact_list[i_subj] = icaact[ic_ind_per_subj[i_subj]]
 
     # ICs from different subjects have different lenths, so we don't
     # concatenate into a single array
-    ic_shape = np.array(list(map(lambda x: x.shape, icaact_list)))
-    n_ics_per_subj = ic_shape[:, 0]
-    ic_lenght_per_subj = ic_shape[:, 1]
+    ic_lenght_per_subj = np.array(list(map(lambda x: x.shape[1], icaact_list)))
     max_n_win_per_subj = ic_lenght_per_subj // args.window_len
     max_minutes_per_ic_per_subj = (max_n_win_per_subj *
                                    args.window_len) / args.srate / 60
     min_max_minutes_per_ic = np.min(max_minutes_per_ic_per_subj)
-    n_ics = np.sum(n_ics_per_subj)
 
     take_all = True
     if (
