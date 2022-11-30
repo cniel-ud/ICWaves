@@ -40,7 +40,7 @@ parser.add_argument('--l1-ratio', type=float, nargs='+',
 parser.add_argument('--max-iter', type=int,
                     default=1000, help='Maximum number of iterations')
 parser.add_argument('--penalty', default='elasticnet',
-                    options=['l1', 'l2', 'elasticnet', 'none'])
+                    choices=['l1', 'l2', 'elasticnet', 'none'])
 
 
 if __name__ == '__main__':
