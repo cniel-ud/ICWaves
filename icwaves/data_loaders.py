@@ -98,9 +98,9 @@ def load_raw_train_set_per_class(args):
     ic_lenght = ic_shape[:, 1]
     n_ics = np.sum(n_ics_per_subj)
     n_win_per_ic = ic_lenght // args.window_len
-    tot_win = n_win_per_ic.sum()
+    tot_win = (n_win_per_ic * n_ics_per_subj).sum()
     tot_hrs = tot_win * args.window_len / args.srate / 3600
-    print(f"Training ICs for '{CLASS_LABELS[args.class_label]}': {n_ics}")
+    print(f"Training ICs for '{CLASS_LABELS[args.class_label-1]}': {n_ics}")
     print(f"Number of training hours: {tot_hrs:.2f}")
 
     X = np.zeros((tot_win, args.window_len), dtype=icaact_list[0].dtype)
