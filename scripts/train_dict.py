@@ -13,6 +13,8 @@ parser = ArgumentParser()
 parser.add_argument("--root", help="Path to root folder", default=os.getcwd())
 parser.add_argument("--class-label", type=int, default=1,
                     choices=[1, 2, 3, 4, 5, 6, 7], help="ICLabel index")
+parser.add_argument('--srate', type=float,
+                    default=256, help='Sampling rate')
 # Same as srate (1 second window):
 parser.add_argument("--centroid-len", type=int, default=256,
                     help="Centroid length")
@@ -25,8 +27,6 @@ parser.add_argument('--n-runs', type=int,
                     default=3, help='Number of runs')
 parser.add_argument('--n-jobs', type=int,
                     default=1, help='Value for n_jobs (sklearn)')
-parser.add_argument('--train-ic-hours', type=float,
-                    default=7, help='Number of total training hours')
 
 
 EXPERT_ANNOTATED_CLASSES = [1, 2, 3] # brain, muscle, eye
