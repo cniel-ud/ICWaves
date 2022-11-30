@@ -28,6 +28,8 @@ parser.add_argument('--n-runs', type=int,
                     default=3, help='Number of runs')
 parser.add_argument('--n-jobs', type=int,
                     default=1, help='Value for n_jobs (sklearn)')
+parser.add_argument('--minutes-per-ic', type=float,
+                    default=None, help='Number of minutes per IC to train the class-specific codebook')
 
 
 EXPERT_ANNOTATED_CLASSES = [1, 2, 3] # brain, muscle, eye
@@ -39,7 +41,7 @@ if __name__ == '__main__':
     srate, win_len = 256, args.window_len
     rng = default_rng(13)
 
-    X = load_raw_train_set_per_class(args)
+    X = load_raw_train_set_per_class(args, rng)
 
     metric, init = 'cosine', 'random'
     t_start = perf_counter()

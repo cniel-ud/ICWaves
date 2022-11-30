@@ -69,7 +69,7 @@ def load_raw_set(args, rng, train=True):
     return X, y, expert_label_mask, subj_ind_ar, noisy_labels_ar
 
 
-def load_raw_train_set_per_class(args):
+def load_raw_train_set_per_class(args, rng):
 
     data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
     file_list = data_dir.glob(f'train_subj-*.mat')
@@ -95,22 +95,41 @@ def load_raw_train_set_per_class(args):
     # concatenate into a single array
     ic_shape = np.array(list(map(lambda x: x.shape, icaact_list)))
     n_ics_per_subj = ic_shape[:, 0]
-    ic_lenght = ic_shape[:, 1]
+    ic_lenght_per_subj = ic_shape[:, 1]
+    max_n_win_per_subj = ic_lenght_per_subj // args.window_len
+    max_minutes_per_ic_per_subj = (max_n_win_per_subj *
+                                   args.window_len) / args.srate / 60
+    min_max_minutes_per_ic = np.min(max_minutes_per_ic_per_subj)
     n_ics = np.sum(n_ics_per_subj)
-    n_win_per_ic = ic_lenght // args.window_len
+
+    take_all = True
+    if (
+        args.minutes_per_ic is not None and
+        args.minutes_per_ic < min_max_minutes_per_ic
+    ):
+        minutes_per_window = (args.window_len/args.srate/60)
+        n_win_per_ic = np.ceil(args.minutes_per_ic /
+                            minutes_per_window).astype(int)
+        take_all = False
+    else:
+        n_win_per_ic = ic_lenght_per_subj // args.window_len
+
     tot_win = (n_win_per_ic * n_ics_per_subj).sum()
     tot_hrs = tot_win * args.window_len / args.srate / 3600
+
     print(f"Training ICs for '{CLASS_LABELS[args.class_label-1]}': {n_ics}")
     print(f"Number of training hours: {tot_hrs:.2f}")
 
     X = np.zeros((tot_win, args.window_len), dtype=icaact_list[0].dtype)
     win_start = 0
     for i_subj, ics in enumerate(icaact_list):
+        n_win = n_win_per_ic[i_subj] if take_all else n_win_per_ic
         for ic in ics:
             time_idx = np.arange(0, ic.size-args.window_len+1, args.window_len)
+            time_idx = rng.choice(time_idx, size=n_win, replace=False)
             time_idx = time_idx[:, None] + np.arange(args.window_len)[None, :]
-            X[win_start:win_start+n_win_per_ic[i_subj]] = ic[time_idx]
-            win_start += n_win_per_ic[i_subj]
+            X[win_start:win_start+n_win] = ic[time_idx]
+            win_start += n_win
 
     return X
 
