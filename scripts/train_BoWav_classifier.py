@@ -9,7 +9,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
-from icwaves.data_loaders import load_codebooks, load_raw_train_set
+from icwaves.data_loaders import load_codebooks, load_raw_set
 from icwaves.feature_extractors.bowav import bag_of_waves
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
@@ -58,8 +58,8 @@ if __name__ == '__main__':
             expert_label_mask = data['expert_label_mask']
             subj_ind = data['subj_ind']
     else:
-        raw_ics, y, expert_label_mask, subj_ind = \
-            load_raw_train_set(args, new_rng)
+        raw_ics, y, expert_label_mask, subj_ind, _ = \
+            load_raw_set(args, new_rng)
         codebooks = load_codebooks(args)
         X = bag_of_waves(raw_ics, codebooks)
         with data_file.open('wb') as f:
