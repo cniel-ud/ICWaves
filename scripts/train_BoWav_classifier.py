@@ -35,6 +35,12 @@ parser.add_argument('--regularization-factor', type=float, nargs='+',
                     default=[0.1, 1, 10], help='Regularization factor used by the classifier. In LogisticRegression, it is the value of C.')
 parser.add_argument('--expert-weight', type=float, nargs='+',
                     default=[1, 2, 4], help='Sample weight given to ICs with expert labels.')
+parser.add_argument('--l1-ratio', type=float, nargs='+',
+                    default=[0, 0.2, 0.4, 0.6, 0.8, 1])
+parser.add_argument('--max-iter', type=int,
+                    default=1000, help='Maximum number of iterations')
+parser.add_argument('--penalty', default='elasticnet',
+                    options=['l1', 'l2', 'elasticnet', 'none'])
 
 
 if __name__ == '__main__':
@@ -75,15 +81,17 @@ if __name__ == '__main__':
     clf_params = dict(
         clf__class_weight='balanced',
         clf__solver='saga',
-        clf__penalty='l1',
+        clf__penalty=args.penalty,
         clf__random_state=old_rng,
         clf__multi_class='multinomial',
         clf__warm_start=True,
+        clf__max_iter=args.max_iter,
     )
     pipe.set_params(**clf_params)
 
     candidate_params = dict(
         clf__C=args.regularization_factor,
+        clf__l1_ratio=args.l1_ratio,
         expert_weight=args.expert_weight
     )
     results = grid_search_cv(
@@ -98,9 +106,11 @@ if __name__ == '__main__':
     )
 
     C_str = '_'.join([str(i) for i in candidate_params['clf__C']])
+    l1_ratio_str = '_'.join([str(i) for i in candidate_params['clf__l1_ratio']])
     ew_str = '_'.join([str(i) for i in candidate_params['expert_weight']])
     fname = (
-        f'clf-lr_penalty-l1_solver-saga_C-{C_str}'
+        f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
+        f'_l1_ratio-{l1_ratio_str}'
         f'_expert_weight-{ew_str}.pickle'
     )
     fpath = Path(args.root, 'results/classifier', fname)
