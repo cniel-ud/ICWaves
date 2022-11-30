@@ -1,6 +1,7 @@
 """Shift-invariant k-means"""
 
 import sys
+import time
 import warnings
 
 import numpy as np
@@ -393,6 +394,7 @@ def si_kmeans_single(X, n_clusters, centroid_length, metric='euclidean',\
         print('Initialization completed.')
 
     for iteration in range(max_iter):
+        t_start = time.time()
         centroids_old = centroids.copy()
         labels, shifts, distances = _asignment_step(
             X, centroids, metric, x_squared_norms, n_jobs=n_jobs)
@@ -400,9 +402,11 @@ def si_kmeans_single(X, n_clusters, centroid_length, metric='euclidean',\
             X, centroid_length, n_clusters, labels, shifts)
 
         inertia = distances.sum()
+        t_elapsed = time.time() - t_start
 
         if verbose:
-            print("Iteration %2d, inertia %.3f" % (iteration, inertia))
+            print("Iteration %2d, inertia %.3f, %.2f seconds" %
+                  (iteration, inertia, t_elapsed))
 
         if best_inertia is None or inertia < best_inertia:
             best_labels = labels.copy()
