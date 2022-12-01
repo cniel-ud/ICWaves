@@ -80,7 +80,7 @@ if __name__ == '__main__':
     else:
         raw_ics, y, expert_label_mask, subj_ind, _ = \
             load_raw_set(args, new_rng)
-        codebook_args = {TO_CODEBOOK_KEYS[k]: args[k]
+        codebook_args = {TO_CODEBOOK_KEYS[k]: getattr(args, k)
                         for k in TO_CODEBOOK_KEYS.keys()}
         codebooks = load_codebooks(codebook_args)
         X = bag_of_waves(raw_ics, codebooks)
