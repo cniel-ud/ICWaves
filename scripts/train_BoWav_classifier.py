@@ -60,9 +60,9 @@ if __name__ == '__main__':
     # Load/generate data
     fname = (
         f'data_k-{args.num_clusters}_P-{args.centroid_len}'
-        f'winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
-        f'cbookMinPerIc-{args.codebook_minutes_per_ic}'
-        f'cbookIcsPerSubj-{args.codebook_ics_per_subject}.npz'
+        f'_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
+        f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
+        f'_cbookIcsPerSubj-{args.codebook_ics_per_subject}.npz'
     )
     data_file = Path(args.root, 'data/ds003004/BoWav', fname)
     if data_file.is_file():
