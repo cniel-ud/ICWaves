@@ -14,6 +14,13 @@ from icwaves.feature_extractors.bowav import bag_of_waves
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 
+TO_CODEBOOK_KEYS = {
+    'centroid_len': 'centroid_len',
+    'num_clusters': 'num_clusters',
+    'codebook_minutes_per_ic': 'minutes_per_ic',
+    'codebook_ics_per_subject': 'ics_per_subject'
+}
+
 parser = ArgumentParser()
 parser.add_argument(
     "--root", help="Path to root folder of the project", required=True)
@@ -41,6 +48,11 @@ parser.add_argument('--max-iter', type=int,
                     default=1000, help='Maximum number of iterations')
 parser.add_argument('--penalty', default='elasticnet',
                     choices=['l1', 'l2', 'elasticnet', 'none'])
+parser.add_argument('--codebook-minutes-per-ic', type=float,
+                    default=None, help='Number of minutes per IC to train the class-specific codebook')
+parser.add_argument('--codebook-ics-per-subject', type=int,
+                    default=2, help='Maximum number of ICs per subject to train the class-specific codebook')
+
 
 
 if __name__ == '__main__':
@@ -54,7 +66,9 @@ if __name__ == '__main__':
     # Load/generate data
     fname = (
         f'data_k-{args.num_clusters}_P-{args.centroid_len}'
-        f'winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}.npz'
+        f'winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
+        f'cbookMinPerIc-{args.codebook_minutes_per_ic}'
+        f'cbookIcsPerSubj-{args.codebook_ics_per_subject}.npz'
     )
     data_file = Path(args.root, 'data/ds003004/BoWav', fname)
     if data_file.is_file():
@@ -66,7 +80,9 @@ if __name__ == '__main__':
     else:
         raw_ics, y, expert_label_mask, subj_ind, _ = \
             load_raw_set(args, new_rng)
-        codebooks = load_codebooks(args)
+        codebook_args = {TO_CODEBOOK_KEYS[k]: args[k]
+                        for k in TO_CODEBOOK_KEYS.keys()}
+        codebooks = load_codebooks(codebook_args)
         X = bag_of_waves(raw_ics, codebooks)
         with data_file.open('wb') as f:
             np.savez(

@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+
 import numpy as np
 from scipy.io import loadmat
 from tqdm import tqdm
@@ -157,7 +158,11 @@ def load_raw_train_set_per_class(args, rng):
 
 
 def load_codebooks(args):
-    pat = f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}*.npz'
+    pat = (
+        f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
+        f'_class-*_minutesPerIC-{args.minutes_per_ic}'
+        f'_icsPerSubj-{args.ics_per_subject}.npz'
+    )
     dict_dir = Path(args.root, 'results/dictionaries')
     file_list = list(dict_dir.glob(pat))
 

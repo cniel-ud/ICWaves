@@ -1,4 +1,3 @@
-import os
 from argparse import ArgumentParser
 from pathlib import Path
 from time import perf_counter
@@ -56,7 +55,8 @@ if __name__ == '__main__':
     dict_dir = Path(args.root, 'results/dictionaries')
     out_file = dict_dir.joinpath(
         f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
-        f'_class-{args.class_label}.npz'
+        f'_class-{args.class_label}_minutesPerIC-{args.minutes_per_ic}'
+        f'_icsPerSubj-{args.ics_per_subject}.npz'
     )
     with out_file.open('wb') as f:
         np.savez(out_file, centroids=centroids, labels=labels,
