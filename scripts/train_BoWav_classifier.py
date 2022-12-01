@@ -1,4 +1,5 @@
 # %%
+import copy
 import pickle
 from argparse import ArgumentParser
 from pathlib import Path
@@ -13,13 +14,6 @@ from icwaves.data_loaders import load_codebooks, load_raw_set
 from icwaves.feature_extractors.bowav import bag_of_waves
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
-
-TO_CODEBOOK_KEYS = {
-    'centroid_len': 'centroid_len',
-    'num_clusters': 'num_clusters',
-    'codebook_minutes_per_ic': 'minutes_per_ic',
-    'codebook_ics_per_subject': 'ics_per_subject'
-}
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -80,8 +74,9 @@ if __name__ == '__main__':
     else:
         raw_ics, y, expert_label_mask, subj_ind, _ = \
             load_raw_set(args, new_rng)
-        codebook_args = {TO_CODEBOOK_KEYS[k]: getattr(args, k)
-                        for k in TO_CODEBOOK_KEYS.keys()}
+        codebook_args = copy.deepcopy(args)
+        codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
+        codebook_args.ics_per_subject = args.codebook_ics_per_subject
         codebooks = load_codebooks(codebook_args)
         X = bag_of_waves(raw_ics, codebooks)
         with data_file.open('wb') as f:
