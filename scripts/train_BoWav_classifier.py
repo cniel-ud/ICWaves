@@ -62,7 +62,7 @@ if __name__ == '__main__':
         f'data_k-{args.num_clusters}_P-{args.centroid_len}'
         f'_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
         f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
-        f'_cbookIcsPerSubj-{args.codebook_ics_per_subject}.npz'
+        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.npz'
     )
     data_file = Path(args.root, 'data/ds003004/BoWav', fname)
     if data_file.is_file():
@@ -122,7 +122,9 @@ if __name__ == '__main__':
     fname = (
         f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
         f'_l1_ratio-{l1_ratio_str}'
-        f'_expert_weight-{ew_str}.pickle'
+        f'_expert_weight-{ew_str}'
+        f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
+        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.pickle'
     )
     fpath = Path(args.root, 'results/classifier', fname)
     with fpath.open('wb') as f:
