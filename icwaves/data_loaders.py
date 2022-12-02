@@ -158,19 +158,21 @@ def load_raw_train_set_per_class(args, rng):
 
 
 def load_codebooks(args):
-    pat = (
-        f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
-        f'_class-*_minutesPerIC-{args.minutes_per_ic}'
-        f'_icsPerSubj-{args.ics_per_subject}.npz'
-    )
-    dict_dir = Path(args.root, 'results/dictionaries')
-    file_list = list(dict_dir.glob(pat))
 
-    n_codebooks = len(file_list)
+    dict_dir = Path(args.root, 'results/dictionaries')
+
+    n_codebooks = 7
     codebooks = np.zeros((n_codebooks, args.num_clusters,
                         args.centroid_len), dtype=np.float32)
-    for i_codebook, file in enumerate(file_list):
-        with np.load(file) as data:
-            codebooks[i_codebook] = data['centroids']
+
+    for i_class in range(n_codebooks):
+        fname = (
+            f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
+            f'_class-{i_class+1}_minutesPerIC-{args.minutes_per_ic}'
+            f'_icsPerSubj-{args.ics_per_subject}.npz'
+        )
+        fpath = dict_dir.joinpath(fname)
+        with np.load(fpath) as data:
+            codebooks[i_class] = data['centroids']
 
     return codebooks
