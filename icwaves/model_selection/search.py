@@ -30,7 +30,7 @@ def grid_search_cv(
     n_splits = cv.get_n_splits(X, y, groups=groups)
 
     with parallel_backend("loky", inner_max_num_threads=1):
-        parallel = Parallel(n_jobs=n_jobs)
+        parallel = Parallel(n_jobs=n_jobs, verbose=42)
         with parallel:
 
             candidate_params = list(ParameterGrid(candidate_params))
