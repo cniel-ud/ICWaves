@@ -104,7 +104,13 @@ def grid_search_cv(
     refit_start_time = time.time()
     sample_weight = np.ones(X.shape[0])
     sample_weight[expert_label_mask] = best_expert_weight
-    best_estimator.fit(X, y, clf__sample_weight=sample_weight)
+
+    named_steps = getattr(estimator, 'named_steps', None)
+    if named_steps is not None:
+        best_estimator.fit(X, y, clf__sample_weight=sample_weight)
+    else:
+        best_estimator.fit(X, y, sample_weight=sample_weight)
+
     refit_end_time = time.time()
     refit_time = refit_end_time - refit_start_time
 
