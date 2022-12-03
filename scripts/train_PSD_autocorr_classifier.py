@@ -93,9 +93,9 @@ if __name__ == '__main__':
         args.n_jobs
     )
 
-    C_str = '_'.join([str(i) for i in candidate_params['clf__C']])
+    C_str = '_'.join([str(i) for i in candidate_params['C']])
     l1_ratio_str = '_'.join([str(i)
-                            for i in candidate_params['clf__l1_ratio']])
+                            for i in candidate_params['l1_ratio']])
     ew_str = '_'.join([str(i) for i in candidate_params['expert_weight']])
     fname = (
         f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
