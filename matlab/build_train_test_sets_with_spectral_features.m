@@ -85,6 +85,8 @@ for ii = 1:length(file_list)
         subj_ind_ar_train = [subj_ind_ar_train; subj_tmp];
     end
 end
+expert_label_mask_train = logical(expert_label_mask_train);
+expert_label_mask_test = logical(expert_label_mask_test);
 fpath = fullfile(out_dir, 'train_data.mat');
 save(fpath, 'X_train', 'y_train', 'expert_label_mask_train', 'subj_ind_ar_train', 'noisy_labels_train', '-v7');
 fpath = fullfile(out_dir, 'test_data.mat');

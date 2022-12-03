@@ -52,10 +52,14 @@ if __name__ == '__main__':
 
     # We expect a 1D array. Matlab always add a singleton dimension that we need to
     # remove here.
-    expert_label_mask = expert_label_mask.squeeze()
     y = y.squeeze()
     expert_label_mask = expert_label_mask.squeeze()
     subj_ind = subj_ind.squeeze()
+
+    # Make sure expert_label_mask is boolean. Matlab R2020b converts to double
+    # when concatenating booleans! Might be removed once we generate the data
+    # from Matlab again with the right type.
+    expert_label_mask = expert_label_mask.astype(bool)
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
 
