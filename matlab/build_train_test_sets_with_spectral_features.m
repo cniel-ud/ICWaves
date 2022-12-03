@@ -86,6 +86,6 @@ for ii = 1:length(file_list)
     end
 end
 fpath = fullfile(out_dir, 'train_data.mat');
-save(fpath, 'X_train', 'y_train', 'expert_label_mask_train', 'subj_ind_ar_train', 'noisy_labels_train');
+save(fpath, 'X_train', 'y_train', 'expert_label_mask_train', 'subj_ind_ar_train', 'noisy_labels_train', '-v7');
 fpath = fullfile(out_dir, 'test_data.mat');
-save(fpath, 'X_test', 'y_test', 'expert_label_mask_test', 'subj_ind_ar_test', 'noisy_labels_test');
+save(fpath, 'X_test', 'y_test', 'expert_label_mask_test', 'subj_ind_ar_test', 'noisy_labels_test', '-v7');
