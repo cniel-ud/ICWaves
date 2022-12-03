@@ -36,7 +36,13 @@ def _fit_and_score(
     start_time = time.time()
     X_train, y_train = X[train], y[train]
     sample_weight_train = sample_weight[train]
-    estimator.fit(X_train, y_train, clf__sample_weight=sample_weight_train)
+
+    named_steps = getattr(estimator, 'named_steps', None)
+    if named_steps is not None:
+        estimator.fit(X_train, y_train, clf__sample_weight=sample_weight_train)
+    else:
+        estimator.fit(X_train, y_train, sample_weight=sample_weight_train)
+
     fit_time = time.time() - start_time
 
     X_test, y_test = X[test], y[test]
