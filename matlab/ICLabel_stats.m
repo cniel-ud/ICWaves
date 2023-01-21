@@ -23,6 +23,7 @@ ic_count = zeros(length(file_list), 1);
 sampling_rates = zeros(length(file_list), 1);
 expert_labels_count = zeros(length(file_list), 4);
 winner_noisy_labes = cell(length(file_list),1);
+ICLabel_errors = cell(length(file_list), 3);
 
 for ii = 1:length(file_list)
     EEG = pop_loadset(...
@@ -40,7 +41,18 @@ for ii = 1:length(file_list)
     ic_count(ii) = EEG.nbchan;
     ic_length(ii) = EEG.pnts;
     noisy_labels = EEG.etc.ic_classification.ICLabel.classifications;
-    [~, winner_noisy_labes{ii}] = max(noisy_labels, [], 2);
+    [~, winner_tmp] = max(noisy_labels, [], 2);
+    winner_noisy_labes{ii} = winner_tmp;
+    labeled_as_brain = winner_tmp == 1;
+    labeled_as_muscle = winner_tmp == 2;
+    labeled_as_eye = winner_tmp == 3;
+    labeled_as_brain(EEG.gdcomps) = false; % ignore expert-annotated labels
+    labeled_as_muscle(EEG.muscle) = false;
+    labeled_as_eye(EEG.lateyes) = false;
+    labeled_as_eye(EEG.blink) = false;
+    ICLabel_errors{ii, 1} = sum(labeled_as_brain);
+    ICLabel_errors{ii, 2} = sum(labeled_as_muscle);
+    ICLabel_errors{ii, 3} = sum(labeled_as_eye);
     sampling_rates(ii) = EEG.srate;
     for jj =1:length(expert_label_fields)
         n_labels = length(EEG.(expert_label_fields{jj}));
