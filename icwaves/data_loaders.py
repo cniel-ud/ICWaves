@@ -110,7 +110,7 @@ def load_raw_train_set_per_class(args, rng):
             ic_ind_per_subj[i_subj], size=args.ics_per_subject, replace=False)
 
     icaact_list = [None] * n_subj
-    for i_subj, file in enumerate(file_list):
+    for i_subj, file in tqdm(enumerate(file_list)):
         with file.open('rb') as f:
             matdict = loadmat(f, variable_names='icaact')
             icaact = matdict['icaact']
@@ -145,7 +145,7 @@ def load_raw_train_set_per_class(args, rng):
 
     X = np.zeros((tot_win, args.window_len), dtype=icaact_list[0].dtype)
     win_start = 0
-    for i_subj, ics in enumerate(icaact_list):
+    for i_subj, ics in tqdm(enumerate(icaact_list)):
         n_win = n_win_per_ic[i_subj] if take_all else n_win_per_ic
         for ic in ics:
             time_idx = np.arange(0, ic.size-args.window_len+1, args.window_len)
