@@ -3,6 +3,7 @@ import copy
 import pickle
 import re
 from pathlib import Path
+import definitions
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,7 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.size": 12
 })
-img_dir = Path('/home/cmendoza/MEGA/Research/dissertation/LaTeX/img/')
+img_dir = Path(definitions.ROOT_DIR + '/img')
 #%%
 
 class Args:
@@ -51,7 +52,7 @@ fname = (
     f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
     f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.pickle'
 )
-clf_path = Path(args.root, 'results/classifier', fname)
+clf_path = Path(definitions.ROOT_DIR, 'results/classifier', fname)
 with clf_path.open('rb') as f:
     results = pickle.load(f)
 clf = results['best_estimator']['clf']

@@ -3,6 +3,7 @@ import copy
 import pickle
 import re
 from pathlib import Path
+import definitions
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,7 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.size": 12
 })
-img_dir = Path('/home/cmendoza/MEGA/Research/dissertation/LaTeX/img/')
+img_dir = Path(definitions.ROOT_DIR + '/img/')
 # %%
 C_str = '_'.join([str(i) for i in args.regularization_factor])
 ew_str = '_'.join([str(i) for i in args.expert_weight])
