@@ -14,13 +14,16 @@ from sklearn.metrics import (balanced_accuracy_score, classification_report,
 from icwaves.data_loaders import load_codebooks, load_raw_set
 from icwaves.feature_extractors.bowav import bag_of_waves
 from icwaves.viz import plot_confusion_matrix
+from scripts.utils import get_project_root
 
 #%%
 plt.rcParams.update({
     "text.usetex": True,
     "font.size": 12
 })
-img_dir = Path('/home/cmendoza/MEGA/Research/dissertation/LaTeX/img/')
+
+root_dir = get_project_root()
+img_dir = Path(root_dir + '/img/')
 #%%
 
 class Args:
