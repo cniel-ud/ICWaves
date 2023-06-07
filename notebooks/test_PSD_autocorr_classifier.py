@@ -12,6 +12,7 @@ from scipy.io import loadmat
 from sklearn.metrics import (ConfusionMatrixDisplay, balanced_accuracy_score,
                              classification_report, confusion_matrix)
 from icwaves.viz import plot_confusion_matrix
+from scripts.utils import get_project_root
 
 
 class Args:
@@ -29,7 +30,9 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.size": 12
 })
-img_dir = Path('/home/cmendoza/MEGA/Research/dissertation/LaTeX/img/')
+
+root_dir = get_project_root()
+img_dir = Path(root_dir + '/img/')
 # %%
 C_str = '_'.join([str(i) for i in args.regularization_factor])
 ew_str = '_'.join([str(i) for i in args.expert_weight])
