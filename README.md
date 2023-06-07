@@ -24,3 +24,7 @@ Additionally, you'll need to be added to the lab Github group. Let me know and I
 
 There are several directories you should make in your project, just don't add them to github. These will store
 the images data (img and data are their names, respectively). 
+
+Next you'll need to get the EEG data onto your computer. The dataset is ds003004 on _OpenNeuro_.
+Run the matlab files on the data. Then you'll have data that's been processed with IC labels and whatnot.
+From this point try the example Jupyter notebooks. 
