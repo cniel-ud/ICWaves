@@ -25,19 +25,12 @@ Additionally, you'll need to be added to the lab Github group. Let me know and I
 There are several directories you should make in your project, just don't add them to github. These will store
 the images data (img and data are their names, respectively). 
 
-Next you'll need to get the EEG data onto your computer. The dataset is ds003004 on _OpenNeuro_.
-This can be installed using datalad fairly easily. Here are some step by step instructions:
-- Open the terminal through Pycharm so that you're in the right git environment
-- Set the git configuration to include your name and email address as follows:
-- - git config user.name 'name'
-- - git config user.email 'email@yada'
-- Then use the command 'datalad install --get-data https://github.com/OpenNeuroDatasets/ds003004.git'
-- Be cautious as this will automatically start downloading all the data in the dataset, approximately 40G
-- To download individual files follow these steps:
-- - 'datalad install https://github.com/OpenNeuroDatasets/ds003004.git'
-- - 'datalad get /path/to/invalid/symlink'
-- Message Austin if you have other questions on this, I've set it up successfully.
-
+Next you'll need to get the EEG data onto your computer. Use the shell script in the data folder provided in this branch.
+It's called 'ds003004-1.1.1.sh'. Run this in the Pycharm terminal with 'bash ds003004-1.1.1.sh' when you're
+in the ICWaves/data directory.
+Note that this will download the entire dataset into your directory, which is about 40 GB. If you want individual
+files, you can use datalad through the command line or write a python script with the datalad api to do so.
+I'm intending to write the rest of the project code assuming that all data is there though.
 
 Run the matlab files on the data. Then you'll have data that's been processed with IC labels and whatnot.
 From this point try the example Jupyter notebooks. 
