@@ -26,5 +26,18 @@ There are several directories you should make in your project, just don't add th
 the images data (img and data are their names, respectively). 
 
 Next you'll need to get the EEG data onto your computer. The dataset is ds003004 on _OpenNeuro_.
+This can be installed using datalad fairly easily. Here are some step by step instructions:
+- Open the terminal through Pycharm so that you're in the right git environment
+- Set the git configuration to include your name and email address as follows:
+- - git config user.name 'name'
+- - git config user.email 'email@yada'
+- Then use the command 'datalad install --get-data https://github.com/OpenNeuroDatasets/ds003004.git'
+- Be cautious as this will automatically start downloading all the data in the dataset, approximately 40G
+- To download individual files follow these steps:
+- - 'datalad install https://github.com/OpenNeuroDatasets/ds003004.git'
+- - 'datalad get /path/to/invalid/symlink'
+- Message Austin if you have other questions on this, I've set it up successfully.
+
+
 Run the matlab files on the data. Then you'll have data that's been processed with IC labels and whatnot.
 From this point try the example Jupyter notebooks. 
