@@ -5,3 +5,6 @@ __pycache__/
 *.asv
 .vscode/
 *.egg-info/
+.direnv/
+.envrc
+.tool-versions
