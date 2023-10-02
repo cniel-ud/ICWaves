@@ -1,11 +1,13 @@
 from typing import Tuple
+
 import numpy as np
 from numpy.typing import NDArray
 
-def psd(
+
+def eeg_psd(
     signal: NDArray[np.float64],
     sfreq: float,
-) -> NDArray[np.float64]:
+) -> NDArray[np.float32]:
     """PSD feature.
 
     `signal.shape = (n_chan, n_points)`, with `n_chan` and
