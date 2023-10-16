@@ -132,7 +132,8 @@ if __name__ == '__main__':
         f'_l1_ratio-{l1_ratio_str}'
         f'_expert_weight-{ew_str}'
         f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
-        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.pickle'
+        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}'
+        f'_bowavNorm-{args.bowav_norm}.pickle'
     )
     fpath = Path(args.root, 'results/classifier', fname)
     with fpath.open('wb') as f:
