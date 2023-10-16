@@ -72,7 +72,7 @@ if __name__ == '__main__':
         f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
         f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.npz'
     )
-    data_file = Path(args.root, 'data/ds003004/BoWav', fname)
+    data_file = Path(args.root, 'data/emotion_study/BoWav', fname)
     if data_file.is_file():
         with np.load(data_file) as data:
             X = data['X']
