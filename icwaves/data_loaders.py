@@ -10,21 +10,23 @@ EXPERT_ANNOTATED_CLASSES = [1, 2, 3]  # brain, muscle, eye (Matlab indexing)
 CLASS_LABELS = ['Brain', 'Muscle', 'Eye', 'Heart',
                 'Line Noise', 'Channel Noise', 'Other']
 
-def load_raw_set(args, rng, train=True):
+def load_raw_set(args, rng):
 
-    file_prefix = 'train' if train else 'test'
-    data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
-    file_list = list(data_dir.glob(f'{file_prefix}_subj-*.mat'))
+    data_dir = Path(args.root, 'data/emotion_study/raw_data_and_IC_labels')
+    fnames = [f"subj-{i}.mat" for i in args.subj_ids]
+    file_list = [data_dir.joinpath(f) for f in fnames]
 
     n_ics_per_subj = []
     for file in file_list:
         with file.open('rb') as f:
-            matdict = loadmat(f, variable_names='expert_labels')
-            expert_labels = matdict['expert_labels']
-            n_ics_per_subj.append(expert_labels.shape[0])
+            matdict = loadmat(f, variable_names=['labels', 'srate'])
+            labels = matdict['labels']
+            srate = matdict['srate'] # assumes all subjects have the same sampling rate
+            srate = srate.item(0) # `srate.shape=(1,1)`. This extracts the number.
+            n_ics_per_subj.append(labels.shape[0])
 
     n_ics = np.sum(n_ics_per_subj)
-    minutes_per_window = (args.window_len/args.srate/60)
+    minutes_per_window = (args.window_len/srate/60)
     n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
 
     # NOTE: float32. ICs were saved in matlab as single.
@@ -32,42 +34,37 @@ def load_raw_set(args, rng, train=True):
     y = -1 * np.ones(n_ics, dtype=int)
 
     cum_ic_ind = 0
-    expert_label_mask = np.full(n_ics, False)
-    subj_ind_ar = np.zeros(n_ics, dtype=int)
-    noisy_labels_ar = []
-    p = re.compile(f'.+{file_prefix}_subj-(?P<subjID>\d{{2}}).mat')
-    for file in tqdm(file_list):
+    expert_label_mask_ar = np.full(n_ics, False)
+    subj_ind = np.zeros(n_ics, dtype=int)
+    # 7 ICLabel classes
+    noisy_labels_ar = np.zeros((n_ics, 7), dtype=np.float32)
+    for file, subjID in tqdm(zip(file_list, args.subj_ids)):
         with file.open('rb') as f:
             matdict = loadmat(f)
-            expert_labels = matdict['expert_labels']
-            icaact = matdict['icaact']
+            data = matdict['data']
+            icaweights = matdict['icaweights']
+            icasphere = matdict['icasphere']
             noisy_labels = matdict['noisy_labels']
+            expert_label_mask = matdict['expert_label_mask']
+            # -1: Let class labels start at 0 in python
+            labels = matdict['labels'] - 1
 
-        noisy_labels_ar.append(noisy_labels)
-        m = p.search(str(file))
-        subjID = int(m.group('subjID'))
+        expert_label_mask = expert_label_mask.astype(bool)
+        icaact = icaweights @ icasphere @ data
 
-        ics_with_expert_label = (expert_labels > 0).nonzero()[0]
+        expert_label_mask = expert_label_mask.astype(bool)
         for ic_ind, ic in enumerate(icaact):
             time_idx = np.arange(0, ic.size-args.window_len+1, args.window_len)
             time_idx = rng.choice(time_idx, size=n_win_per_ic, replace=False)
             time_idx = time_idx[:, None] + np.arange(args.window_len)[None, :]
             X[cum_ic_ind] = ic[time_idx]
-
-            subj_ind_ar[cum_ic_ind] = subjID
-
-            if ic_ind in ics_with_expert_label:
-                # -1: Let class labels start at 0 in python
-                y[cum_ic_ind] = expert_labels[ic_ind] - 1
-                expert_label_mask[cum_ic_ind] = True
-            else:
-                noisy_label = np.argmax(noisy_labels[ic_ind])
-                y[cum_ic_ind] = noisy_label
+            y[cum_ic_ind] = labels[ic_ind]
+            noisy_labels_ar[cum_ic_ind] = noisy_labels[ic_ind]
+            expert_label_mask_ar[cum_ic_ind] = expert_label_mask[ic_ind]
+            subj_ind[cum_ic_ind] = subjID
             cum_ic_ind += 1
 
-    noisy_labels_ar = np.vstack(noisy_labels_ar)
-
-    return X, y, expert_label_mask, subj_ind_ar, noisy_labels_ar
+    return X, y, expert_label_mask_ar, subj_ind, noisy_labels_ar
 
 
 def load_raw_train_set_per_class(args, rng):
