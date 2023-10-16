@@ -72,7 +72,7 @@ def load_raw_set(args, rng, train=True):
 
 def load_raw_train_set_per_class(args, rng):
 
-    data_dir = Path(args.root, 'data/ds003004/icact_iclabel')
+    data_dir = Path(args.root, 'data/emotion_study/icact_iclabel')
     file_list = list(data_dir.glob(f'train_subj-*.mat'))
 
     ic_ind_per_subj = []
