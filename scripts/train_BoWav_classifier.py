@@ -47,8 +47,15 @@ parser.add_argument('--codebook-minutes-per-ic', type=float,
                     default=None, help='Number of minutes per IC to train the class-specific codebook')
 parser.add_argument('--codebook-ics-per-subject', type=int,
                     default=2, help='Maximum number of ICs per subject to train the class-specific codebook')
+parser.add_argument('--bowav-norm', help='Instance-wise normalization in BoWav', choices=['none', 'l_1', 'l_2', 'l_inf'], default='l_inf')
 
 
+BOWAV_NORM_MAP = {
+    'none': None,
+    'l_1': 1,
+    'l_2': 2,
+    'l_inf': np.inf,
+}
 
 if __name__ == '__main__':
 
@@ -79,7 +86,7 @@ if __name__ == '__main__':
         codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
         codebook_args.ics_per_subject = args.codebook_ics_per_subject
         codebooks = load_codebooks(codebook_args)
-        X = bag_of_waves(raw_ics, codebooks)
+        X = bag_of_waves(raw_ics, codebooks, ord=BOWAV_NORM_MAP[args.bowav_norm])
         with data_file.open('wb') as f:
             np.savez(
                 f, raw_ics=raw_ics, X=X, y=y,
