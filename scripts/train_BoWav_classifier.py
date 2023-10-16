@@ -18,8 +18,9 @@ from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 parser = ArgumentParser()
 parser.add_argument(
     "--root", help="Path to root folder of the project", required=True)
-parser.add_argument('--srate', type=float,
-                    default=256, help='Sampling rate')
+parser.add_argument('--subj-ids', help='A list with the subject ids to be used during training.', nargs='+', required=True)
+# parser.add_argument('--srate', type=float,
+#                     default=256, help='Sampling rate')
 # Same as srate (1 second window):
 parser.add_argument("--centroid-len", type=int, default=256,
                     help="Centroid length")
