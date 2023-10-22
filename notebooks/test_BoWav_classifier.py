@@ -20,7 +20,6 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.size": 12
 })
-img_dir = Path('/home/cmendoza/MEGA/Research/dissertation/LaTeX/img/')
 #%%
 
 class Args:
@@ -42,6 +41,8 @@ class Args:
 
 args = Args()
 rng = default_rng(13)
+
+img_dir = Path(f'{args.root}').joinpath('img')
 
 BOWAV_NORM_MAP = {
     'none': None,
