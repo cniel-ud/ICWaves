@@ -36,10 +36,19 @@ class Args:
     l1_ratio = [0, 0.2, 0.4, 0.6, 0.8, 1]
     codebook_minutes_per_ic = 50.0
     codebook_ics_per_subject = 2
+    bowav_norm = 'l_inf'
+    subj_ids= ['01', '02', '03', '04', '05', '06', '07']
 
 
 args = Args()
 rng = default_rng(13)
+
+BOWAV_NORM_MAP = {
+    'none': None,
+    'l_1': 1,
+    'l_2': 2,
+    'l_inf': np.inf,
+}
 #%%
 C_str = '_'.join([str(i) for i in args.regularization_factor])
 ew_str = '_'.join([str(i) for i in args.expert_weight])
@@ -49,7 +58,8 @@ fname = (
     f'_l1_ratio-{l1_ratio_str}'
     f'_expert_weight-{ew_str}'
     f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
-    f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.pickle'
+    f'_cbookICsPerSubj-{args.codebook_ics_per_subject}'
+    f'_bowavNorm-{args.bowav_norm}.pickle'
 )
 clf_path = Path(args.root, 'results/classifier', fname)
 with clf_path.open('rb') as f:
@@ -65,9 +75,10 @@ fname = (
     f'test_data_k-{args.num_clusters}_P-{args.centroid_len}'
     f'_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
     f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
-    f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.npz'
+    f'_cbookICsPerSubj-{args.codebook_ics_per_subject}'
+    f'_bowavNorm-{args.bowav_norm}.npz'
 )
-data_file = Path(args.root, 'data/ds003004/BoWav', fname)
+data_file = Path(args.root, 'data/emotion_study/BoWav', fname)
 if data_file.is_file():
     with np.load(data_file) as data:
         X = data['X']
@@ -77,12 +88,12 @@ if data_file.is_file():
         subj_ind = data['subj_ind']
 else:
     raw_ics, y, expert_label_mask, \
-        subj_ind, noisy_labels = load_raw_set(args, rng, train=False)
+        subj_ind, noisy_labels = load_raw_set(args, rng)
     codebook_args = copy.deepcopy(args)
     codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
     codebook_args.ics_per_subject = args.codebook_ics_per_subject
     codebooks = load_codebooks(codebook_args)
-    X = bag_of_waves(raw_ics, codebooks)
+    X = bag_of_waves(raw_ics, codebooks, ord=BOWAV_NORM_MAP[args.bowav_norm])
     with data_file.open('wb') as f:
         np.savez(
             f, raw_ics=raw_ics, X=X, y=y, noisy_labels=noisy_labels,
@@ -166,58 +177,36 @@ score_BoWav_expert = balanced_accuracy_score(y_expert, y_pred_expert)
 score_ICLabel_expert = balanced_accuracy_score(y_expert, ICLabel_expert)
 print(score_BoWav_expert, score_ICLabel_expert)
 
-#%%
-recall = np.zeros((3, 2))
-for i in range(3):
-    true_ind = y_expert == i
-    n_true = np.count_nonzero(true_ind)
-    recall[i, 0] = np.count_nonzero(y_pred_expert[true_ind]==i)/n_true
-    recall[i, 1] = np.count_nonzero(noisy_labels_vec[true_ind] == i)/n_true
-df = pd.DataFrame(recall, columns=['BoWav', 'ICLabel'], index=['brain', 'muscle', 'eye'])
-df
-#%%
-precision = np.zeros((3, 2))
-for i in range(3):
-    true_ind = y_expert == i
-    tp = np.count_nonzero(y_pred_expert[true_ind] == i)
-    fp = np.count_nonzero(y_pred_expert[~true_ind] == i)
-    precision[i, 0] = tp/(tp+fp)
-    tp = np.count_nonzero(noisy_labels_vec[true_ind] == i)
-    fp = np.count_nonzero(noisy_labels_vec[~true_ind] == i)
-    precision[i, 1] = tp/(tp+fp)
-df = pd.DataFrame(precision, columns=['BoWav', 'ICLabel'], index=[
-                  'brain', 'muscle', 'eye'])
-df
+# %% TODO: Find the code used to create the codebook plots in the dissertation. If it is already in
+# plot_codebooks.ipynb, then delete the code below:
+# def show_codebook(codebook):
 
-# %%
-def show_codebook(codebook):
+#     k, P = codebook.shape
+#     n_rows = np.ceil(np.sqrt(k)).astype(int)
+#     n_cols = k // n_rows
+#     fig, ax = plt.subplots(n_rows, n_cols, figsize=(n_cols, n_rows))
+#     ax = ax.flatten()
+#     for i in range(n_rows*n_cols):
+#         if i < k:
+#             ax[i].plot(codebook[i])
+#         ax[i].axis('off')
 
-    k, P = codebook.shape
-    n_rows = np.ceil(np.sqrt(k)).astype(int)
-    n_cols = k // n_rows
-    fig, ax = plt.subplots(n_rows, n_cols, figsize=(n_cols, n_rows))
-    ax = ax.flatten()
-    for i in range(n_rows*n_cols):
-        if i < k:
-            ax[i].plot(codebook[i])
-        ax[i].axis('off')
-
-    return fig, ax
-# %%
-for i, cb in enumerate(codebooks):
-    fig, ax = show_codebook(cb)
-    fig.suptitle(IC_classes[i])
-    plt.tight_layout()
-# %%
-args = codebook_args
-dict_dir = Path(args.root, 'results/dictionaries')
-pat = (
-    f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
-    f'_class-*_minutesPerIC-{args.minutes_per_ic}'
-    f'_icsPerSubj-{args.ics_per_subject}.npz'
-)
-file_list = list(dict_dir.glob(pat))
-expr = r'.+_class-(?P<label>\d).*npz'
-p = re.compile(expr)
-label_sort = [int(p.search(str(file))['label']) for file in file_list]
+#     return fig, ax
+# # %%
+# for i, cb in enumerate(codebooks):
+#     fig, ax = show_codebook(cb)
+#     fig.suptitle(IC_classes[i])
+#     plt.tight_layout()
+# # %%
+# args = codebook_args
+# dict_dir = Path(args.root, 'results/dictionaries')
+# pat = (
+#     f'sikmeans_P-{args.centroid_len}_k-{args.num_clusters}'
+#     f'_class-*_minutesPerIC-{args.minutes_per_ic}'
+#     f'_icsPerSubj-{args.ics_per_subject}.npz'
+# )
+# file_list = list(dict_dir.glob(pat))
+# expr = r'.+_class-(?P<label>\d).*npz'
+# p = re.compile(expr)
+# label_sort = [int(p.search(str(file))['label']) for file in file_list]
 # %%
