@@ -28,14 +28,20 @@ def load_raw_set(args, rng):
     n_ics = np.sum(n_ics_per_subj)
     minutes_per_window = (args.window_len/srate/60)
     n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
+    n_win_per_segment = args.n_windows_per_segment
+    segment_len = n_win_per_segment * args.window_len
+    if n_win_per_segment > 0 and n_win_per_segment < n_win_per_ic:
+        n_segments = n_win_per_ic // n_win_per_segment
+    else:
+        n_segments = 1
 
     # NOTE: float32. ICs were saved in matlab as single.
-    X = np.zeros((n_ics, n_win_per_ic, args.window_len), dtype=np.float32)
-    y = -1 * np.ones(n_ics, dtype=int)
+    X = np.zeros((n_ics, n_segments, n_win_per_segment, args.window_len), dtype=np.float32)
+    y = -1 * np.ones((n_ics, n_segments), dtype=int)
 
     cum_ic_ind = 0
-    expert_label_mask_ar = np.full(n_ics, False)
-    subj_ind = np.zeros(n_ics, dtype=int)
+    expert_label_mask_ar = np.full((n_ics, n_segments), False)
+    subj_ind = np.zeros((n_ics, n_segments), dtype=int)
     # 7 ICLabel classes
     noisy_labels_ar = np.zeros((n_ics, 7), dtype=np.float32)
     for file, subjID in tqdm(zip(file_list, args.subj_ids)):
@@ -54,15 +60,21 @@ def load_raw_set(args, rng):
 
         expert_label_mask = expert_label_mask.astype(bool)
         for ic_ind, ic in enumerate(icaact):
-            time_idx = np.arange(0, ic.size-args.window_len+1, args.window_len)
-            time_idx = rng.choice(time_idx, size=n_win_per_ic, replace=False)
-            time_idx = time_idx[:, None] + np.arange(args.window_len)[None, :]
-            X[cum_ic_ind] = ic[time_idx]
+            time_idx = np.arange(0, ic.size-segment_len+1, segment_len)
+            time_idx = rng.choice(time_idx, size=n_segments, replace=False)
+            time_idx = time_idx[:, None] + np.arange(segment_len)[None, :]
+            segmented_ic = ic[time_idx] # a 2D array
+            X[cum_ic_ind] = segmented_ic.reshape((n_segments, n_win_per_segment, args.window_len))
             y[cum_ic_ind] = labels[ic_ind]
             noisy_labels_ar[cum_ic_ind] = noisy_labels[ic_ind]
             expert_label_mask_ar[cum_ic_ind] = expert_label_mask[ic_ind]
             subj_ind[cum_ic_ind] = subjID
             cum_ic_ind += 1
+
+    X = X.reshape((n_ics * n_segments, n_win_per_segment, args.window_len))
+    y = y.reshape(n_ics * n_segments)
+    expert_label_mask_ar = expert_label_mask_ar.reshape(n_ics * n_segments)
+    subj_ind = subj_ind.reshape(n_ics * n_segments)
 
     return X, y, expert_label_mask_ar, subj_ind, noisy_labels_ar
 
