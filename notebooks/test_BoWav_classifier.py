@@ -1,7 +1,6 @@
 #%%
 import copy
 import pickle
-import re
 from pathlib import Path
 
 import numpy as np
@@ -35,8 +34,9 @@ class Args:
     l1_ratio = [0, 0.2, 0.4, 0.6, 0.8, 1]
     codebook_minutes_per_ic = 50.0
     codebook_ics_per_subject = 2
-    bowav_norm = 'l_inf'
+    bowav_norm = 'l_2'
     subj_ids= ['01', '02', '03', '04', '05', '06', '07']
+    n_windows_per_segment = -1 # -1: use all windows to count
 
 
 args = Args()
