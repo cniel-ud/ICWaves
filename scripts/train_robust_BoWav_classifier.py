@@ -68,13 +68,18 @@ if __name__ == '__main__':
     old_rng = np.random.RandomState(13)
 
     # Load/generate data
-    fname = (
+    BoWav_base_name = (
         f'data_k-{args.num_clusters}_P-{args.centroid_len}'
         f'_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
+        f'_nwinPerSeg-{args.n_windows_per_segment}'
         f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
-        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.npz'
+        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}'
+        f'_bowavNorm-{args.bowav_norm}'
     )
-    data_file = Path(args.root, 'data/emotion_study/BoWav', fname)
+    BoWav_file_name = f'{BoWav_base_name}.npz'
+    BoWav_data_folder = Path(args.root, 'data/emotion_study/BoWav')
+    BoWav_data_folder.mkdir(exist_ok=True, parents=True)
+    data_file = BoWav_data_folder.joinpath(BoWav_file_name)
     if data_file.is_file():
         with np.load(data_file) as data:
             X = data['X']
@@ -129,14 +134,13 @@ if __name__ == '__main__':
     C_str = '_'.join([str(i) for i in candidate_params['clf__C']])
     l1_ratio_str = '_'.join([str(i) for i in candidate_params['clf__l1_ratio']])
     ew_str = '_'.join([str(i) for i in candidate_params['expert_weight']])
-    fname = (
+    classifier_fname = (
         f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
         f'_l1_ratio-{l1_ratio_str}'
-        f'_expert_weight-{ew_str}'
-        f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
-        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}'
-        f'_bowavNorm-{args.bowav_norm}.pickle'
+        f'_expert_weight-{ew_str}.pickle'
     )
-    fpath = Path(args.root, 'results/classifier', fname)
-    with fpath.open('wb') as f:
+    BoWav_folder = Path(args.root, 'results/classifier', 'BoWav', BoWav_base_name)
+    BoWav_folder.mkdir(exist_ok=True, parents=True)
+    classifier_file = BoWav_folder.joinpath(classifier_fname)
+    with classifier_file.open('wb') as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
