@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     # Load/generate data
     BoWav_base_name = (
-        f'data_k-{args.num_clusters}_P-{args.centroid_len}'
+        f'k-{args.num_clusters}_P-{args.centroid_len}'
         f'_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
         f'_nwinPerSeg-{args.n_windows_per_segment}'
         f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
