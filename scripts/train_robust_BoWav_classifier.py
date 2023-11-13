@@ -96,7 +96,7 @@ if __name__ == '__main__':
         X = bag_of_waves(raw_ics, codebooks, ord=BOWAV_NORM_MAP[args.bowav_norm])
         with data_file.open('wb') as f:
             np.savez(
-                f, raw_ics=raw_ics, X=X, y=y,
+                f, X=X, y=y,
                 expert_label_mask=expert_label_mask, subj_ind=subj_ind)
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
