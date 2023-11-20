@@ -1,5 +1,6 @@
 # %%
 import copy
+import logging
 import pickle
 from argparse import ArgumentParser
 from pathlib import Path
@@ -10,25 +11,36 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
-from icwaves.data_loaders import load_codebooks, load_raw_set
-from icwaves.feature_extractors.bowav import bag_of_waves
+from icwaves.data_loaders import load_codebooks, load_codebooks_wrapper, load_raw_set
+from icwaves.feature_extractors.bowav import bag_of_waves, build_or_load_centroid_assignments
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
+from icwaves.preprocessing import load_or_build_preprocessed_data
 
 parser = ArgumentParser()
 parser.add_argument(
-    "--root", help="Path to root folder of the project", required=True)
+    "--path-to-raw-data", help="Path to raw data", required=True)
+parser.add_argument(
+    "--path-to-preprocessed-data", help="Path to preprocessed data", required=True)
+parser.add_argument(
+    "--path-to-centroid-assignments-folder", help="Path to centroid assignments", required=True)
+parser.add_argument(
+    "--path-to-results", help="Path to results", required=True)
+parser.add_argument(
+    "--path-to-codebooks", help="Path to codebooks", required=True)
 parser.add_argument('--subj-ids', help='A list with the subject ids to be used during training.', nargs='+', required=True)
 # parser.add_argument('--srate', type=float,
 #                     default=256, help='Sampling rate')
 # Same as srate (1 second window):
-parser.add_argument("--centroid-len", type=int, default=256,
-                    help="Centroid length")
+parser.add_argument("--centroid-len", type=float, default=1.,
+                    help="Centroid length in seconds")
 # 1.5 * centroid_len:
-parser.add_argument("--window-len", type=int, default=384,
-                    help="Length of window assigned to centroid")
-parser.add_argument("--n-windows-per-segment", type=int, default=10,
-                    help="Number of windows used to compute BoWav feature. Use -1 if you want to use a single segment (i.e., all possible windows).")
+parser.add_argument("--window-len", type=float, default=1.5,
+                    help="Length of window assigned to centroid, in seconds")
+parser.add_argument("--segment-len", type=float, nargs='+', default=[10, 30, 90, 180, 300],
+                    help="Length in seconds of segment used during training.")
+parser.add_argument("--minutes-for-validation", type=int, default=5,
+                    help="Number of minutes used for validation. Use -1 if you want to use all the validation data")
 parser.add_argument('--num-clusters', type=int,
                     default=16, help='Number of clusters')
 parser.add_argument('--n-jobs', type=int,
@@ -61,43 +73,27 @@ BOWAV_NORM_MAP = {
 
 if __name__ == '__main__':
 
+    logging.basicConfig(format='%(levelname)s:%(filename)s:%(message)s', level=logging.DEBUG)
+    logging.info('Started')
+
     args = parser.parse_args()
 
     new_rng = default_rng(13)
     # scikit-learn doesn't support the new numpy Generator:
     old_rng = np.random.RandomState(13)
 
-    # Load/generate data
-    BoWav_base_name = (
-        f'k-{args.num_clusters}_P-{args.centroid_len}'
-        f'_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}'
-        f'_nwinPerSeg-{args.n_windows_per_segment}'
-        f'_cbookMinPerIc-{args.codebook_minutes_per_ic}'
-        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}'
-        f'_bowavNorm-{args.bowav_norm}'
-    )
-    BoWav_file_name = f'{BoWav_base_name}.npz'
-    BoWav_data_folder = Path(args.root, 'data/emotion_study/BoWav')
-    BoWav_data_folder.mkdir(exist_ok=True, parents=True)
-    data_file = BoWav_data_folder.joinpath(BoWav_file_name)
-    if data_file.is_file():
-        with np.load(data_file) as data:
-            X = data['X']
-            y = data['y']
-            expert_label_mask = data['expert_label_mask']
-            subj_ind = data['subj_ind']
-    else:
-        raw_ics, y, expert_label_mask, subj_ind, _ = \
-            load_raw_set(args, new_rng)
-        codebook_args = copy.deepcopy(args)
-        codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
-        codebook_args.ics_per_subject = args.codebook_ics_per_subject
-        codebooks = load_codebooks(codebook_args)
-        X = bag_of_waves(raw_ics, codebooks, ord=BOWAV_NORM_MAP[args.bowav_norm])
-        with data_file.open('wb') as f:
-            np.savez(
-                f, X=X, y=y,
-                expert_label_mask=expert_label_mask, subj_ind=subj_ind)
+    # Load or build preprocessed data
+    windowed_ics, labels, srate, expert_label_mask, subj_ind = load_or_build_preprocessed_data(args)
+
+    # Load codebooks
+    codebooks = load_codebooks_wrapper(args)
+
+    # Load or build centroid assignments
+    centroid_assignments = build_or_load_centroid_assignments(args, windowed_ics, codebooks)
+
+    input_or_output_aggregation_method = ['count_pooling', 'majority_vote']
+    segment_length = args.segment_len
+    minutes_for_validation = args.minutes_for_validation
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
 
@@ -118,13 +114,16 @@ if __name__ == '__main__':
     candidate_params = dict(
         clf__C=args.regularization_factor,
         clf__l1_ratio=args.l1_ratio,
-        expert_weight=args.expert_weight
+        expert_weight=args.expert_weight,
+        input_or_output_aggregation_method=input_or_output_aggregation_method,
+        segment_length=segment_length,
+        minutes_for_validation=minutes_for_validation,
     )
     results = grid_search_cv(
         pipe,
         candidate_params,
-        X,
-        y,
+        windowed_ics,
+        labels,
         subj_ind,
         expert_label_mask,
         cv,
@@ -144,3 +143,5 @@ if __name__ == '__main__':
     classifier_file = BoWav_folder.joinpath(classifier_fname)
     with classifier_file.open('wb') as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
+
+    logging.info('Finished')

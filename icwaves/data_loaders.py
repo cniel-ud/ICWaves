@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 import logging
 
@@ -10,78 +11,10 @@ EXPERT_ANNOTATED_CLASSES = [1, 2, 3]  # brain, muscle, eye (Matlab indexing)
 CLASS_LABELS = ['Brain', 'Muscle', 'Eye', 'Heart',
                 'Line Noise', 'Channel Noise', 'Other']
 
-def load_raw_set(args):
-
-    data_dir = Path(args.root, 'data/emotion_study/raw_data_and_IC_labels')
-    fnames = [f"subj-{i}.mat" for i in args.subj_ids]
-    file_list = [data_dir.joinpath(f) for f in fnames]
-
-    logging.info("Getting number of time series and sampling rate...")
-    logging.info("NOTE: Assumes all subjects have the same sampling rate")
-    logging.info(f"Data path: {data_dir}")
-    n_ics_per_subj = []
-    for file in file_list:
-        with file.open('rb') as f:
-            matdict = loadmat(f, variable_names=['labels', 'srate'])
-            labels = matdict['labels']
-            srate = matdict['srate']
-            srate = srate.item(0) # `srate.shape=(1,1)`. This extracts the number.
-            n_ics_per_subj.append(labels.shape[0])
-
-    n_ics = np.sum(n_ics_per_subj)
-    minutes_per_window = (args.window_len/srate/60)
-    n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
-    window_len = args.window_len
-
-    logging.info(f"Sampling rate = {srate} Hz")
-    logging.info(f"Total number of ICs = {n_ics}")
-    logging.info(f"Windown length = {minutes_per_window * 60} seconds")
-    logging.info(f"Number of windows per IC = {n_win_per_ic}")
-    logging.info("Building data matrix, labels, and other metadata...")
-
-    # NOTE: float32. ICs were saved in matlab as single.
-    X = np.zeros((n_ics, n_win_per_ic, window_len), dtype=np.float32)
-    y = -1 * np.ones(n_ics, dtype=int)
-
-    cum_ic_ind = 0
-    expert_label_mask_ar = np.full(n_ics, False)
-    subj_ind = np.zeros(n_ics, dtype=int)
-    # 7 ICLabel classes
-    noisy_labels_ar = np.zeros((n_ics, 7), dtype=np.float32)
-    for file, subjID in tqdm(zip(file_list, args.subj_ids)):
-        with file.open('rb') as f:
-            matdict = loadmat(f)
-            data = matdict['data']
-            icaweights = matdict['icaweights']
-            icasphere = matdict['icasphere']
-            noisy_labels = matdict['noisy_labels']
-            expert_label_mask = matdict['expert_label_mask']
-            # -1: Let class labels start at 0 in python
-            labels = matdict['labels'] - 1
-
-        expert_label_mask = expert_label_mask.astype(bool)
-        icaact = icaweights @ icasphere @ data
-
-        expert_label_mask = expert_label_mask.astype(bool)
-        for ic_ind, ic in enumerate(icaact):
-            time_idx = np.arange(0, ic.size-window_len+1, window_len)
-            time_idx = time_idx[: n_win_per_ic]
-            time_idx = time_idx[:, None] + np.arange(window_len)[None, :]
-            X[cum_ic_ind] = ic[time_idx]
-            y[cum_ic_ind] = labels[ic_ind]
-            noisy_labels_ar[cum_ic_ind] = noisy_labels[ic_ind]
-            expert_label_mask_ar[cum_ic_ind] = expert_label_mask[ic_ind]
-            subj_ind[cum_ic_ind] = subjID
-            cum_ic_ind += 1
-
-        logging.info("Done building data matrix, labels, and other metadata")
-
-    return X, y, srate, expert_label_mask_ar, subj_ind, noisy_labels_ar
-
 
 def load_raw_train_set_per_class(args, rng):
 
-    data_dir = Path(args.root, 'data/emotion_study/icact_iclabel')
+    data_dir = args.path_to_centroid_assignments
     file_list = list(data_dir.glob(f'train_subj-*.mat'))
 
     ic_ind_per_subj = []
@@ -168,7 +101,7 @@ def load_raw_train_set_per_class(args, rng):
 
 def load_codebooks(args):
 
-    dict_dir = Path(args.root, 'results/dictionaries')
+    dict_dir = args.path_to_codebooks
 
     n_codebooks = 7
     codebooks = np.zeros((n_codebooks, args.num_clusters,
@@ -184,4 +117,12 @@ def load_codebooks(args):
         with np.load(fpath) as data:
             codebooks[i_class] = data['centroids']
 
+    return codebooks
+
+
+def load_codebooks_wrapper(args):
+    codebook_args = copy.deepcopy(args)
+    codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
+    codebook_args.ics_per_subject = args.codebook_ics_per_subject
+    codebooks = load_codebooks(codebook_args)
     return codebooks

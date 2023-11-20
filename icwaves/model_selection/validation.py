@@ -29,6 +29,16 @@ def _fit_and_score(
     sample_weight = np.ones(X.shape[0])
     sample_weight[expert_label_mask] = expert_weight
 
+    # Get input/output aggregation method
+    input_or_output_aggregation_method = parameters.pop(
+        'input_or_output_aggregation_method')
+
+    # Get segment length
+    segment_length = parameters.pop('segment_length')
+
+    # Get minutes for validation
+    minutes_for_validation = parameters.pop('minutes_for_validation')
+
     # Set classifier params
     estimator.set_params(**parameters)
 
@@ -36,6 +46,17 @@ def _fit_and_score(
     start_time = time.time()
     X_train, y_train = X[train], y[train]
     sample_weight_train = sample_weight[train]
+
+    # Get (BoWav) counts per segment
+    # TODO:
+    #  * Create function in bowav.py that takes X_test and return the counts
+    #    for each segment (a BoWav vector).
+    #  * If the input_or_output_aggregation_method is 'count_pooling', then
+    #    aggregate the BoWav vectors until completing minutes_for_validation,
+    #    or aggregate all BoWav vectors if minutes_for_validation==-1
+    #  * If the input_or_output_aggregation_method is 'majority_vote', then
+    #    perform prediction, and then aggregate the predictions until completing
+    #    minutes_for_validation, or aggregate all predictions if minutes_for_validation==-1
 
     named_steps = getattr(estimator, 'named_steps', None)
     if named_steps is not None:
@@ -46,6 +67,13 @@ def _fit_and_score(
     fit_time = time.time() - start_time
 
     X_test, y_test = X[test], y[test]
+
+    # Maybe aggregate input
+    if input_or_output_aggregation_method == 'count_pooling':
+        X_test = np.sum(X_test, axis=1)
+        X_test = X_test.reshape(-1, 1)
+
+
     y_pred = estimator.predict(X_test)
     sample_weight_test = sample_weight[test]
     test_scores = scorer(
