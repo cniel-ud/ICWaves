@@ -9,6 +9,12 @@ from icwaves.data_loaders import load_codebooks, load_raw_set
 from icwaves.sikmeans.shift_kmeans import _asignment_step
 from icwaves.utils import _build_centroid_assignments_file
 
+BOWAV_NORM_MAP = {
+    'none': None,
+    'l_1': 1,
+    'l_2': 2,
+    'l_inf': np.inf,
+}
 
 def _compute_centroid_assignments(X, codebooks, metric='cosine', n_jobs=1):
     """Shift-invariant assignment of centroids
@@ -65,6 +71,59 @@ def build_or_load_centroid_assignments(args, windowed_ics, codebooks):
             np.save(f, centroid_assignments, allow_pickle=False)
 
     return centroid_assignments
+
+
+def build_bowav_from_centroid_assignments(centroid_assignments, n_centroids, n_windows_per_segment, ord_str):
+    """Build flattened bag of waves from centroid assignments. Use all windows on each time series.
+
+    Parameters
+    ----------
+    centroid_assignments:
+        A matrix of shape (m, c, n), where m, c and n are the number of
+        time series, codebooks, and windows per time series, respectively.
+        centroid_assignments[i, j, k] contains the index of the centroid
+        assigned to the k-th window of the i-th time series when using the
+        j-th codebook.
+    n_centroids:
+        The number of centroids on each codebook. This is used to compute
+        the number of features in the BoWav.
+    n_windows_per_segment:
+        The number of windows per segment. This is the number of
+        windows/assignments counted to compute the BoWav vector.
+    ord_str (str):
+        BOWAV_NORM_MAP[ord_str] is the `ord` argument passed to np.linalg.norm
+        to perform instance-wise normalization of each BoWav from each codebook
+        before concatenation. If None, don't perform normalization.
+    """
+    n_time_series, n_codebooks, n_windows_per_time_series  = centroid_assignments
+    n_features = n_codebooks * n_centroids
+
+    if n_windows_per_segment:
+        n_segments_per_time_series = n_windows_per_time_series // n_windows_per_segment
+    else:
+        n_segments_per_time_series = 1
+        n_windows_per_segment = n_windows_per_time_series
+
+    bowav = np.zeros((n_time_series, n_segments_per_time_series, n_features), dtype=np.float32)
+    for i_ts in tqdm(range(n_time_series)):
+        for i_seg in range(n_segments_per_time_series):
+            start_ind = i_seg * n_windows_per_segment
+            end_ind = start_ind + n_windows_per_segment
+            for r in np.arange(n_codebooks):
+                nu, counts = np.unique(
+                    centroid_assignments[i_ts, r, start_ind:end_ind],
+                    return_counts=True
+                )
+                # centroid index->feature index
+                i_feature = nu + r * n_centroids
+
+                if BOWAV_NORM_MAP[ord_str]:
+                    # instance-wise normalization
+                    bowav[i_ts, i_seg, i_feature] = counts / np.linalg.norm(counts, ord=ord)
+                else:
+                    bowav[i_ts, i_seg, i_feature] = counts
+
+    return bowav
 
 
 def bag_of_waves(X, codebooks, metric='cosine', n_jobs=1, ord=None):

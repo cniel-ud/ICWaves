@@ -16,6 +16,9 @@ from icwaves.feature_extractors.bowav import bag_of_waves, build_or_load_centroi
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.preprocessing import load_or_build_preprocessed_data
+from icwaves.utils import _build_results_file
+import sklearn
+import scipy
 
 parser = ArgumentParser()
 parser.add_argument(
@@ -35,12 +38,12 @@ parser.add_argument('--subj-ids', help='A list with the subject ids to be used d
 parser.add_argument("--centroid-len", type=float, default=1.,
                     help="Centroid length in seconds")
 # 1.5 * centroid_len:
-parser.add_argument("--window-len", type=float, default=1.5,
+parser.add_argument("--window-length", type=float, default=1.5,
                     help="Length of window assigned to centroid, in seconds")
-parser.add_argument("--segment-len", type=float, nargs='+', default=[10, 30, 90, 180, 300],
+parser.add_argument("--training-segment-length", type=float, nargs='+', default=[10, 30, 90, 180, 300],
                     help="Length in seconds of segment used during training.")
-parser.add_argument("--minutes-for-validation", type=int, default=5,
-                    help="Number of minutes used for validation. Use -1 if you want to use all the validation data")
+parser.add_argument("--n-seconds-for-validation", type=int, default=5,
+                    help="Number of seconds used for validation. Use -1 if you want to use all the validation data")
 parser.add_argument('--num-clusters', type=int,
                     default=16, help='Number of clusters')
 parser.add_argument('--n-jobs', type=int,
@@ -61,7 +64,7 @@ parser.add_argument('--codebook-minutes-per-ic', type=float,
                     default=None, help='Number of minutes per IC to train the class-specific codebook')
 parser.add_argument('--codebook-ics-per-subject', type=int,
                     default=2, help='Maximum number of ICs per subject to train the class-specific codebook')
-parser.add_argument('--bowav-norm', help='Instance-wise normalization in BoWav', choices=['none', 'l_1', 'l_2', 'l_inf'], default='l_inf')
+parser.add_argument('--bowav-norm', help='Instance-wise normalization in BoWav', nargs='+', default=['none', 'l_1', 'l_2', 'l_inf'])
 
 
 BOWAV_NORM_MAP = {
@@ -87,13 +90,25 @@ if __name__ == '__main__':
 
     # Load codebooks
     codebooks = load_codebooks_wrapper(args)
+    n_centroids = codebooks[0].shape[0]
 
     # Load or build centroid assignments
     centroid_assignments = build_or_load_centroid_assignments(args, windowed_ics, codebooks)
 
     input_or_output_aggregation_method = ['count_pooling', 'majority_vote']
-    segment_length = args.segment_len
-    minutes_for_validation = args.minutes_for_validation
+
+    training_segment_length = args.training_segment_length
+    # convert segment length (in seconds) to n_training_windows_per_segment
+    n_training_windows_per_segment = [int(s * srate / args.window_length) for s in training_segment_length]
+    logging.info(f"n_training_windows_per_segment: {n_training_windows_per_segment}")
+
+    n_seconds_for_validation = args.n_seconds_for_validation
+    # convert n_seconds_for_validation to n_windows_for_validation
+    if n_seconds_for_validation == -1:
+        n_windows_for_validation = None
+    else:
+        n_windows_for_validation = int(n_seconds_for_validation * srate / args.window_length)
+    logging.info(f"n_windows_for_validation: {n_windows_for_validation}")
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
 
@@ -115,14 +130,16 @@ if __name__ == '__main__':
         clf__C=args.regularization_factor,
         clf__l1_ratio=args.l1_ratio,
         expert_weight=args.expert_weight,
+        bowav_norm=args.bowav_norm,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
-        segment_length=segment_length,
-        minutes_for_validation=minutes_for_validation,
+        n_training_windows_per_segment=n_training_windows_per_segment,
+        n_windows_for_validation=n_windows_for_validation,
+        n_centroids=n_centroids,
     )
     results = grid_search_cv(
         pipe,
         candidate_params,
-        windowed_ics,
+        centroid_assignments,
         labels,
         subj_ind,
         expert_label_mask,
@@ -130,18 +147,24 @@ if __name__ == '__main__':
         args.n_jobs
     )
 
-    C_str = '_'.join([str(i) for i in candidate_params['clf__C']])
-    l1_ratio_str = '_'.join([str(i) for i in candidate_params['clf__l1_ratio']])
-    ew_str = '_'.join([str(i) for i in candidate_params['expert_weight']])
-    classifier_fname = (
-        f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
-        f'_l1_ratio-{l1_ratio_str}'
-        f'_expert_weight-{ew_str}.pickle'
+
+    results_file = _build_results_file(
+        args,
+        candidate_params['clf__C'],
+        candidate_params['clf__l1_ratio'],
+        candidate_params['expert_weight'],
+        candidate_params['bowav_norm'],
+        training_segment_length,
+        n_seconds_for_validation,
     )
-    BoWav_folder = Path(args.root, 'results/classifier', 'BoWav', BoWav_base_name)
-    BoWav_folder.mkdir(exist_ok=True, parents=True)
-    classifier_file = BoWav_folder.joinpath(classifier_fname)
-    with classifier_file.open('wb') as f:
+
+    # Add to results the version of scikit-learn, numpy, and
+    # scipy to improve reproducibility
+    results['sklearn_version'] = sklearn.__version__
+    results['numpy_version'] = np.__version__
+    results['scipy_version'] = scipy.__version__
+
+    with results_file.open('wb') as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
 
     logging.info('Finished')
