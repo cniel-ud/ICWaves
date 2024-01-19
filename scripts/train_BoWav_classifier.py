@@ -53,6 +53,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    print(args.minutes_per_ic)
+
     new_rng = default_rng(13)
     # scikit-learn doesn't support the new numpy Generator:
     old_rng = np.random.RandomState(13)
@@ -72,7 +74,7 @@ if __name__ == '__main__':
             expert_label_mask = data['expert_label_mask']
             subj_ind = data['subj_ind']
     else:
-        raw_ics, y, expert_label_mask, subj_ind, _ = \
+        raw_ics, y, expert_label_mask, subj_ind = \
             load_raw_set(args, new_rng)
         codebook_args = copy.deepcopy(args)
         codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
@@ -84,48 +86,48 @@ if __name__ == '__main__':
                 f, raw_ics=raw_ics, X=X, y=y,
                 expert_label_mask=expert_label_mask, subj_ind=subj_ind)
 
-    cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
-
-    pipe = Pipeline([('scaler', TfidfTransformer()),
-                    ('clf', LogisticRegression())])
-
-    clf_params = dict(
-        clf__class_weight='balanced',
-        clf__solver='saga',
-        clf__penalty=args.penalty,
-        clf__random_state=old_rng,
-        clf__multi_class='multinomial',
-        clf__warm_start=True,
-        clf__max_iter=args.max_iter,
-    )
-    pipe.set_params(**clf_params)
-
-    candidate_params = dict(
-        clf__C=args.regularization_factor,
-        clf__l1_ratio=args.l1_ratio,
-        expert_weight=args.expert_weight
-    )
-    results = grid_search_cv(
-        pipe,
-        candidate_params,
-        X,
-        y,
-        subj_ind,
-        expert_label_mask,
-        cv,
-        args.n_jobs
-    )
-
-    C_str = '_'.join([str(i) for i in candidate_params['clf__C']])
-    l1_ratio_str = '_'.join([str(i) for i in candidate_params['clf__l1_ratio']])
-    ew_str = '_'.join([str(i) for i in candidate_params['expert_weight']])
-    fname = (
-        f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
-        f'_l1_ratio-{l1_ratio_str}'
-        f'_expert_weight-{ew_str}'
-        f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
-        f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.pickle'
-    )
-    fpath = Path(args.root, 'results/classifier', fname)
-    with fpath.open('wb') as f:
-        pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
+    # cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
+    #
+    # pipe = Pipeline([('scaler', TfidfTransformer()),
+    #                 ('clf', LogisticRegression())])
+    #
+    # clf_params = dict(
+    #     clf__class_weight='balanced',
+    #     clf__solver='saga',
+    #     clf__penalty=args.penalty,
+    #     clf__random_state=old_rng,
+    #     clf__multi_class='multinomial',
+    #     clf__warm_start=True,
+    #     clf__max_iter=args.max_iter,
+    # )
+    # pipe.set_params(**clf_params)
+    #
+    # candidate_params = dict(
+    #     clf__C=args.regularization_factor,
+    #     clf__l1_ratio=args.l1_ratio,
+    #     expert_weight=args.expert_weight
+    # )
+    # results = grid_search_cv(
+    #     pipe,
+    #     candidate_params,
+    #     X,
+    #     y,
+    #     subj_ind,
+    #     expert_label_mask,
+    #     cv,
+    #     args.n_jobs
+    # )
+    #
+    # C_str = '_'.join([str(i) for i in candidate_params['clf__C']])
+    # l1_ratio_str = '_'.join([str(i) for i in candidate_params['clf__l1_ratio']])
+    # ew_str = '_'.join([str(i) for i in candidate_params['expert_weight']])
+    # fname = (
+    #     f'clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}'
+    #     f'_l1_ratio-{l1_ratio_str}'
+    #     f'_expert_weight-{ew_str}'
+    #     f'_cbookMinPerIC-{args.codebook_minutes_per_ic}'
+    #     f'_cbookICsPerSubj-{args.codebook_ics_per_subject}.pickle'
+    # )
+    # fpath = Path(args.root, 'results/classifier', fname)
+    # with fpath.open('wb') as f:
+    #     pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)

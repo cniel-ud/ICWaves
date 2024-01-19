@@ -28,13 +28,17 @@ def load_raw_set(args, rng, train=True):
     n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
 
     # NOTE: float32. ICs were saved in matlab as single.
+    print(type(n_ics), type(n_win_per_ic), type(args.window_len))
+    print(n_ics)
+    #changed as there was the following issue: TypeError: 'numpy.float64' object cannot be interpreted as an integer
+    n_ics = int(n_ics)
     X = np.zeros((n_ics, n_win_per_ic, args.window_len), dtype=np.float32)
     y = -1 * np.ones(n_ics, dtype=int)
 
     cum_ic_ind = 0
     expert_label_mask = np.full(n_ics, False)
     subj_ind_ar = np.zeros(n_ics, dtype=int)
-    noisy_labels_ar = []
+    #noisy_labels_ar = []
     p = re.compile(f'.+{file_prefix}_subj-(?P<subjID>\d{{2}}).mat')
     for file in tqdm(file_list):
         with file.open('rb') as f:
@@ -43,7 +47,7 @@ def load_raw_set(args, rng, train=True):
             icaact = matdict['icaact']
             noisy_labels = matdict['noisy_labels']
 
-        noisy_labels_ar.append(noisy_labels)
+        #noisy_labels_ar.append(noisy_labels)
         m = p.search(str(file))
         subjID = int(m.group('subjID'))
 
@@ -65,9 +69,9 @@ def load_raw_set(args, rng, train=True):
                 y[cum_ic_ind] = noisy_label
             cum_ic_ind += 1
 
-    noisy_labels_ar = np.vstack(noisy_labels_ar)
+    #noisy_labels_ar = np.vstack(noisy_labels_ar)
 
-    return X, y, expert_label_mask, subj_ind_ar, noisy_labels_ar
+    return X, y, expert_label_mask, subj_ind_ar#, noisy_labels_ar
 
 
 def load_raw_train_set_per_class(args, rng):
@@ -160,6 +164,8 @@ def load_raw_train_set_per_class(args, rng):
 def load_codebooks(args):
 
     dict_dir = Path(args.root, 'results/dictionaries')
+
+    print(f'minutesPerIC: {args.minutes_per_ic}')
 
     n_codebooks = 7
     codebooks = np.zeros((n_codebooks, args.num_clusters,
