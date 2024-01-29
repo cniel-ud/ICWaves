@@ -161,11 +161,11 @@ if __name__ == "__main__":
     validation_segment_length = args.validation_segment_length
     # Compute n_validation_windows_per_segment
     if validation_segment_length == -1:
-        n_validation_windows_per_segment = [None]
+        n_validation_windows_per_segment = None
     else:
-        n_validation_windows_per_segment = [
-            int(validation_segment_length / args.window_length)
-        ]
+        n_validation_windows_per_segment = int(
+            validation_segment_length / args.window_length
+        )
     logging.info(
         f"n_validation_windows_per_segment: {n_validation_windows_per_segment}"
     )
@@ -184,6 +184,10 @@ if __name__ == "__main__":
         clf__max_iter=args.max_iter,
     )
     pipe.set_params(**clf_params)
+
+    # Wrap single-value params as a list. TODO: check and convert for all patams
+    n_centroids = [n_centroids]
+    n_validation_windows_per_segment = [n_validation_windows_per_segment]
 
     candidate_params = dict(
         clf__C=args.regularization_factor,
