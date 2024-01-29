@@ -3,8 +3,8 @@ from pathlib import Path
 
 def _build_centroid_assignments_file(args):
     base_name = (
-        f"k-{args.num_clusters}_P-{args.centroid_len}"
-        f"_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}"
+        f"k-{args.num_clusters}_P-{args.centroid_length}"
+        f"_winlen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
         f"_cbookMinPerIc-{args.codebook_minutes_per_ic}"
         f"_cbookICsPerSubj-{args.codebook_ics_per_subject}"
     )
@@ -17,7 +17,7 @@ def _build_centroid_assignments_file(args):
 
 
 def _build_preprocessed_data_file(args):
-    base_name = f"_winlen-{args.window_len}_minPerIC-{args.minutes_per_ic}"
+    base_name = f"winlen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
     file_name = f"{base_name}.npz"
     data_folder = Path(args.path_to_preprocessed_data)
     data_folder.mkdir(exist_ok=True, parents=True)

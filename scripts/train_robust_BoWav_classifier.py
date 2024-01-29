@@ -26,7 +26,7 @@ parser.add_argument(
     "--path-to-preprocessed-data", help="Path to preprocessed data", required=True
 )
 parser.add_argument(
-    "--path-to-centroid-assignments-folder",
+    "--path-to-centroid-assignments",
     help="Path to centroid assignments",
     required=True,
 )
@@ -34,12 +34,13 @@ parser.add_argument("--path-to-results", help="Path to results", required=True)
 parser.add_argument("--path-to-codebooks", help="Path to codebooks", required=True)
 parser.add_argument(
     "--subj-ids",
+    type=int,
     help="A list with the subject ids to be used during training.",
     nargs="+",
     required=True,
 )
 parser.add_argument(
-    "--centroid-len", type=float, default=1.0, help="Centroid length in seconds"
+    "--centroid-length", type=float, default=1.0, help="Centroid length in seconds"
 )
 parser.add_argument(
     "--window-length",
@@ -60,12 +61,12 @@ parser.add_argument(
     default=300,
     help="Length in seconds of segment used during validation. Use -1 if you want to use all the time series.",
 )
-parser.add_argument("--num-clusters", type=int, default=16, help="Number of clusters")
+parser.add_argument("--num-clusters", type=int, default=128, help="Number of clusters")
 parser.add_argument("--n-jobs", type=int, default=1, help="Value for n_jobs (sklearn)")
 parser.add_argument(
     "--minutes-per-ic",
     type=float,
-    default=15,
+    default=50,
     help="Number of minutes per IC to extract BagOfWaves features",
 )
 parser.add_argument(
@@ -94,7 +95,7 @@ parser.add_argument(
 parser.add_argument(
     "--codebook-minutes-per-ic",
     type=float,
-    default=None,
+    default=50,
     help="Number of minutes per IC to train the class-specific codebook",
 )
 parser.add_argument(
@@ -195,14 +196,14 @@ if __name__ == "__main__":
         n_centroids=n_centroids,
     )
     results = grid_search_cv(
-        pipe,
-        candidate_params,
-        centroid_assignments,
-        labels,
-        subj_ind,
-        expert_label_mask,
-        cv,
-        args.n_jobs,
+        estimator=pipe,
+        candidate_params=candidate_params,
+        X=centroid_assignments,
+        y=labels,
+        groups=subj_ind,
+        expert_label_mask=expert_label_mask,
+        cv=cv,
+        n_jobs=args.n_jobs,
     )
 
     results_file = _build_results_file(

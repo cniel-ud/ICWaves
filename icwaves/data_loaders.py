@@ -1,6 +1,6 @@
 import copy
-from pathlib import Path
 import logging
+from pathlib import Path
 
 import numpy as np
 from scipy.io import loadmat
@@ -102,24 +102,26 @@ def load_raw_train_set_per_class(args, rng):
 
 
 def load_codebooks(args, srate):
-    dict_dir = args.path_to_codebooks
+    dict_dir = Path(args.path_to_codebooks)
+    if not dict_dir.is_dir():
+        raise ValueError(f"Directory {dict_dir} does not exist")
 
-    # Convert centroid_len from seconds to samples
-    centroid_len = int(args.centroid_len * srate)
-    logging.info(f"Centroid length in samples: {centroid_len}")
+    # Convert centroid_length from seconds to samples
+    centroid_length = int(args.centroid_length * srate)
+    logging.info(f"Centroid length in samples: {centroid_length}")
 
     n_codebooks = 7
     codebooks = np.zeros(
-        (n_codebooks, args.num_clusters, centroid_len), dtype=np.float32
+        (n_codebooks, args.num_clusters, centroid_length), dtype=np.float32
     )
 
     for i_class in range(n_codebooks):
         fname = (
-            # TODO: change centroid_len to seconds in file naming. This needs
+            # TODO: change centroid_length to seconds in file naming. This needs
             # refactoring of code that saves the file too, and manually rename
             # files of codebooks that were already learned. In that way, we don't
             # need to know the sampling rate.
-            f"sikmeans_P-{centroid_len}_k-{args.num_clusters}"
+            f"sikmeans_P-{centroid_length}_k-{args.num_clusters}"
             f"_class-{i_class+1}_minutesPerIC-{args.minutes_per_ic}"
             f"_icsPerSubj-{args.ics_per_subject}.npz"
         )
