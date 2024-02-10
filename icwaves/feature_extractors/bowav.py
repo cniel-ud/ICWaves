@@ -97,7 +97,7 @@ def build_bowav_from_centroid_assignments(
         to perform instance-wise normalization of each BoWav from each codebook
         before concatenation. If None, don't perform normalization.
     """
-    n_time_series, n_codebooks, n_windows_per_time_series = centroid_assignments
+    n_time_series, n_codebooks, n_windows_per_time_series = centroid_assignments.shape
     n_features = n_codebooks * n_centroids
 
     if n_windows_per_segment:
