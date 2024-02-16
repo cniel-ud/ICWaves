@@ -121,6 +121,16 @@ def _fit_and_score(
     print(end_msg)
 
     parameters.update({"expert_weight": expert_weight})
+    parameters.update({"bowav_norm": bowav_norm})
+    parameters.update(
+        {"input_or_output_aggregation_method": input_or_output_aggregation_method}
+    )
+    parameters.update(
+        {"n_training_windows_per_segment": n_training_windows_per_segment}
+    )
+    parameters.update(
+        {"n_validation_windows_per_segment": n_validation_windows_per_segment}
+    )
     result["test_scores"] = test_scores
     result["fit_time"] = fit_time
     result["score_time"] = score_time
