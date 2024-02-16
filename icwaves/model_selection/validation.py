@@ -74,7 +74,7 @@ def _fit_and_score(
     if named_steps is not None:
         estimator.fit(bowav_train, y_train, clf__sample_weight=sample_weight_train)
     else:
-        estimator.fit(X_train, y_train, sample_weight=sample_weight_train)
+        estimator.fit(bowav_train, y_train, sample_weight=sample_weight_train)
 
     fit_time = time.time() - start_time
 
