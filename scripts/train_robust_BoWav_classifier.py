@@ -148,6 +148,9 @@ if __name__ == "__main__":
     centroid_assignments = build_or_load_centroid_assignments(
         args, windowed_ics, codebooks
     )
+    logging.info(f"centroid_assignments.shape: {centroid_assignments.shape}")
+    logging.info(f"centroid_assignments.dtype: {centroid_assignments.dtype}")
+    logging.info(f"centroid_assignments[13, 0]: {centroid_assignments[13, 0]}")
 
     input_or_output_aggregation_method = ["count_pooling", "majority_vote"]
 
