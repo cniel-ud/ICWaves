@@ -16,7 +16,7 @@ from icwaves.feature_extractors.bowav import (
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.preprocessing import load_or_build_preprocessed_data
-from icwaves.utils import _build_results_file
+from icwaves.utils import build_results_file
 import sklearn
 import scipy
 
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         n_jobs=args.n_jobs,
     )
 
-    results_file = _build_results_file(args=args)
+    results_file = build_results_file(args=args)
 
     # Add to results the version of scikit-learn, numpy, and
     # scipy to improve reproducibility

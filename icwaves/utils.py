@@ -26,7 +26,7 @@ def _build_preprocessed_data_file(args):
     return data_file
 
 
-def _build_results_file(args):
+def build_results_file(args):
     centroid_assignment_base = _build_centroid_assignments_file(args)
     centroid_assignment_base = centroid_assignment_base.stem
     preprocessed_data_base = _build_preprocessed_data_file(args)
