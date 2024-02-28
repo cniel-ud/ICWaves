@@ -26,28 +26,20 @@ def _build_preprocessed_data_file(args):
     return data_file
 
 
-def _build_results_file(
-    args,
-    regularization_factor,
-    l1_ratio,
-    expert_weight,
-    bowav_norm,
-    train_segment_length,
-    validation_segment_length,
-):
+def _build_results_file(args):
     centroid_assignment_base = _build_centroid_assignments_file(args)
     centroid_assignment_base = centroid_assignment_base.stem
     preprocessed_data_base = _build_preprocessed_data_file(args)
     preprocessed_data_base = preprocessed_data_base.stem
 
-    C_str = "_".join([str(i) for i in regularization_factor])
-    l1_ratio_str = "_".join([str(i) for i in l1_ratio])
-    ew_str = "_".join([str(i) for i in expert_weight])
-    train_segment_length_str = "_".join([str(i) for i in train_segment_length])
+    C_str = "_".join([str(i) for i in args.regularization_factor])
+    l1_ratio_str = "_".join([str(i) for i in args.l1_ratio])
+    ew_str = "_".join([str(i) for i in args.expert_weight])
+    train_segment_length_str = "_".join([str(i) for i in args.train_segment_length])
     validation_segment_length_str = "_".join(
-        [str(i) for i in validation_segment_length]
+        [str(i) for i in args.validation_segment_length]
     )
-    bowav_norm_str = "_".join([str(i) for i in bowav_norm])
+    bowav_norm_str = "_".join([str(i) for i in args.bowav_norm])
 
     classifier_base = (
         f"clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}"

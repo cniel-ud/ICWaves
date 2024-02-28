@@ -213,15 +213,7 @@ if __name__ == "__main__":
         n_jobs=args.n_jobs,
     )
 
-    results_file = _build_results_file(
-        args,
-        candidate_params["clf__C"],
-        candidate_params["clf__l1_ratio"],
-        candidate_params["expert_weight"],
-        candidate_params["bowav_norm"],
-        training_segment_length,
-        validation_segment_length,
-    )
+    results_file = _build_results_file(args=args)
 
     # Add to results the version of scikit-learn, numpy, and
     # scipy to improve reproducibility
