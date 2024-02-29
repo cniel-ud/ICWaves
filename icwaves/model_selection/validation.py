@@ -99,13 +99,23 @@ def _fit_and_score(
 
     # Maybe aggregate output
     if input_or_output_aggregation_method == "majority_vote":
-        y_pred = y_pred.reshape(-1, n_segments_per_time_series)
+        if n_validation_windows_per_segment is None:
+            n_windows_per_time_series = X_test.shape[2]
+            n_validation_windows_per_segment = n_windows_per_time_series
+
+        n_train_segments_per_validation_segment = (
+            n_validation_windows_per_segment // n_training_windows_per_segment
+        )
+        y_pred = y_pred.reshape(-1, n_train_segments_per_validation_segment)
         y_pred = scipy.stats.mode(y_pred, axis=1)[0]
-    else:
-        # expand test labels to match test BoWav vectors
-        y_test = np.repeat(y_test, n_segments_per_time_series)
-        # expand test sample weights to match test BoWav vectors
-        sample_weight_test = np.repeat(sample_weight_test, n_segments_per_time_series)
+        n_segments_per_time_series = (
+            n_segments_per_time_series // n_train_segments_per_validation_segment
+        )
+
+    # expand test labels to match test BoWav vectors
+    y_test = np.repeat(y_test, n_segments_per_time_series)
+    # expand test sample weights to match test BoWav vectors
+    sample_weight_test = np.repeat(sample_weight_test, n_segments_per_time_series)
 
     test_scores = scorer(y_test, y_pred, sample_weight=sample_weight_test)
     score_time = time.time() - start_time - fit_time
