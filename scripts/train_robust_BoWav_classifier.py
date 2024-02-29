@@ -188,7 +188,7 @@ if __name__ == "__main__":
     )
     pipe.set_params(**clf_params)
 
-    # Wrap single-value params as a list. TODO: check and convert for all patams
+    # Wrap single-value params as a list. TODO: check and convert for all params
     n_centroids = [n_centroids]
     n_validation_windows_per_segment = [n_validation_windows_per_segment]
 
