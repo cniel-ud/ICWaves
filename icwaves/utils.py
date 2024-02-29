@@ -2,11 +2,13 @@ from pathlib import Path
 
 
 def _build_centroid_assignments_file(args):
+    subj_str = list_to_base36(args.subj_ids)
     base_name = (
         f"k-{args.num_clusters}_P-{args.centroid_length}"
-        f"_winlen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
+        f"_winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
         f"_cbookMinPerIc-{args.codebook_minutes_per_ic}"
         f"_cbookICsPerSubj-{args.codebook_ics_per_subject}"
+        f"_subj-{subj_str}"
     )
     file_name = f"{base_name}.npy"
     data_folder = Path(args.path_to_centroid_assignments)
@@ -17,7 +19,10 @@ def _build_centroid_assignments_file(args):
 
 
 def _build_preprocessed_data_file(args):
-    base_name = f"winlen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
+    subj_str = list_to_base36(args.subj_ids)
+    base_name = (
+        f"winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}_subj-{subj_str}"
+    )
     file_name = f"{base_name}.npz"
     data_folder = Path(args.path_to_preprocessed_data)
     data_folder.mkdir(exist_ok=True, parents=True)
@@ -29,32 +34,56 @@ def _build_preprocessed_data_file(args):
 def build_results_file(args):
     centroid_assignment_base = _build_centroid_assignments_file(args)
     centroid_assignment_base = centroid_assignment_base.stem
-    preprocessed_data_base = _build_preprocessed_data_file(args)
-    preprocessed_data_base = preprocessed_data_base.stem
 
     C_str = "_".join([str(i) for i in args.regularization_factor])
     l1_ratio_str = "_".join([str(i) for i in args.l1_ratio])
     ew_str = "_".join([str(i) for i in args.expert_weight])
-    train_segment_length_str = "_".join([str(i) for i in args.train_segment_length])
-    validation_segment_length_str = "_".join(
-        [str(i) for i in args.validation_segment_length]
-    )
+    train_segment_length_str = "_".join([str(i) for i in args.training_segment_length])
+    validation_segment_length_str = str(args.validation_segment_length)
     bowav_norm_str = "_".join([str(i) for i in args.bowav_norm])
 
     classifier_base = (
-        f"clf-lr_penalty-{args.penalty}_solver-saga_C-{C_str}"
-        f"_l1_ratio-{l1_ratio_str}"
-        f"_expert_weight-{ew_str}"
-        f"_train_segment_length-{train_segment_length_str}"
-        f"_validation_segment_length-{validation_segment_length_str}"
-        f"_bowav_norm-{bowav_norm_str}"
+        f"clf-lr_pen-{args.penalty}_solv-saga_C-{C_str}"
+        f"_l1Ratio-{l1_ratio_str}"
+        f"_expW-{ew_str}"
+        f"_trSegLen-{train_segment_length_str}"
+        f"_valSegLen-{validation_segment_length_str}"
+        f"_bowavNorm-{bowav_norm_str}"
     )
-    classifier_fname = (
-        f"{centroid_assignment_base}_{preprocessed_data_base}_"
-        f"{classifier_base}.pickle"
-    )
+    classifier_fname = f"{centroid_assignment_base}_{classifier_base}.pickle"
     results_folder = Path(args.path_to_results)
     results_folder.mkdir(exist_ok=True, parents=True)
     results_file = results_folder.joinpath(classifier_fname)
 
     return results_file
+
+
+def list_to_base36(int_list):
+    # Create a 34-bit binary representation
+    binary_str = ["0"] * 34
+    for i in int_list:
+        if 1 <= i <= 34:
+            binary_str[i - 1] = "1"
+    binary_str = "".join(binary_str)
+
+    # Convert binary string to integer
+    integer_representation = int(binary_str, 2)
+
+    # Convert integer to base-36
+    base36_representation = base36_encode(integer_representation)
+
+    return base36_representation
+
+
+def base36_encode(number):
+    assert number >= 0, "Number must be non-negative."
+    if number == 0:
+        return "0"
+
+    alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    base36 = ""
+    while number:
+        number, i = divmod(number, 36)
+        base36 = alphabet[i] + base36
+
+    return base36
