@@ -73,6 +73,9 @@ def grid_search_cv(
 
     results = {**fit_time_dict, **test_time_dict, **param_results}
     results["params"] = candidate_params
+    # TODO: We save back candidate parameters in the "parameters" key of `result`
+    # in validation.py, but we never access that key here. Maybe remove that in
+    # validation.py?
     test_scores_dict = {"scores": all_out["test_scores"]}
     # Computed the (weighted) mean and std for test scores alone
     results.update(
@@ -94,6 +97,7 @@ def grid_search_cv(
     best_n_training_windows_per_segment = best_params.pop(
         "n_training_windows_per_segment"
     )
+    n_centroids = best_params.pop("n_centroids")
     del best_params["n_validation_windows_per_segment"]
     del best_params["input_or_output_aggregation_method"]
     best_estimator = clone(clone(estimator).set_params(**best_params))
@@ -103,7 +107,6 @@ def grid_search_cv(
     sample_weight[expert_label_mask] = best_expert_weight
 
     # Build train BoWav vector for a given segment length
-    n_centroids = candidate_params["n_centroids"]
     bowav = build_bowav_from_centroid_assignments(
         X, n_centroids, best_n_training_windows_per_segment, best_bowav_norm
     )
