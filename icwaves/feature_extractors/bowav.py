@@ -1,3 +1,4 @@
+from pathlib import Path
 from pprint import pprint
 
 import numpy as np
@@ -62,7 +63,10 @@ def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
 
 
 def build_or_load_centroid_assignments(args, windowed_ics, codebooks):
+    data_folder = Path(args.path_to_centroid_assignments)
+    data_folder.mkdir(exist_ok=True, parents=True)
     centroid_assignments_file = _build_centroid_assignments_file(args)
+    centroid_assignments_file = data_folder.joinpath(centroid_assignments_file)
     if centroid_assignments_file.is_file():
         centroid_assignments = np.load(centroid_assignments_file)
     else:

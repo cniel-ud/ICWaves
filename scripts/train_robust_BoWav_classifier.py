@@ -1,5 +1,6 @@
 # %%
 import logging
+from pathlib import Path
 import pickle
 from argparse import ArgumentParser
 
@@ -42,6 +43,7 @@ parser.add_argument(
 parser.add_argument(
     "--centroid-length", type=float, default=1.0, help="Centroid length in seconds"
 )
+# TODO: change type from float to int to arguments that are in seconds
 parser.add_argument(
     "--window-length",
     type=float,
@@ -213,7 +215,10 @@ if __name__ == "__main__":
         n_jobs=args.n_jobs,
     )
 
+    results_folder = Path(args.path_to_results)
+    results_folder.mkdir(exist_ok=True, parents=True)
     results_file = build_results_file(args=args)
+    results_file = results_folder.joinpath(results_file)
 
     # Add to results the version of scikit-learn, numpy, and
     # scipy to improve reproducibility

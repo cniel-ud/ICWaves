@@ -11,11 +11,8 @@ def _build_centroid_assignments_file(args):
         f"_subj-{subj_str}"
     )
     file_name = f"{base_name}.npy"
-    data_folder = Path(args.path_to_centroid_assignments)
-    data_folder.mkdir(exist_ok=True, parents=True)
-    data_file = data_folder.joinpath(file_name)
 
-    return data_file
+    return file_name
 
 
 def _build_preprocessed_data_file(args):
@@ -24,16 +21,13 @@ def _build_preprocessed_data_file(args):
         f"winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}_subj-{subj_str}"
     )
     file_name = f"{base_name}.npz"
-    data_folder = Path(args.path_to_preprocessed_data)
-    data_folder.mkdir(exist_ok=True, parents=True)
-    data_file = data_folder.joinpath(file_name)
 
-    return data_file
+    return file_name
 
 
 def build_results_file(args):
     centroid_assignment_base = _build_centroid_assignments_file(args)
-    centroid_assignment_base = centroid_assignment_base.stem
+    centroid_assignment_base = Path(centroid_assignment_base).stem
 
     C_str = "_".join([str(i) for i in args.regularization_factor])
     l1_ratio_str = "_".join([str(i) for i in args.l1_ratio])
@@ -51,11 +45,8 @@ def build_results_file(args):
         f"_bowavNorm-{bowav_norm_str}"
     )
     classifier_fname = f"{centroid_assignment_base}_{classifier_base}.pickle"
-    results_folder = Path(args.path_to_results)
-    results_folder.mkdir(exist_ok=True, parents=True)
-    results_file = results_folder.joinpath(classifier_fname)
 
-    return results_file
+    return classifier_fname
 
 
 def list_to_base36(int_list):
