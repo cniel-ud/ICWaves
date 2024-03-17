@@ -3,7 +3,6 @@ from itertools import product
 import logging
 from pathlib import Path
 import pickle
-from argparse import ArgumentParser
 
 import numpy as np
 from numpy.random import default_rng
@@ -12,17 +11,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
-from sklearn.base import clone
 
 from icwaves.data_loaders import load_codebooks_wrapper
 from icwaves.feature_extractors.bowav import (
     build_or_load_centroid_assignments,
 )
-from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
 from icwaves.preprocessing import load_or_build_preprocessed_data
-from icwaves.utils import build_results_file, read_args_from_file
+from icwaves.utils import read_args_from_file
 from icwaves.argparser import (
     create_argparser_all_params,
     create_argparser_one_parameter_one_split,
