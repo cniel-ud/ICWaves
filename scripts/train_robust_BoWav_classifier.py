@@ -1,4 +1,5 @@
 # %%
+from itertools import product
 import logging
 from pathlib import Path
 import pickle
@@ -8,7 +9,10 @@ import numpy as np
 from numpy.random import default_rng
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import balanced_accuracy_score
+from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
+from sklearn.base import clone
 
 from icwaves.data_loaders import load_codebooks_wrapper
 from icwaves.feature_extractors.bowav import (
@@ -16,102 +20,15 @@ from icwaves.feature_extractors.bowav import (
 )
 from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
+from icwaves.model_selection.validation import _fit_and_score
 from icwaves.preprocessing import load_or_build_preprocessed_data
-from icwaves.utils import build_results_file
+from icwaves.utils import build_results_file, read_args_from_file
+from icwaves.argparser import (
+    create_argparser_all_params,
+    create_argparser_one_parameter_one_split,
+)
 import sklearn
 import scipy
-
-parser = ArgumentParser()
-parser.add_argument("--path-to-raw-data", help="Path to raw data", required=True)
-parser.add_argument(
-    "--path-to-preprocessed-data", help="Path to preprocessed data", required=True
-)
-parser.add_argument(
-    "--path-to-centroid-assignments",
-    help="Path to centroid assignments",
-    required=True,
-)
-parser.add_argument("--path-to-results", help="Path to results", required=True)
-parser.add_argument("--path-to-codebooks", help="Path to codebooks", required=True)
-parser.add_argument(
-    "--subj-ids",
-    type=int,
-    help="A list with the subject ids to be used during training.",
-    nargs="+",
-    required=True,
-)
-parser.add_argument(
-    "--centroid-length", type=float, default=1.0, help="Centroid length in seconds"
-)
-# TODO: change type from float to int to arguments that are in seconds
-parser.add_argument(
-    "--window-length",
-    type=float,
-    default=1.5,
-    help="Length of window assigned to centroid, in seconds",
-)
-parser.add_argument(
-    "--training-segment-length",
-    type=float,
-    nargs="+",
-    default=[10, 30, 90, 180, 300],
-    help="Length in seconds of segment used during training.",
-)
-parser.add_argument(
-    "--validation-segment-length",
-    type=int,
-    default=300,
-    help="Length in seconds of segment used during validation. Use -1 if you want to use all the time series.",
-)
-parser.add_argument("--num-clusters", type=int, default=128, help="Number of clusters")
-parser.add_argument("--n-jobs", type=int, default=1, help="Value for n_jobs (sklearn)")
-parser.add_argument(
-    "--minutes-per-ic",
-    type=float,
-    default=50,
-    help="Number of minutes per IC to extract BagOfWaves features",
-)
-parser.add_argument(
-    "--regularization-factor",
-    type=float,
-    nargs="+",
-    default=[0.1, 1, 10],
-    help="Regularization factor used by the classifier. In LogisticRegression, it is the value of C.",
-)
-parser.add_argument(
-    "--expert-weight",
-    type=float,
-    nargs="+",
-    default=[1, 2, 4],
-    help="Sample weight given to ICs with expert labels.",
-)
-parser.add_argument(
-    "--l1-ratio", type=float, nargs="+", default=[0, 0.2, 0.4, 0.6, 0.8, 1]
-)
-parser.add_argument(
-    "--max-iter", type=int, default=1000, help="Maximum number of iterations"
-)
-parser.add_argument(
-    "--penalty", default="elasticnet", choices=["l1", "l2", "elasticnet", "none"]
-)
-parser.add_argument(
-    "--codebook-minutes-per-ic",
-    type=float,
-    default=50,
-    help="Number of minutes per IC to train the class-specific codebook",
-)
-parser.add_argument(
-    "--codebook-ics-per-subject",
-    type=int,
-    default=2,
-    help="Maximum number of ICs per subject to train the class-specific codebook",
-)
-parser.add_argument(
-    "--bowav-norm",
-    help="Instance-wise normalization in BoWav",
-    nargs="+",
-    default=["none", "l_1", "l_2", "l_inf"],
-)
 
 
 BOWAV_NORM_MAP = {
@@ -127,7 +44,14 @@ if __name__ == "__main__":
     )
     logging.info("Started")
 
-    args = parser.parse_args()
+    parser = create_argparser_one_parameter_one_split()
+    one_run_args = parser.parse_args()
+
+    args_list = read_args_from_file(one_run_args.path_to_config_file)
+    job_id = one_run_args.job_id
+
+    all_params_parser = create_argparser_all_params()
+    args = all_params_parser.parse_args(args_list)
 
     new_rng = default_rng(13)
     # scikit-learn doesn't support the new numpy Generator:
@@ -204,29 +128,46 @@ if __name__ == "__main__":
         n_validation_windows_per_segment=n_validation_windows_per_segment,
         n_centroids=n_centroids,
     )
-    results = grid_search_cv(
-        estimator=pipe,
-        candidate_params=candidate_params,
-        X=centroid_assignments,
-        y=labels,
-        groups=subj_ind,
-        expert_label_mask=expert_label_mask,
-        cv=cv,
-        n_jobs=args.n_jobs,
+
+    candidate_params = list(ParameterGrid(candidate_params))
+    n_candidates = len(candidate_params)
+    list_of_candidate_params_and_splits = list(
+        product(
+            enumerate(candidate_params),
+            enumerate(cv.split(centroid_assignments, labels, subj_ind)),
+        )
+    )
+    (cand_idx, parameters), (split_idx, (train, test)) = (
+        list_of_candidate_params_and_splits[job_id]
     )
 
-    results_folder = Path(args.path_to_results)
+    n_splits = cv.get_n_splits(centroid_assignments, labels, groups=subj_ind)
+
+    result = _fit_and_score(
+        clone(pipe),
+        centroid_assignments,
+        labels,
+        expert_label_mask,
+        train=train,
+        test=test,
+        parameters=parameters,
+        scorer=balanced_accuracy_score,
+        split_progress=(split_idx, n_splits),
+        candidate_progress=(cand_idx, n_candidates),
+    )
+
+    results_folder = Path(args.path_to_results, "temporal_results")
     results_folder.mkdir(exist_ok=True, parents=True)
-    results_file = build_results_file(args=args)
+    results_file = f"candidate_{cand_idx}_split_{split_idx}.pkl"
     results_file = results_folder.joinpath(results_file)
 
     # Add to results the version of scikit-learn, numpy, and
     # scipy to improve reproducibility
-    results["sklearn_version"] = sklearn.__version__
-    results["numpy_version"] = np.__version__
-    results["scipy_version"] = scipy.__version__
+    result["sklearn_version"] = sklearn.__version__
+    result["numpy_version"] = np.__version__
+    result["scipy_version"] = scipy.__version__
 
     with results_file.open("wb") as f:
-        pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
 
     logging.info("Finished")
