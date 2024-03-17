@@ -1,4 +1,17 @@
 from pathlib import Path
+import shlex
+
+
+def read_args_from_file(file_path):
+    # Read the file
+    with open(file_path, "r") as file:
+        file_contents = file.read()
+
+    # Split the file contents into a list of arguments
+    # shlex.split properly handles spaces within arguments
+    args_list = shlex.split(file_contents)
+
+    return args_list
 
 
 def _build_centroid_assignments_file(args):
