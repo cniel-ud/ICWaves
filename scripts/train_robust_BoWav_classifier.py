@@ -14,7 +14,7 @@ from sklearn.pipeline import Pipeline
 
 from icwaves.data_loaders import load_codebooks_wrapper
 from icwaves.feature_extractors.bowav import (
-    build_or_load_centroid_assignments,
+    build_or_load_centroid_assignments_and_labels,
 )
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
@@ -54,24 +54,10 @@ if __name__ == "__main__":
     # scikit-learn doesn't support the new numpy Generator:
     old_rng = np.random.RandomState(13)
 
-    # Load or build preprocessed data
-    (
-        windowed_ics,
-        labels,
-        srate,
-        expert_label_mask,
-        subj_ind,
-    ) = load_or_build_preprocessed_data(args)
-
-    # Load codebooks
-    codebooks = load_codebooks_wrapper(args, srate)
-    n_centroids = codebooks[0].shape[0]
-
     # Load or build centroid assignments
-    centroid_assignments = build_or_load_centroid_assignments(
-        args, windowed_ics, codebooks
+    centroid_assignments, labels, expert_label_mask, subj_ind, n_centroids = (
+        build_or_load_centroid_assignments_and_labels(args)
     )
-    del windowed_ics, codebooks
     logging.info(f"centroid_assignments.shape: {centroid_assignments.shape}")
     logging.info(f"centroid_assignments.dtype: {centroid_assignments.dtype}")
     logging.info(f"centroid_assignments[13, 0]: {centroid_assignments[13, 0]}")

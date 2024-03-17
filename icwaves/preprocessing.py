@@ -85,6 +85,21 @@ def _get_windowed_ics_and_labels(args):
     return windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
 
 
+def load_labels(args):
+    data_folder = Path(args.path_to_preprocessed_data)
+    data_folder.mkdir(exist_ok=True, parents=True)
+    preprocessed_data_file = _build_preprocessed_data_file(args)
+    preprocessed_data_file = data_folder.joinpath(preprocessed_data_file)
+    if preprocessed_data_file.is_file():
+        with np.load(preprocessed_data_file) as data:
+            labels = data["labels"]
+            srate = data["srate"]
+            expert_label_mask = data["expert_label_mask"]
+            subj_ind = data["subj_ind"]
+
+    return labels, srate, expert_label_mask, subj_ind
+
+
 def load_or_build_preprocessed_data(args):
     data_folder = Path(args.path_to_preprocessed_data)
     data_folder.mkdir(exist_ok=True, parents=True)
