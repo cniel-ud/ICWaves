@@ -74,6 +74,7 @@ if __name__ == "__main__":
     centroid_assignments = build_or_load_centroid_assignments(
         args, windowed_ics, codebooks
     )
+    del windowed_ics, codebooks
     logging.info(f"centroid_assignments.shape: {centroid_assignments.shape}")
     logging.info(f"centroid_assignments.dtype: {centroid_assignments.dtype}")
     logging.info(f"centroid_assignments[13, 0]: {centroid_assignments[13, 0]}")
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     n_splits = cv.get_n_splits(centroid_assignments, labels, groups=subj_ind)
 
     result = _fit_and_score(
-        clone(pipe),
+        pipe,
         centroid_assignments,
         labels,
         expert_label_mask,
