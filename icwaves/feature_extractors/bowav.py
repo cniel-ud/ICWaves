@@ -123,14 +123,12 @@ def build_bowav_from_centroid_assignments(
                 )
                 # centroid index->feature index
                 i_feature = nu + r * n_centroids
+                bowav[i_ts, i_seg, i_feature] = counts
 
-                if BOWAV_NORM_MAP[ord_str]:
-                    # instance-wise normalization
-                    bowav[i_ts, i_seg, i_feature] = counts / np.linalg.norm(
-                        counts, ord=ord
-                    )
-                else:
-                    bowav[i_ts, i_seg, i_feature] = counts
+    if BOWAV_NORM_MAP[ord_str] is not None:
+        # instance-wise normalization
+        bowav_norm = np.linalg.norm(bowav, ord=BOWAV_NORM_MAP[ord_str], axis=2)
+        bowav = bowav / bowav_norm[:, :, None]
 
     return bowav
 
