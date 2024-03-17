@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 def create_argparser_one_parameter_one_split():
     parser = ArgumentParser()
     parser.add_argument(
-        "--path-config-file",
+        "--path-to-config-file",
         help="Path to config file with all the parameters",
         required=True,
     )
