@@ -62,6 +62,7 @@ def _fit_and_score(
     bowav_train = build_bowav_from_centroid_assignments(
         X_train, n_centroids, n_training_windows_per_segment, bowav_norm
     )
+    del X_train
     n_segments_per_time_series = bowav_train.shape[1]
     # vertically concatenate train BoWav vectors: (m, n, p) -> (m*n, p)
     bowav_train = np.vstack(bowav_train)
@@ -75,6 +76,8 @@ def _fit_and_score(
         estimator.fit(bowav_train, y_train, clf__sample_weight=sample_weight_train)
     else:
         estimator.fit(bowav_train, y_train, sample_weight=sample_weight_train)
+
+    del bowav_train, y_train, sample_weight_train
 
     fit_time = time.time() - start_time
 
@@ -91,11 +94,14 @@ def _fit_and_score(
             X_test, n_centroids, n_training_windows_per_segment, bowav_norm
         )
 
+    del X_test
+
     n_segments_per_time_series = bowav_test.shape[1]
     # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
     bowav_test = np.vstack(bowav_test)
 
     y_pred = estimator.predict(bowav_test)
+    del bowav_test
 
     # Maybe aggregate output
     if input_or_output_aggregation_method == "majority_vote":
