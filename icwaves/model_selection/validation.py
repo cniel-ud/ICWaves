@@ -31,9 +31,6 @@ def _fit_and_score(
     sample_weight = np.ones(X.shape[0])
     sample_weight[expert_label_mask] = expert_weight
 
-    # Get bowav norm
-    bowav_norm = parameters.pop("bowav_norm")
-
     # Get input/output aggregation method
     input_or_output_aggregation_method = parameters.pop(
         "input_or_output_aggregation_method"
@@ -60,7 +57,7 @@ def _fit_and_score(
 
     # Build train BoWav vector for a given segment length
     bowav_train = build_bowav_from_centroid_assignments(
-        X_train, n_centroids, n_training_windows_per_segment, bowav_norm
+        X_train, n_centroids, n_training_windows_per_segment
     )
     del X_train
     n_segments_per_time_series = bowav_train.shape[1]
@@ -87,11 +84,11 @@ def _fit_and_score(
     # Aggregate input at either training segment length or validation segment length
     if input_or_output_aggregation_method == "count_pooling":
         bowav_test = build_bowav_from_centroid_assignments(
-            X_test, n_centroids, n_validation_windows_per_segment, bowav_norm
+            X_test, n_centroids, n_validation_windows_per_segment
         )
     else:
         bowav_test = build_bowav_from_centroid_assignments(
-            X_test, n_centroids, n_training_windows_per_segment, bowav_norm
+            X_test, n_centroids, n_training_windows_per_segment
         )
 
     del X_test
@@ -137,7 +134,6 @@ def _fit_and_score(
     print(end_msg)
 
     parameters.update({"expert_weight": expert_weight})
-    parameters.update({"bowav_norm": bowav_norm})
     parameters.update(
         {"input_or_output_aggregation_method": input_or_output_aggregation_method}
     )

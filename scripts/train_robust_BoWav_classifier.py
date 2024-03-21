@@ -12,13 +12,11 @@ from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
 
-from icwaves.data_loaders import load_codebooks_wrapper
 from icwaves.feature_extractors.bowav import (
     build_or_load_centroid_assignments_and_labels,
 )
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
-from icwaves.preprocessing import load_or_build_preprocessed_data
 from icwaves.utils import read_args_from_file
 from icwaves.argparser import (
     create_argparser_all_params,
@@ -28,11 +26,10 @@ import sklearn
 import scipy
 
 
-BOWAV_NORM_MAP = {
+TF_IDF_NORM_MAP = {
     "none": None,
-    "l_1": 1,
-    "l_2": 2,
-    "l_inf": np.inf,
+    "l1": "l1",
+    "l2": "l2",
 }
 
 if __name__ == "__main__":
@@ -101,12 +98,14 @@ if __name__ == "__main__":
     # Wrap single-value params as a list. TODO: check and convert for all params
     n_centroids = [n_centroids]
     n_validation_windows_per_segment = [n_validation_windows_per_segment]
+    if not isinstance(args.tf_idf_norm, list):
+        args.tf_idf_norm = [args.tf_idf_norm]
 
     candidate_params = dict(
         clf__C=args.regularization_factor,
         clf__l1_ratio=args.l1_ratio,
+        scaler__norm=[TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm],
         expert_weight=args.expert_weight,
-        bowav_norm=args.bowav_norm,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
         n_training_windows_per_segment=n_training_windows_per_segment,
         n_validation_windows_per_segment=n_validation_windows_per_segment,

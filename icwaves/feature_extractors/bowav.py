@@ -10,13 +10,6 @@ from icwaves.preprocessing import load_labels, load_or_build_preprocessed_data
 from icwaves.sikmeans.shift_kmeans import _asignment_step
 from icwaves.utils import _build_centroid_assignments_file
 
-BOWAV_NORM_MAP = {
-    "none": None,
-    "l_1": 1,
-    "l_2": 2,
-    "l_inf": np.inf,
-}
-
 
 def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
     """Shift-invariant assignment of centroids
@@ -99,7 +92,7 @@ def build_or_load_centroid_assignments_and_labels(args):
 
 
 def build_bowav_from_centroid_assignments(
-    centroid_assignments, n_centroids, n_windows_per_segment, ord_str
+    centroid_assignments, n_centroids, n_windows_per_segment
 ):
     """Build flattened bag of waves from centroid assignments. Use all windows on each time series.
 
@@ -117,10 +110,6 @@ def build_bowav_from_centroid_assignments(
     n_windows_per_segment:
         The number of windows per segment. This is the number of
         windows/assignments counted to compute the BoWav vector.
-    ord_str (str):
-        BOWAV_NORM_MAP[ord_str] is the `ord` argument passed to np.linalg.norm
-        to perform instance-wise normalization of each BoWav from each codebook
-        before concatenation. If None, don't perform normalization.
     """
     n_time_series, n_codebooks, n_windows_per_time_series = centroid_assignments.shape
     n_features = n_codebooks * n_centroids
@@ -132,9 +121,9 @@ def build_bowav_from_centroid_assignments(
         n_windows_per_segment = n_windows_per_time_series
 
     bowav = np.zeros(
-        (n_time_series, n_segments_per_time_series, n_features), dtype=np.float32
+        (n_time_series, n_segments_per_time_series, n_features), dtype=np.int32
     )
-    for i_ts in tqdm(range(n_time_series)):
+    for i_ts in range(n_time_series):
         for i_seg in range(n_segments_per_time_series):
             start_ind = i_seg * n_windows_per_segment
             end_ind = start_ind + n_windows_per_segment
@@ -145,11 +134,6 @@ def build_bowav_from_centroid_assignments(
                 # centroid index->feature index
                 i_feature = nu + r * n_centroids
                 bowav[i_ts, i_seg, i_feature] = counts
-
-    if BOWAV_NORM_MAP[ord_str] is not None:
-        # instance-wise normalization
-        bowav_norm = np.linalg.norm(bowav, ord=BOWAV_NORM_MAP[ord_str], axis=2)
-        bowav = bowav / bowav_norm[:, :, None]
 
     return bowav
 

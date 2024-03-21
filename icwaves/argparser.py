@@ -112,10 +112,10 @@ def create_argparser_all_params():
         help="Maximum number of ICs per subject to train the class-specific codebook",
     )
     parser.add_argument(
-        "--bowav-norm",
-        help="Instance-wise normalization in BoWav",
+        "--tf-idf-norm",
+        help="Norm in TfidfTransformer",
         nargs="+",
-        default=["none", "l_1", "l_2", "l_inf"],
+        default=["none", "l1", "l2"],
     )
 
     return parser

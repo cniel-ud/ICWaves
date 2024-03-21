@@ -51,7 +51,7 @@ class Args:
     l1_ratio = [1.0]
     codebook_minutes_per_ic = 50.0
     codebook_ics_per_subject = 2
-    bowav_norm = ["none"]
+    tf_idf_norm = ["none"]
     subj_ids = train_subj_ids
     training_segment_length = [30.0, 300.0]
     validation_segment_length = 300
@@ -62,7 +62,7 @@ rng = default_rng(13)
 
 img_dir = root.joinpath("img")
 
-BOWAV_NORM_MAP = {
+TF_IDF_NORM_MAP = {
     "none": None,
     "l_1": 1,
     "l_2": 2,
@@ -102,14 +102,13 @@ centroid_assignments = build_or_load_centroid_assignments(args, windowed_ics, co
 input_or_output_aggregation_method = best_params["input_or_output_aggregation_method"]
 n_validation_windows_per_segment = best_params["n_validation_windows_per_segment"]
 n_training_windows_per_segment = best_params["n_training_windows_per_segment"]
-bowav_norm = best_params["bowav_norm"]
 if input_or_output_aggregation_method == "count_pooling":
     bowav_test = build_bowav_from_centroid_assignments(
-        centroid_assignments, n_centroids, n_validation_windows_per_segment, bowav_norm
+        centroid_assignments, n_centroids, n_validation_windows_per_segment
     )
 else:
     bowav_test = build_bowav_from_centroid_assignments(
-        centroid_assignments, n_centroids, n_training_windows_per_segment, bowav_norm
+        centroid_assignments, n_centroids, n_training_windows_per_segment
     )
 # %%
 n_segments_per_time_series = bowav_test.shape[1]

@@ -47,7 +47,7 @@ def build_results_file(args):
     ew_str = "_".join([str(i) for i in args.expert_weight])
     train_segment_length_str = "_".join([str(i) for i in args.training_segment_length])
     validation_segment_length_str = str(args.validation_segment_length)
-    bowav_norm_str = "_".join([str(i) for i in args.bowav_norm])
+    tf_idf_norm_str = "_".join([str(i) for i in args.tf_idf_norm])
 
     classifier_base = (
         f"clf-lr_pen-{args.penalty}_solv-saga_C-{C_str}"
@@ -55,7 +55,7 @@ def build_results_file(args):
         f"_expW-{ew_str}"
         f"_trSegLen-{train_segment_length_str}"
         f"_valSegLen-{validation_segment_length_str}"
-        f"_bowavNorm-{bowav_norm_str}"
+        f"_tfIdfNorm-{tf_idf_norm_str}"
     )
     classifier_fname = f"{centroid_assignment_base}_{classifier_base}.pickle"
 
