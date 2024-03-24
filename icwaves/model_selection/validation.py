@@ -47,6 +47,9 @@ def _fit_and_score(
     # Get n_centroids
     n_centroids = parameters.pop("n_centroids")
 
+    # Get scorer_kwargs
+    scorer_kwargs = parameters.pop("scorer_kwargs", {})
+
     # Set classifier params
     estimator.set_params(**parameters)
 
@@ -91,6 +94,7 @@ def _fit_and_score(
             X_test, n_centroids, n_training_windows_per_segment
         )
 
+    n_windows_per_time_series = X_test.shape[2]
     del X_test
 
     n_segments_per_time_series = bowav_test.shape[1]
@@ -103,7 +107,6 @@ def _fit_and_score(
     # Maybe aggregate output
     if input_or_output_aggregation_method == "majority_vote":
         if n_validation_windows_per_segment is None:
-            n_windows_per_time_series = X_test.shape[2]
             n_validation_windows_per_segment = n_windows_per_time_series
 
         n_train_segments_per_validation_segment = (
@@ -120,7 +123,15 @@ def _fit_and_score(
     # expand test sample weights to match test BoWav vectors
     sample_weight_test = np.repeat(sample_weight_test, n_segments_per_time_series)
 
-    test_scores = scorer(y_test, y_pred, sample_weight=sample_weight_test)
+    test_scores = scorer(
+        y_test, y_pred, sample_weight=sample_weight_test, **scorer_kwargs
+    )
+
+    # This accounts for cases where we want to compute a metric on a single class
+    # e.g., F1-score on brain
+    if isinstance(test_scores, np.ndarray) and len(test_scores) == 1:
+        test_scores = test_scores[0]
+
     score_time = time.time() - start_time - fit_time
 
     total_time = score_time + fit_time

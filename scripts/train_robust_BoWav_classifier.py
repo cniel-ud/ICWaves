@@ -8,7 +8,7 @@ import numpy as np
 from numpy.random import default_rng
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import f1_score
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
 
@@ -126,6 +126,9 @@ if __name__ == "__main__":
 
     n_splits = cv.get_n_splits(centroid_assignments, labels, groups=subj_ind)
 
+    # '0' is the 'brain' class. We want to compute the F1-score for this class only.
+    parameters["scorer_kwargs"] = {"labels": [0], "average": None}
+
     result = _fit_and_score(
         pipe,
         centroid_assignments,
@@ -134,7 +137,7 @@ if __name__ == "__main__":
         train=train,
         test=test,
         parameters=parameters,
-        scorer=balanced_accuracy_score,
+        scorer=f1_score,
         split_progress=(split_idx, n_splits),
         candidate_progress=(cand_idx, n_candidates),
     )
