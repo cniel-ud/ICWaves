@@ -3,6 +3,7 @@ import time
 import numpy as np
 import scipy
 from joblib import logger
+import logging
 
 from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
 
@@ -94,7 +95,6 @@ def _fit_and_score(
             X_test, n_centroids, n_training_windows_per_segment
         )
 
-    n_windows_per_time_series = X_test.shape[2]
     del X_test
 
     n_segments_per_time_series = bowav_test.shape[1]
@@ -104,19 +104,41 @@ def _fit_and_score(
     y_pred = estimator.predict(bowav_test)
     del bowav_test
 
-    # Maybe aggregate output
+    # Predictions were made on segments of length n_training_windows_per_segment.
     if input_or_output_aggregation_method == "majority_vote":
+        # Aggregate all the predictions
         if n_validation_windows_per_segment is None:
-            n_validation_windows_per_segment = n_windows_per_time_series
+            y_pred = y_pred.reshape(-1, n_segments_per_time_series)
+            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+            n_segments_per_time_series = 1
+        # Aggregate predictions every n_validation_windows_per_segment > n_training_windows_per_segment
+        else:
+            n_validation_segments_per_time_series = (
+                n_segments_per_time_series * n_training_windows_per_segment
+            ) // n_validation_windows_per_segment
 
-        n_train_segments_per_validation_segment = (
-            n_validation_windows_per_segment // n_training_windows_per_segment
-        )
-        y_pred = y_pred.reshape(-1, n_train_segments_per_validation_segment)
-        y_pred = scipy.stats.mode(y_pred, axis=1)[0]
-        n_segments_per_time_series = (
-            n_segments_per_time_series // n_train_segments_per_validation_segment
-        )
+            n_train_segments_per_validation_segment = (
+                n_segments_per_time_series // n_validation_segments_per_time_series
+            )
+
+            # Discard some predictions if the number of training segments is not
+            # divisible by the number of validation segments.
+            if n_segments_per_time_series % n_validation_segments_per_time_series:
+                trimmed_n_segments = (
+                    n_train_segments_per_validation_segment
+                    * n_validation_segments_per_time_series
+                )
+                y_pred = y_pred.reshape(-1, n_segments_per_time_series)
+                y_pred = y_pred[:, :trimmed_n_segments]
+                y_pred = y_pred.reshape(-1)
+                logging.warning(
+                    f"Trimming y_pred from {n_segments_per_time_series} to "
+                    f"{trimmed_n_segments} segments per time series."
+                )
+
+            y_pred = y_pred.reshape(-1, n_train_segments_per_validation_segment)
+            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+            n_segments_per_time_series = n_validation_segments_per_time_series
 
     # expand test labels to match test BoWav vectors
     y_test = np.repeat(y_test, n_segments_per_time_series)
