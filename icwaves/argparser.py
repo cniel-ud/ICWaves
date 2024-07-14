@@ -21,6 +21,17 @@ def create_argparser_one_parameter_one_split():
     return parser
 
 
+def create_argparser_aggregate_results():
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--path-to-config-file",
+        help="Path to config file with all the parameters",
+        required=True,
+    )
+
+    return parser
+
+
 def create_argparser_all_params():
     parser = ArgumentParser()
     parser.add_argument("--path-to-raw-data", help="Path to raw data", required=True)
