@@ -8,7 +8,7 @@ from tqdm import tqdm
 from icwaves.data_loaders import load_codebooks_wrapper
 from icwaves.preprocessing import load_labels, load_or_build_preprocessed_data
 from icwaves.sikmeans.shift_kmeans import _asignment_step
-from icwaves.utils import _build_centroid_assignments_file
+from icwaves.file_utils import _build_centroid_assignments_file
 
 
 def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
@@ -66,19 +66,15 @@ def build_or_load_centroid_assignments_and_labels(args):
     if centroid_assignments_file.is_file():
         centroid_assignments = np.load(centroid_assignments_file)
         # Load labels
-        labels, srate, expert_label_mask, subj_ind = load_labels(args)
+        labels, srate, expert_label_mask, subj_ind, noisy_labels = load_labels(args)
         codebooks = load_codebooks_wrapper(args, srate)
         n_centroids = codebooks[0].shape[0]
 
     else:
         # Load or build preprocessed data
-        (
-            windowed_ics,
-            labels,
-            srate,
-            expert_label_mask,
-            subj_ind,
-        ) = load_or_build_preprocessed_data(args)
+        (windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels) = (
+            load_or_build_preprocessed_data(args)
+        )
 
         # Load codebooks
         codebooks = load_codebooks_wrapper(args, srate)
@@ -88,7 +84,14 @@ def build_or_load_centroid_assignments_and_labels(args):
         with centroid_assignments_file.open("wb") as f:
             np.save(f, centroid_assignments, allow_pickle=False)
 
-    return centroid_assignments, labels, expert_label_mask, subj_ind, n_centroids
+    return (
+        centroid_assignments,
+        labels,
+        expert_label_mask,
+        subj_ind,
+        noisy_labels,
+        n_centroids,
+    )
 
 
 def build_bowav_from_centroid_assignments(
