@@ -17,7 +17,7 @@ from icwaves.feature_extractors.bowav import (
 )
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
-from icwaves.utils import read_args_from_file
+from icwaves.file_utils import read_args_from_file
 from icwaves.argparser import (
     create_argparser_all_params,
     create_argparser_one_parameter_one_split,
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load or build centroid assignments
-    centroid_assignments, labels, expert_label_mask, subj_ind, n_centroids = (
+    centroid_assignments, labels, expert_label_mask, subj_ind, _, n_centroids = (
         build_or_load_centroid_assignments_and_labels(args)
     )
     logging.info(f"centroid_assignments.shape: {centroid_assignments.shape}")
