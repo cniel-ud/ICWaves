@@ -5,15 +5,10 @@ import numpy as np
 from threadpoolctl import threadpool_info
 from tqdm import tqdm
 
+from icwaves.data_loaders import load_codebooks_wrapper
+from icwaves.preprocessing import load_labels, load_or_build_preprocessed_data
 from icwaves.sikmeans.shift_kmeans import _asignment_step
-from icwaves.utils import _build_centroid_assignments_file
-
-BOWAV_NORM_MAP = {
-    "none": None,
-    "l_1": 1,
-    "l_2": 2,
-    "l_inf": np.inf,
-}
+from icwaves.file_utils import _build_centroid_assignments_file
 
 
 def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
@@ -62,23 +57,45 @@ def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
     return centroid_assignments
 
 
-def build_or_load_centroid_assignments(args, windowed_ics, codebooks):
+def build_or_load_centroid_assignments_and_labels(args):
+
     data_folder = Path(args.path_to_centroid_assignments)
     data_folder.mkdir(exist_ok=True, parents=True)
     centroid_assignments_file = _build_centroid_assignments_file(args)
     centroid_assignments_file = data_folder.joinpath(centroid_assignments_file)
     if centroid_assignments_file.is_file():
         centroid_assignments = np.load(centroid_assignments_file)
+        # Load labels
+        labels, srate, expert_label_mask, subj_ind, noisy_labels = load_labels(args)
+        codebooks = load_codebooks_wrapper(args, srate)
+        n_centroids = codebooks[0].shape[0]
+
     else:
+        # Load or build preprocessed data
+        (windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels) = (
+            load_or_build_preprocessed_data(args)
+        )
+
+        # Load codebooks
+        codebooks = load_codebooks_wrapper(args, srate)
+        n_centroids = codebooks[0].shape[0]
         centroid_assignments = _compute_centroid_assignments(windowed_ics, codebooks)
+
         with centroid_assignments_file.open("wb") as f:
             np.save(f, centroid_assignments, allow_pickle=False)
 
-    return centroid_assignments
+    return (
+        centroid_assignments,
+        labels,
+        expert_label_mask,
+        subj_ind,
+        noisy_labels,
+        n_centroids,
+    )
 
 
 def build_bowav_from_centroid_assignments(
-    centroid_assignments, n_centroids, n_windows_per_segment, ord_str
+    centroid_assignments, n_centroids, n_windows_per_segment
 ):
     """Build flattened bag of waves from centroid assignments. Use all windows on each time series.
 
@@ -96,10 +113,6 @@ def build_bowav_from_centroid_assignments(
     n_windows_per_segment:
         The number of windows per segment. This is the number of
         windows/assignments counted to compute the BoWav vector.
-    ord_str (str):
-        BOWAV_NORM_MAP[ord_str] is the `ord` argument passed to np.linalg.norm
-        to perform instance-wise normalization of each BoWav from each codebook
-        before concatenation. If None, don't perform normalization.
     """
     n_time_series, n_codebooks, n_windows_per_time_series = centroid_assignments.shape
     n_features = n_codebooks * n_centroids
@@ -111,9 +124,9 @@ def build_bowav_from_centroid_assignments(
         n_windows_per_segment = n_windows_per_time_series
 
     bowav = np.zeros(
-        (n_time_series, n_segments_per_time_series, n_features), dtype=np.float32
+        (n_time_series, n_segments_per_time_series, n_features), dtype=np.int32
     )
-    for i_ts in tqdm(range(n_time_series)):
+    for i_ts in range(n_time_series):
         for i_seg in range(n_segments_per_time_series):
             start_ind = i_seg * n_windows_per_segment
             end_ind = start_ind + n_windows_per_segment
@@ -123,14 +136,7 @@ def build_bowav_from_centroid_assignments(
                 )
                 # centroid index->feature index
                 i_feature = nu + r * n_centroids
-
-                if BOWAV_NORM_MAP[ord_str]:
-                    # instance-wise normalization
-                    bowav[i_ts, i_seg, i_feature] = counts / np.linalg.norm(
-                        counts, ord=ord
-                    )
-                else:
-                    bowav[i_ts, i_seg, i_feature] = counts
+                bowav[i_ts, i_seg, i_feature] = counts
 
     return bowav
 

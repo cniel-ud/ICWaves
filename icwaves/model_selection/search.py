@@ -93,7 +93,6 @@ def grid_search_cv(
     best_score = results[f"mean_test_scores"][best_index]
     best_params = copy.deepcopy(results["params"][best_index])
     best_expert_weight = best_params.pop("expert_weight", 1)
-    best_bowav_norm = best_params.pop("bowav_norm")
     best_n_training_windows_per_segment = best_params.pop(
         "n_training_windows_per_segment"
     )
@@ -108,7 +107,7 @@ def grid_search_cv(
 
     # Build train BoWav vector for a given segment length
     bowav = build_bowav_from_centroid_assignments(
-        X, n_centroids, best_n_training_windows_per_segment, best_bowav_norm
+        X, n_centroids, best_n_training_windows_per_segment
     )
 
     n_segments_per_time_series = bowav.shape[1]

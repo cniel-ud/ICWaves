@@ -1,80 +1,115 @@
-from pathlib import Path
+import numpy as np
+import pandas as pd
+import scipy
+from sklearn.metrics import f1_score
+
+from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
 
 
-def _build_centroid_assignments_file(args):
-    subj_str = list_to_base36(args.subj_ids)
-    base_name = (
-        f"k-{args.num_clusters}_P-{args.centroid_length}"
-        f"_winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
-        f"_cbookMinPerIc-{args.codebook_minutes_per_ic}"
-        f"_cbookICsPerSubj-{args.codebook_ics_per_subject}"
-        f"_subj-{subj_str}"
+def build_bowav_based_on_aggregation_method(
+    centroid_assignments,
+    n_centroids,
+    agg_method,
+    n_validation_windows_per_segment,
+    n_training_windows_per_segment,
+    subj_mask=slice(None),
+):
+    if agg_method == "count_pooling":
+        bowav_test = build_bowav_from_centroid_assignments(
+            centroid_assignments[subj_mask],
+            n_centroids,
+            n_validation_windows_per_segment,
+        )
+        bowav_test = np.expand_dims(bowav_test[:, 0, :], axis=1)
+    else:
+        # TODO: using `n_training_windows_per_segment` does not make sense,
+        # as the test segment length might be smaller. Discuss this with AJB.
+        bowav_test = build_bowav_from_centroid_assignments(
+            centroid_assignments[subj_mask],
+            n_centroids,
+            n_training_windows_per_segment,
+        )
+        n_segments_per_time_series = bowav_test.shape[1]
+        if n_validation_windows_per_segment is not None:
+            n_validation_segments_per_time_series = (
+                n_segments_per_time_series * n_training_windows_per_segment
+            ) // n_validation_windows_per_segment
+
+            n_train_segments_per_validation_segment = (
+                n_segments_per_time_series // n_validation_segments_per_time_series
+            )
+            bowav_test = bowav_test[:, :n_train_segments_per_validation_segment, :]
+
+    return bowav_test
+
+
+def compute_brain_F1_score_per_subject(
+    clf,
+    centroid_assignments,
+    labels,
+    expert_label_mask,
+    n_centroids,
+    agg_method,
+    n_validation_windows_per_segment,
+    n_training_windows_per_segment,
+    subj_mask=slice(None),
+):
+
+    bowav_test = build_bowav_based_on_aggregation_method(
+        centroid_assignments,
+        n_centroids,
+        agg_method,
+        n_validation_windows_per_segment,
+        n_training_windows_per_segment,
+        subj_mask,
     )
-    file_name = f"{base_name}.npy"
 
-    return file_name
+    n_segments_per_time_series = bowav_test.shape[1]
+    # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
+    bowav_test = np.vstack(bowav_test)
+    y_pred = clf.predict(bowav_test)
 
+    # Maybe aggregate output
+    if agg_method == "majority_vote":
+        # Aggregate all the predictions
+        # TODO: include None in n_validation_windows_per_segment_arr
+        # to get all the time series
+        if n_validation_windows_per_segment is None:
+            y_pred = y_pred.reshape(-1, n_segments_per_time_series)
+            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+            n_segments_per_time_series = 1
 
-def _build_preprocessed_data_file(args):
-    subj_str = list_to_base36(args.subj_ids)
-    base_name = (
-        f"winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}_subj-{subj_str}"
+    # expand labels and expert mask to match test BoWav vectors
+    y = np.repeat(labels[subj_mask], n_segments_per_time_series)
+    ext_expert_label_mask = np.repeat(
+        expert_label_mask[subj_mask], n_segments_per_time_series
     )
-    file_name = f"{base_name}.npz"
 
-    return file_name
+    y_expert = y[ext_expert_label_mask]
+    y_pred_expert = y_pred[ext_expert_label_mask]
+    brain_f1_score = f1_score(y_expert, y_pred_expert, labels=[0], average=None)
+
+    return brain_f1_score.item()
 
 
-def build_results_file(args):
-    centroid_assignment_base = _build_centroid_assignments_file(args)
-    centroid_assignment_base = Path(centroid_assignment_base).stem
+def jackknife_stddev(group):
+    subject_ids = group["Subject ID"].unique()
+    n = len(subject_ids)
+    means = []
 
-    C_str = "_".join([str(i) for i in args.regularization_factor])
-    l1_ratio_str = "_".join([str(i) for i in args.l1_ratio])
-    ew_str = "_".join([str(i) for i in args.expert_weight])
-    train_segment_length_str = "_".join([str(i) for i in args.training_segment_length])
-    validation_segment_length_str = str(args.validation_segment_length)
-    bowav_norm_str = "_".join([str(i) for i in args.bowav_norm])
+    # Perform jackknife resampling
+    for subject_id in subject_ids:
+        jackknife_sample = group[group["Subject ID"] != subject_id]
+        means.append(jackknife_sample["Brain F1 score [holdout]"].mean())
 
-    classifier_base = (
-        f"clf-lr_pen-{args.penalty}_solv-saga_C-{C_str}"
-        f"_l1Ratio-{l1_ratio_str}"
-        f"_expW-{ew_str}"
-        f"_trSegLen-{train_segment_length_str}"
-        f"_valSegLen-{validation_segment_length_str}"
-        f"_bowavNorm-{bowav_norm_str}"
+    # Calculate the jackknife estimate of the mean
+    jackknife_mean = np.mean(means)
+
+    # Calculate the jackknife estimate of the standard deviation
+    squared_diffs = [(mean - jackknife_mean) ** 2 for mean in means]
+    jackknife_variance = (n - 1) / n * np.sum(squared_diffs)
+    jackknife_std = np.sqrt(jackknife_variance)
+
+    return pd.Series(
+        {"Jackknife Mean": jackknife_mean, "Jackknife StdDev": jackknife_std}
     )
-    classifier_fname = f"{centroid_assignment_base}_{classifier_base}.pickle"
-
-    return classifier_fname
-
-
-def list_to_base36(int_list):
-    # Create a 34-bit binary representation
-    binary_str = ["0"] * 34
-    for i in int_list:
-        if 1 <= i <= 34:
-            binary_str[i - 1] = "1"
-    binary_str = "".join(binary_str)
-
-    # Convert binary string to integer
-    integer_representation = int(binary_str, 2)
-
-    # Convert integer to base-36
-    base36_representation = base36_encode(integer_representation)
-
-    return base36_representation
-
-
-def base36_encode(number):
-    assert number >= 0, "Number must be non-negative."
-    if number == 0:
-        return "0"
-
-    alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    base36 = ""
-    while number:
-        number, i = divmod(number, 36)
-        base36 = alphabet[i] + base36
-
-    return base36

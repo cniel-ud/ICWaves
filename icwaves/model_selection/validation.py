@@ -3,6 +3,7 @@ import time
 import numpy as np
 import scipy
 from joblib import logger
+import logging
 
 from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
 
@@ -31,9 +32,6 @@ def _fit_and_score(
     sample_weight = np.ones(X.shape[0])
     sample_weight[expert_label_mask] = expert_weight
 
-    # Get bowav norm
-    bowav_norm = parameters.pop("bowav_norm")
-
     # Get input/output aggregation method
     input_or_output_aggregation_method = parameters.pop(
         "input_or_output_aggregation_method"
@@ -50,6 +48,9 @@ def _fit_and_score(
     # Get n_centroids
     n_centroids = parameters.pop("n_centroids")
 
+    # Get scorer_kwargs
+    scorer_kwargs = parameters.pop("scorer_kwargs", {})
+
     # Set classifier params
     estimator.set_params(**parameters)
 
@@ -60,8 +61,9 @@ def _fit_and_score(
 
     # Build train BoWav vector for a given segment length
     bowav_train = build_bowav_from_centroid_assignments(
-        X_train, n_centroids, n_training_windows_per_segment, bowav_norm
+        X_train, n_centroids, n_training_windows_per_segment
     )
+    del X_train
     n_segments_per_time_series = bowav_train.shape[1]
     # vertically concatenate train BoWav vectors: (m, n, p) -> (m*n, p)
     bowav_train = np.vstack(bowav_train)
@@ -76,6 +78,8 @@ def _fit_and_score(
     else:
         estimator.fit(bowav_train, y_train, sample_weight=sample_weight_train)
 
+    del bowav_train, y_train, sample_weight_train
+
     fit_time = time.time() - start_time
 
     X_test, y_test = X[test], y[test]
@@ -84,40 +88,72 @@ def _fit_and_score(
     # Aggregate input at either training segment length or validation segment length
     if input_or_output_aggregation_method == "count_pooling":
         bowav_test = build_bowav_from_centroid_assignments(
-            X_test, n_centroids, n_validation_windows_per_segment, bowav_norm
+            X_test, n_centroids, n_validation_windows_per_segment
         )
     else:
         bowav_test = build_bowav_from_centroid_assignments(
-            X_test, n_centroids, n_training_windows_per_segment, bowav_norm
+            X_test, n_centroids, n_training_windows_per_segment
         )
+
+    del X_test
 
     n_segments_per_time_series = bowav_test.shape[1]
     # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
     bowav_test = np.vstack(bowav_test)
 
     y_pred = estimator.predict(bowav_test)
+    del bowav_test
 
-    # Maybe aggregate output
+    # Predictions were made on segments of length n_training_windows_per_segment.
     if input_or_output_aggregation_method == "majority_vote":
+        # Aggregate all the predictions
         if n_validation_windows_per_segment is None:
-            n_windows_per_time_series = X_test.shape[2]
-            n_validation_windows_per_segment = n_windows_per_time_series
+            y_pred = y_pred.reshape(-1, n_segments_per_time_series)
+            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+            n_segments_per_time_series = 1
+        # Aggregate predictions every n_validation_windows_per_segment > n_training_windows_per_segment
+        else:
+            n_validation_segments_per_time_series = (
+                n_segments_per_time_series * n_training_windows_per_segment
+            ) // n_validation_windows_per_segment
 
-        n_train_segments_per_validation_segment = (
-            n_validation_windows_per_segment // n_training_windows_per_segment
-        )
-        y_pred = y_pred.reshape(-1, n_train_segments_per_validation_segment)
-        y_pred = scipy.stats.mode(y_pred, axis=1)[0]
-        n_segments_per_time_series = (
-            n_segments_per_time_series // n_train_segments_per_validation_segment
-        )
+            n_train_segments_per_validation_segment = (
+                n_segments_per_time_series // n_validation_segments_per_time_series
+            )
+
+            # Discard some predictions if the number of training segments is not
+            # divisible by the number of validation segments.
+            if n_segments_per_time_series % n_validation_segments_per_time_series:
+                trimmed_n_segments = (
+                    n_train_segments_per_validation_segment
+                    * n_validation_segments_per_time_series
+                )
+                y_pred = y_pred.reshape(-1, n_segments_per_time_series)
+                y_pred = y_pred[:, :trimmed_n_segments]
+                y_pred = y_pred.reshape(-1)
+                logging.warning(
+                    f"Trimming y_pred from {n_segments_per_time_series} to "
+                    f"{trimmed_n_segments} segments per time series."
+                )
+
+            y_pred = y_pred.reshape(-1, n_train_segments_per_validation_segment)
+            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+            n_segments_per_time_series = n_validation_segments_per_time_series
 
     # expand test labels to match test BoWav vectors
     y_test = np.repeat(y_test, n_segments_per_time_series)
     # expand test sample weights to match test BoWav vectors
     sample_weight_test = np.repeat(sample_weight_test, n_segments_per_time_series)
 
-    test_scores = scorer(y_test, y_pred, sample_weight=sample_weight_test)
+    test_scores = scorer(
+        y_test, y_pred, sample_weight=sample_weight_test, **scorer_kwargs
+    )
+
+    # This accounts for cases where we want to compute a metric on a single class
+    # e.g., F1-score on brain
+    if isinstance(test_scores, np.ndarray) and len(test_scores) == 1:
+        test_scores = test_scores[0]
+
     score_time = time.time() - start_time - fit_time
 
     total_time = score_time + fit_time
@@ -131,7 +167,6 @@ def _fit_and_score(
     print(end_msg)
 
     parameters.update({"expert_weight": expert_weight})
-    parameters.update({"bowav_norm": bowav_norm})
     parameters.update(
         {"input_or_output_aggregation_method": input_or_output_aggregation_method}
     )

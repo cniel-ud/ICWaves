@@ -5,7 +5,7 @@ import numpy as np
 from scipy.io import loadmat
 from tqdm import tqdm
 
-from icwaves.utils import _build_preprocessed_data_file
+from icwaves.file_utils import _build_preprocessed_data_file
 
 
 def _get_metadata(args):
@@ -85,6 +85,16 @@ def _get_windowed_ics_and_labels(args):
     return windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
 
 
+def load_labels(args):
+    # TODO: make a function to compute/extract only the labels, without
+    # `windowed_ics`.
+    _, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
+        load_or_build_preprocessed_data(args)
+    )
+
+    return labels, srate, expert_label_mask, subj_ind, noisy_labels
+
+
 def load_or_build_preprocessed_data(args):
     data_folder = Path(args.path_to_preprocessed_data)
     data_folder.mkdir(exist_ok=True, parents=True)
@@ -97,6 +107,7 @@ def load_or_build_preprocessed_data(args):
             srate = data["srate"]
             expert_label_mask = data["expert_label_mask"]
             subj_ind = data["subj_ind"]
+            noisy_labels = data["noisy_labels"]
     else:
         (
             windowed_ics,
@@ -104,7 +115,7 @@ def load_or_build_preprocessed_data(args):
             srate,
             expert_label_mask,
             subj_ind,
-            _,
+            noisy_labels,
         ) = _get_windowed_ics_and_labels(args)
         with preprocessed_data_file.open("wb") as f:
             np.savez(
@@ -114,6 +125,7 @@ def load_or_build_preprocessed_data(args):
                 srate=srate,
                 expert_label_mask=expert_label_mask,
                 subj_ind=subj_ind,
+                noisy_labels=noisy_labels,
             )
 
-    return windowed_ics, labels, srate, expert_label_mask, subj_ind
+    return windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels

@@ -1,5 +1,7 @@
+from matplotlib import pyplot as plt
 import numpy as np
 from itertools import product
+
 
 def plot_confusion_matrix(
     cm,
@@ -9,7 +11,7 @@ def plot_confusion_matrix(
     colorbar=True,
     ylabel=None,
     xticks_rotation="horizontal",
-    ):
+):
 
     import matplotlib.pyplot as plt
 
@@ -40,9 +42,7 @@ def plot_confusion_matrix(
         else:
             text_cm = format(cm[i, j], values_format)
 
-        text_[i, j] = ax.text(
-            j, i, text_cm, ha="center", va="center", color=color
-        )
+        text_[i, j] = ax.text(j, i, text_cm, ha="center", va="center", color=color)
 
     if display_labels is None:
         display_labels = [0] * 2
@@ -64,3 +64,21 @@ def plot_confusion_matrix(
     plt.setp(ax.get_xticklabels(), rotation=xticks_rotation)
 
     return fig, ax
+
+
+def plot_line_with_error_area(ax, df, x, y, error, color="blue"):
+    ax.plot(
+        df[x],
+        df[y],
+        label=y,
+        color=f"tab:{color}",
+    )
+    ax.fill_between(
+        df[x],
+        df[y] - df[error],
+        df[y] + df[error],
+        color=f"tab:{color}",
+        alpha=0.2,
+        label=error,
+    )
+    return ax
