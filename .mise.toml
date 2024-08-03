@@ -1,0 +1,5 @@
+[tools]
+python = "3.10" # [optional] will be used for the venv
+
+[env]
+_.python.venv = ".venv" # relative to this file's directory
