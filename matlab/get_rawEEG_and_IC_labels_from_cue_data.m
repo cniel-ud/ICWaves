@@ -2,10 +2,10 @@ clearvars; eeglab; close;
 expr = 'frolich_extract_(?<id>\d{2}).mat';
 data_path = getenv('DATA_DIR');
 cue_path = fullfile(data_path, "cue");
-expert_labels_path = fullfile(cue_path, 'expert_labels')
+expert_labels_path = fullfile(cue_path, 'expert_labels');
 EEGstruct_path = fullfile(cue_path, 'EEG_struct');
 out_dir = fullfile(cue_path, 'raw_data_and_IC_labels');
-file_list = dir(expert_labels_path)
+file_list = dir(expert_labels_path);
 n_files = length(file_list);
 cue_expert_labels = {'blink', 'neural', 'heart', 'lateyes', 'muscle', 'mixed'};
 for i = 1:n_files
