@@ -7,6 +7,8 @@ from numpy.typing import NDArray
 def eeg_psd(
     signal: NDArray[np.float64],
     sfreq: float,
+    logscale: bool = True,
+    normalize: bool = True,
 ) -> NDArray[np.float32]:
     """PSD feature.
 
@@ -17,15 +19,18 @@ def eeg_psd(
 
     n_chan, n_points = signal.shape
     constants = _psd_constants(n_points, sfreq, n_chan)
-    psd = _psd_compute_psdmed(signal, sfreq, *constants)
-    psd = _psd_format(psd)
+    psd = _psd_compute_psdmed(signal, sfreq, *constants, logscale=logscale)
+    psd = _psd_format(psd, logscale=logscale, normalize=normalize)
     return psd
+
 
 def _psd_constants(
     n_points: int,
     sfreq: float,
     n_chan: int,
-) -> Tuple[int, int, int, int, NDArray[np.int32], NDArray[np.float64], NDArray[np.int32]]:
+) -> Tuple[
+    int, int, int, int, NDArray[np.int32], NDArray[np.float64], NDArray[np.int32]
+]:
     """Compute the constants before ``randperm`` is used to compute the subset."""
     # in MATLAB, 'pct_data' variable is never provided and is always initialized
     # to 100. 'pct_data' is only used in a division by 100.. and thus has no
@@ -35,7 +40,7 @@ def _psd_constants(
     # the nyquist frequency.
 
     nyquist = np.floor(sfreq / 2).astype(int)
-    n_freqs = nyquist if nyquist < 100 else 100  #XXX: parametrize max freq.?
+    n_freqs = nyquist if nyquist < 100 else 100  # XXX: parametrize max freq.?
 
     n_points_ = min(n_points, int(sfreq))
     window = np.hamming(n_points_)
@@ -71,6 +76,7 @@ def _psd_compute_psdmed(
     index: NDArray[np.int32],
     window: NDArray[np.float64],
     subset: NDArray[np.int32],
+    logscale: bool = True,
 ) -> NDArray[np.float64]:
     """Compute the variable 'psdmed', annotated as windowed spectrums."""
     denominator = sfreq * np.sum(np.power(window, 2))
@@ -89,18 +95,23 @@ def _psd_compute_psdmed(
         temp = temp[1 : n_freqs + 1, :] * 2 / denominator
         if n_freqs == nyquist:
             temp[-1, :] = temp[-1, :] / 2
-        psdmed[it, :] = 20 * np.real(np.log10(np.median(temp, axis=1)))
+        if logscale:
+            psdmed[it, :] = 20 * np.real(np.log10(np.median(temp, axis=1)))
+        else:  # linear scale
+            psdmed[it, :] = np.real(np.median(temp, axis=1))
 
     return psdmed
 
 
 def _psd_format(
     psd: NDArray[np.float64],
+    logscale: bool = True,
+    normalize: bool = True,
 ) -> NDArray[np.float32]:
     """Apply the formatting steps after 'eeg_rpsd.m'."""
     # extrapolate or prune as needed
     nfreq = psd.shape[1]
-    if nfreq < 100:  #XXX: parametrize?
+    if nfreq < 100:  # XXX: parametrize?
         psd = np.concatenate([psd, np.tile(psd[:, -1:], (1, 100 - nfreq))], axis=1)
 
     # undo notch filter
@@ -112,7 +123,10 @@ def _psd_format(
         # 'linenoise_around' is used for array selection in psd, which is
         # 0-index in Python and 1-index in MATLAB.
         difference = (psd[:, linenoise_around].T - psd[:, linenoise_ind]).T
-        notch_ind = np.all(5 < difference, axis=1)
+        if logscale:
+            notch_ind = np.all(5 < difference, axis=1)
+        else:  # linear scale
+            notch_ind = np.all(10 ** (5 / 20) < difference, axis=1)
         if any(notch_ind):
             # Numpy doesn't like the selection '[notch_ind, linenoise_ind]' with
             # 'notch_ind' as a bool mask. 'notch_ind' is first converted to int.
@@ -125,8 +139,9 @@ def _psd_format(
                 psd[notch_ind[:, None], linenoise_around], axis=-1
             )
 
-    # normalize
-    psd = np.divide(psd.T, np.max(np.abs(psd), axis=-1)).T
+    if normalize:
+        # normalize
+        psd = np.divide(psd.T, np.max(np.abs(psd), axis=-1)).T
 
-    # cast
-    return 0.99 * psd.astype(np.float32)
+        # cast
+        return 0.99 * psd.astype(np.float32)
