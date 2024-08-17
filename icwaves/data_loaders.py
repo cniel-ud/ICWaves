@@ -19,6 +19,9 @@ CLASS_LABELS = [
 ]
 
 
+# TODO: refactor to recieve subject ids and use new-format files subj-<id>.mat
+# The train set here were subjects 8 to 35 (subject 22 is missing) from the
+# 'emotion_study' dataset.
 def load_raw_train_set_per_class(args, rng):
     data_dir = args.path_to_centroid_assignments
     file_list = list(data_dir.glob(f"train_subj-*.mat"))
@@ -101,27 +104,35 @@ def load_raw_train_set_per_class(args, rng):
     return X
 
 
-def load_codebooks(args, srate):
+def load_codebooks(args):
     dict_dir = Path(args.path_to_codebooks)
     if not dict_dir.is_dir():
         raise ValueError(f"Directory {dict_dir} does not exist")
 
-    # Convert centroid_length from seconds to samples
-    centroid_length = int(args.centroid_length * srate)
-    logging.info(f"Centroid length in samples: {centroid_length}")
-
+    # TODO: avoid hard coding this
     n_codebooks = 7
-    codebooks = np.zeros(
-        (n_codebooks, args.num_clusters, centroid_length), dtype=np.float32
-    )
 
-    for i_class in range(n_codebooks):
+    # TODO: move to a function in charge of building this name
+    fname = (
+        f"sikmeans_P-{args.centroid_length}_k-{args.num_clusters}"
+        f"_class-{1}_minutesPerIC-{args.minutes_per_ic}"
+        f"_icsPerSubj-{args.ics_per_subject}.npz"
+    )
+    fpath = dict_dir.joinpath(fname)
+    with np.load(fpath) as data:
+        codebook_class_1 = data["centroids"]
+    n_centroids, centroid_length = codebook_class_1.shape
+
+    # TODO: args.num_clusters might not be longer needed?
+    codebooks = np.zeros((n_codebooks, n_centroids, centroid_length), dtype=np.float32)
+    codebooks[0] = codebook_class_1
+
+    for i_class in range(1, n_codebooks):
         fname = (
-            # TODO: change centroid_length to seconds in file naming. This needs
-            # refactoring of code that saves the file too, and manually rename
-            # files of codebooks that were already learned. In that way, we don't
-            # need to know the sampling rate.
-            f"sikmeans_P-{centroid_length}_k-{args.num_clusters}"
+            # TODO: The P value is now in seconds and not in number of samples, to avoid
+            # the need of knowing the sampling rate. Refactor code that saves the file,
+            # and manually rename files of codebooks that were already learned.
+            f"sikmeans_P-{args.centroid_length}_k-{args.num_clusters}"
             f"_class-{i_class+1}_minutesPerIC-{args.minutes_per_ic}"
             f"_icsPerSubj-{args.ics_per_subject}.npz"
         )
@@ -132,9 +143,9 @@ def load_codebooks(args, srate):
     return codebooks
 
 
-def load_codebooks_wrapper(args, srate):
+def load_codebooks_wrapper(args):
     codebook_args = copy.deepcopy(args)
     codebook_args.minutes_per_ic = args.codebook_minutes_per_ic
     codebook_args.ics_per_subject = args.codebook_ics_per_subject
-    codebooks = load_codebooks(codebook_args, srate)
+    codebooks = load_codebooks(codebook_args)
     return codebooks

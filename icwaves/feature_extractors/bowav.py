@@ -63,22 +63,18 @@ def build_or_load_centroid_assignments_and_labels(args):
     data_folder.mkdir(exist_ok=True, parents=True)
     centroid_assignments_file = _build_centroid_assignments_file(args)
     centroid_assignments_file = data_folder.joinpath(centroid_assignments_file)
+    codebooks = load_codebooks_wrapper(args)
+    n_centroids = codebooks[0].shape[0]
     if centroid_assignments_file.is_file():
         centroid_assignments = np.load(centroid_assignments_file)
         # Load labels
         labels, srate, expert_label_mask, subj_ind, noisy_labels = load_labels(args)
-        codebooks = load_codebooks_wrapper(args, srate)
-        n_centroids = codebooks[0].shape[0]
-
     else:
         # Load or build preprocessed data
         (windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels) = (
             load_or_build_preprocessed_data(args)
         )
 
-        # Load codebooks
-        codebooks = load_codebooks_wrapper(args, srate)
-        n_centroids = codebooks[0].shape[0]
         centroid_assignments = _compute_centroid_assignments(windowed_ics, codebooks)
 
         with centroid_assignments_file.open("wb") as f:
