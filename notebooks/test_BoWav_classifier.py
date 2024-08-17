@@ -1,4 +1,10 @@
 # %%
+"""
+The "emotion_study" dataset has EEG data from 34 subjects. Subjects 8 to 35
+(subject 22 is missing) were used to train a multiclass classifier, and subject
+1 to 7 were used to test it. This script computes the test results on those 7
+subjects, using the trained classifier.
+"""
 import copy
 import pickle
 from pathlib import Path
