@@ -23,7 +23,9 @@ def build_bowav_based_on_aggregation_method(
         bowav_test = np.expand_dims(bowav_test[:, 0, :], axis=1)
     else:
         # TODO: using `n_training_windows_per_segment` does not make sense,
-        # as the test segment length might be smaller. Discuss this with AJB.
+        # as the test segment length might be smaller. Majority vote is useful
+        # when classifying short (noisy) segments, so we need to impose a restriction
+        # that there are at least 2-3 windows (counts) per segment.
         bowav_test = build_bowav_from_centroid_assignments(
             centroid_assignments[subj_mask],
             n_centroids,
