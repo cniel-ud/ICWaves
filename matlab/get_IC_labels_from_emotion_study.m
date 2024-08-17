@@ -59,7 +59,7 @@ for ii = 1:length(file_list)
         labels(~expert_label_mask) = winner_label(~expert_label_mask); % use ICLabel where no expert label exist
 
 
-        dir_name = sprintf("IC_labels_at_%d_seconds", test_segment_len(jj));
+        dir_name = sprintf("IC_labels_at_%.1f_seconds", test_segment_len(jj));
         out_dir = fullfile(data_dir, dir_name);
         if ~isfolder(out_dir), mkdir(out_dir), end
         out_file = fullfile(out_dir, sprintf('subj-%s.mat', subjID));
