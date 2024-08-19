@@ -1,9 +1,15 @@
 from typing import Union
 
 import numpy as np
-from mne_icalabel.iclabel.utils import _next_power_of_2
 from numpy.typing import NDArray
 from scipy.signal import resample_poly
+
+
+def _next_power_of_2(x) -> int:
+    """
+    Equivalent to 2^nextpow2 in MATLAB.
+    """
+    return 1 if x == 0 else 2 ** (x - 1).bit_length()
 
 
 def eeg_autocorr(
@@ -13,12 +19,13 @@ def eeg_autocorr(
 
     _, n_points_ = signal.shape
 
-    if n_points_/sfreq > 5:
+    if n_points_ / sfreq > 5:
         autocorr = _eeg_autocorr_welch(signal, sfreq)
     else:
         autocorr = _eeg_autocorr(signal, sfreq)
 
     return autocorr
+
 
 def _eeg_autocorr_welch(
     signal: NDArray[np.float64],
@@ -99,7 +106,6 @@ def _eeg_autocorr_welch(
     return 0.99 * np.real(resamp).astype(np.float32)
 
 
-
 def _resample(ac: NDArray[np.float64], sfreq: Union[int, float]) -> NDArray[np.float64]:
     """Resample the autocorrelation feature.
 
@@ -128,7 +134,7 @@ def _resample(ac: NDArray[np.float64], sfreq: Union[int, float]) -> NDArray[np.f
 def _eeg_autocorr(
     signal: NDArray[np.float64],
     sfreq: float,
-    ) -> NDArray[np.float32]:
+) -> NDArray[np.float32]:
     """Autocorr applied on raw object without enough sampes for eeg_autocorr_welch.
 
     MATLAB: 'eeg_autocorr.m'.
@@ -149,7 +155,7 @@ def _eeg_autocorr(
 
     if n_points_ < sfreq:
         zeros = np.zeros((c.shape[0], int(sfreq) - n_points_ + 1))
-        ac = np.hstack([c[:, : n_points_], zeros])
+        ac = np.hstack([c[:, :n_points_], zeros])
     else:
         ac = c[:, : int(sfreq) + 1]
 
