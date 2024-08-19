@@ -1,3 +1,12 @@
+"""
+Much of this code was taken/adapted from MNE-ICALabel
+
+BSD 3-Clause License
+
+Copyright (c) 2022, MNE
+All rights reserved.
+"""
+
 from typing import Tuple
 
 import numpy as np
