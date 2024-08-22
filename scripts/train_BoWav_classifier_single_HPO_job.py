@@ -12,6 +12,8 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import ParameterGrid
 from sklearn.pipeline import Pipeline
 
+from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
+
 from icwaves.feature_extractors.bowav import (
     build_or_load_centroid_assignments_and_labels,
 )
@@ -96,7 +98,6 @@ if __name__ == "__main__":
     pipe.set_params(**clf_params)
 
     # Wrap single-value params as a list. TODO: check and convert for all params
-    n_centroids = [n_centroids]
     n_validation_windows_per_segment = [n_validation_windows_per_segment]
     if not isinstance(args.tf_idf_norm, list):
         args.tf_idf_norm = [args.tf_idf_norm]
@@ -109,7 +110,6 @@ if __name__ == "__main__":
         input_or_output_aggregation_method=input_or_output_aggregation_method,
         n_training_windows_per_segment=n_training_windows_per_segment,
         n_validation_windows_per_segment=n_validation_windows_per_segment,
-        n_centroids=n_centroids,
     )
 
     candidate_params = list(ParameterGrid(candidate_params))
@@ -129,6 +129,14 @@ if __name__ == "__main__":
     # '0' is the 'brain' class. We want to compute the F1-score for this class only.
     parameters["scorer_kwargs"] = {"labels": [0], "average": None}
 
+    # build_bowav_from_centroid_assignments has args (centroid_assignments, n_centroids, n_windows_per_segment)
+    # `feature_extractor` has args (time_series, segment_len)
+    feature_extractor = (
+        lambda time_series, segment_len: build_bowav_from_centroid_assignments(
+            time_series, n_centroids, segment_len
+        )
+    )
+
     result = _fit_and_score(
         pipe,
         centroid_assignments,
@@ -138,6 +146,7 @@ if __name__ == "__main__":
         test=test,
         parameters=parameters,
         scorer=f1_score,
+        feature_extractor=feature_extractor,
         split_progress=(split_idx, n_splits),
         candidate_progress=(cand_idx, n_candidates),
     )

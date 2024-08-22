@@ -18,7 +18,15 @@ from icwaves.model_selection.validation import _fit_and_score
 
 
 def grid_search_cv(
-    estimator, candidate_params, X, y, groups, expert_label_mask, cv, n_jobs
+    estimator,
+    feature_extractor,
+    candidate_params,
+    X,
+    y,
+    groups,
+    expert_label_mask,
+    cv,
+    n_jobs,
 ):
 
     n_splits = cv.get_n_splits(X, y, groups=groups)
@@ -41,6 +49,7 @@ def grid_search_cv(
                     test=test,
                     parameters=parameters,
                     scorer=balanced_accuracy_score,
+                    feature_extractor=feature_extractor,
                     split_progress=(split_idx, n_splits),
                     candidate_progress=(cand_idx, n_candidates),
                 )
@@ -96,7 +105,6 @@ def grid_search_cv(
     best_n_training_windows_per_segment = best_params.pop(
         "n_training_windows_per_segment"
     )
-    n_centroids = best_params.pop("n_centroids")
     del best_params["n_validation_windows_per_segment"]
     del best_params["input_or_output_aggregation_method"]
     best_estimator = clone(clone(estimator).set_params(**best_params))
@@ -106,23 +114,21 @@ def grid_search_cv(
     sample_weight[expert_label_mask] = best_expert_weight
 
     # Build train BoWav vector for a given segment length
-    bowav = build_bowav_from_centroid_assignments(
-        X, n_centroids, best_n_training_windows_per_segment
-    )
+    X = feature_extractor(X, best_n_training_windows_per_segment)
 
-    n_segments_per_time_series = bowav.shape[1]
+    n_segments = X.shape[1]
     # vertically concatenate train BoWav vectors: (m, n, p) -> (m*n, p)
-    bowav = np.vstack(bowav)
+    X = np.vstack(X)
     # expand train labels to match train BoWav vectors
-    y = np.repeat(y, n_segments_per_time_series)
+    y = np.repeat(y, n_segments)
     # expand train sample weights to match train BoWav vectors
-    sample_weight = np.repeat(sample_weight, n_segments_per_time_series)
+    sample_weight = np.repeat(sample_weight, n_segments)
 
     named_steps = getattr(estimator, "named_steps", None)
     if named_steps is not None:
-        best_estimator.fit(bowav, y, clf__sample_weight=sample_weight)
+        best_estimator.fit(X, y, clf__sample_weight=sample_weight)
     else:
-        best_estimator.fit(bowav, y, sample_weight=sample_weight)
+        best_estimator.fit(X, y, sample_weight=sample_weight)
 
     refit_end_time = time.time()
     refit_time = refit_end_time - refit_start_time
