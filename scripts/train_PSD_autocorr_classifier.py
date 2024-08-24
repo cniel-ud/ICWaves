@@ -1,4 +1,11 @@
 # %%
+# TODO:
+#   * Refactor argparser.py to create a parser for the PSD+autocorr classifier
+#   * Use `_get_ics_and_labels` to get the ics and labels. The spectral features
+#     should later be computed inside `_fit_and_score`
+#   * Pass `get_iclabel_features_per_segment` as the `feature_extractor` to
+#     `_fit_and_score`
+#   * Finish refactoring this script
 import pickle
 from argparse import ArgumentParser
 from pathlib import Path
