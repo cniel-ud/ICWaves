@@ -94,6 +94,47 @@ def _get_windowed_ics_and_labels(args):
     return windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
 
 
+def _get_ics_and_labels(args):
+    file_list, n_ics, n_points, srate = _get_base_metadata(args)
+
+    logging.info("Building data matrix, labels, and other metadata...")
+    # NOTE: float32. ICs were saved in matlab as single.
+    ics = np.zeros((n_ics, n_points), dtype=np.float32)
+    labels = -1 * np.ones(n_ics, dtype=int)
+
+    ic_start = 0
+    expert_label_mask = np.full(n_ics, False)
+    subj_ind = np.zeros(n_ics, dtype=int)
+    # 7 ICLabel classes
+    noisy_labels = np.zeros((n_ics, 7), dtype=np.float32)
+    for file, subjID in tqdm(zip(file_list, args.subj_ids)):
+        logging.info(f"Loading data from {file} and subject {subjID}")
+        with file.open("rb") as f:
+            matdict = loadmat(f)
+            data = matdict["data"]
+            icaweights = matdict["icaweights"]
+            icasphere = matdict["icasphere"]
+            noisy_labels_per_subject = matdict["noisy_labels"]
+            expert_label_mask_per_subject = matdict["expert_label_mask"]
+            # -1: Let class labels start at 0 in python
+            labels_per_subject = matdict["labels"] - 1
+
+        expert_label_mask_per_subject = expert_label_mask_per_subject.astype(bool)
+        ica_activations = icaweights @ icasphere @ data
+
+        ic_end = ic_start + ica_activations.shape[0]
+        ics[ic_start:ic_end] = ica_activations[:, :n_points]
+        labels[ic_start:ic_end] = labels_per_subject
+        noisy_labels[ic_start:ic_end] = noisy_labels_per_subject
+        expert_label_mask[ic_start:ic_end] = expert_label_mask_per_subject
+        subj_ind[ic_start:ic_end] = subjID
+        ic_start = ic_end
+
+    logging.info("Done building data matrix, labels, and other metadata")
+
+    return ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
+
+
 def load_labels(args):
     # TODO: make a function to compute/extract only the labels, without
     # `windowed_ics`.
