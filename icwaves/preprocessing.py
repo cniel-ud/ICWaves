@@ -8,7 +8,7 @@ from tqdm import tqdm
 from icwaves.file_utils import _build_preprocessed_data_file
 
 
-def _get_metadata(args):
+def _get_base_metadata(args):
     data_dir = Path(args.path_to_raw_data)
     if not data_dir.is_dir():
         raise FileNotFoundError(f"Directory {data_dir} does not exist.")
@@ -29,18 +29,27 @@ def _get_metadata(args):
             n_ics_per_subj.append(labels.shape[0])
 
     n_ics = np.sum(n_ics_per_subj)
-    minutes_per_window = args.window_length / 60
-    n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
+    n_points = int(args.minutes_per_ic * 60 * srate)
 
     logging.info(f"Sampling rate = {srate} Hz")
     logging.info(f"Total number of ICs = {n_ics}")
+    logging.info(f"Number of time points per IC = {n_points}")
+
+    return file_list, n_ics, n_points, srate
+
+
+def _get_metadata_for_windowed_ics(args):
+
+    file_list, n_ics, n_points, srate = _get_base_metadata(args)
+
+    n_win_per_ic = int(np.ceil(n_points / (args.window_length * srate)).item())
     logging.info(f"Number of windows per IC = {n_win_per_ic}")
 
     return file_list, n_ics, n_win_per_ic, srate
 
 
 def _get_windowed_ics_and_labels(args):
-    file_list, n_ics, n_win_per_ic, srate = _get_metadata(args)
+    file_list, n_ics, n_win_per_ic, srate = _get_metadata_for_windowed_ics(args)
     window_length = int(args.window_length * srate)
     logging.info(f"Window length = {window_length} samples")
 
