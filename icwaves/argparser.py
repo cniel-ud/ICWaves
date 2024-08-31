@@ -32,35 +32,25 @@ def create_argparser_aggregate_results():
     return parser
 
 
-def create_argparser_all_params():
+def create_base_argparser_all_params():
     parser = ArgumentParser()
     parser.add_argument("--path-to-raw-data", help="Path to raw data", required=True)
     parser.add_argument(
         "--path-to-preprocessed-data", help="Path to preprocessed data", required=True
     )
     parser.add_argument(
-        "--path-to-centroid-assignments",
-        help="Path to centroid assignments",
-        required=True,
+        "--minutes-per-ic",
+        type=float,
+        default=50,
+        help="Number of minutes per IC to extract BagOfWaves features",
     )
     parser.add_argument("--path-to-results", help="Path to results", required=True)
-    parser.add_argument("--path-to-codebooks", help="Path to codebooks", required=True)
     parser.add_argument(
         "--subj-ids",
         type=int,
         help="A list with the subject ids to be used during training.",
         nargs="+",
         required=True,
-    )
-    parser.add_argument(
-        "--centroid-length", type=float, default=1.0, help="Centroid length in seconds"
-    )
-    # TODO: change type from float to int to arguments that are in seconds
-    parser.add_argument(
-        "--window-length",
-        type=float,
-        default=1.5,
-        help="Length of window assigned to centroid, in seconds",
     )
     parser.add_argument(
         "--training-segment-length",
@@ -76,16 +66,7 @@ def create_argparser_all_params():
         help="Length in seconds of segment used during validation. Use -1 if you want to use all the time series.",
     )
     parser.add_argument(
-        "--num-clusters", type=int, default=128, help="Number of clusters"
-    )
-    parser.add_argument(
         "--n-jobs", type=int, default=1, help="Value for n_jobs (sklearn)"
-    )
-    parser.add_argument(
-        "--minutes-per-ic",
-        type=float,
-        default=50,
-        help="Number of minutes per IC to extract BagOfWaves features",
     )
     parser.add_argument(
         "--regularization-factor",
@@ -109,6 +90,30 @@ def create_argparser_all_params():
     )
     parser.add_argument(
         "--penalty", default="elasticnet", choices=["l1", "l2", "elasticnet", "none"]
+    )
+
+    return parser
+
+
+def create_argparser_all_params():
+    parser = create_base_argparser_all_params()
+    parser.add_argument(
+        "--path-to-centroid-assignments",
+        help="Path to centroid assignments",
+        required=True,
+    )
+    parser.add_argument("--path-to-codebooks", help="Path to codebooks", required=True)
+    parser.add_argument(
+        "--centroid-length", type=float, default=1.0, help="Centroid length in seconds"
+    )
+    parser.add_argument(
+        "--window-length",
+        type=float,
+        default=1.5,
+        help="Length of window assigned to centroid, in seconds",
+    )
+    parser.add_argument(
+        "--num-clusters", type=int, default=128, help="Number of clusters"
     )
     parser.add_argument(
         "--codebook-minutes-per-ic",
