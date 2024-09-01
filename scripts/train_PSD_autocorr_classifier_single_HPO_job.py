@@ -2,23 +2,18 @@
 from itertools import product
 import logging
 import pickle
-from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
 from numpy.random import default_rng
 import scipy
-from scipy.io import loadmat
 import sklearn
-from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 from sklearn.model_selection import ParameterGrid
-from sklearn.pipeline import Pipeline
 
 from icwaves.feature_extractors.iclabel_features import get_iclabel_features_per_segment
 from icwaves.file_utils import read_args_from_file
-from icwaves.model_selection.search import grid_search_cv
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.argparser import (
     create_argparser_one_parameter_one_split,
@@ -52,17 +47,6 @@ if __name__ == "__main__":
     ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = _get_ics_and_labels(
         args
     )
-
-    # We expect a 1D array. Matlab always add a singleton dimension that we need to
-    # remove here.
-    # y = y.squeeze()
-    # expert_label_mask = expert_label_mask.squeeze()
-    # subj_ind = subj_ind.squeeze()
-
-    # Make sure expert_label_mask is boolean. Matlab R2020b converts to double
-    # when concatenating booleans! Might be removed once we generate the data
-    # from Matlab again with the right type.
-    # expert_label_mask = expert_label_mask.astype(bool)
 
     input_or_output_aggregation_method = ["count_pooling", "majority_vote"]
     training_segment_length = int(args.training_segment_length * srate)
