@@ -128,7 +128,7 @@ if __name__ == "__main__":
         candidate_progress=(cand_idx, n_candidates),
     )
 
-    results_folder = Path(args.path_to_results, "temporal_results")
+    results_folder = Path(args.path_to_results, "tmp_PSD_autocorr")
     results_folder.mkdir(exist_ok=True, parents=True)
     results_file = f"candidate_{cand_idx}_split_{split_idx}.pkl"
     results_file = results_folder.joinpath(results_file)
