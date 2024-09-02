@@ -32,6 +32,14 @@ def _build_centroid_assignments_file(args):
     return file_name
 
 
+def _build_ics_and_labels_file(args):
+    subj_str = list_to_base36(args.subj_ids)
+    base_name = f"minPerIC-{args.minutes_per_ic}_subj-{subj_str}"
+    file_name = f"{base_name}.npz"
+
+    return file_name
+
+
 def _build_preprocessed_data_file(args):
     subj_str = list_to_base36(args.subj_ids)
     base_name = (
