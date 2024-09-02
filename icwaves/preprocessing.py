@@ -124,9 +124,9 @@ def _get_ics_and_labels(args):
 
         ic_end = ic_start + ica_activations.shape[0]
         ics[ic_start:ic_end] = ica_activations[:, :n_points]
-        labels[ic_start:ic_end] = labels_per_subject
+        labels[ic_start:ic_end] = labels_per_subject.squeeze()
         noisy_labels[ic_start:ic_end] = noisy_labels_per_subject
-        expert_label_mask[ic_start:ic_end] = expert_label_mask_per_subject
+        expert_label_mask[ic_start:ic_end] = expert_label_mask_per_subject.squeeze()
         subj_ind[ic_start:ic_end] = subjID
         ic_start = ic_end
 
