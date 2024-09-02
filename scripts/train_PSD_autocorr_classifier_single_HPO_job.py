@@ -20,7 +20,7 @@ from icwaves.argparser import (
     create_base_argparser_all_params,
 )
 from icwaves.model_selection.validation import _fit_and_score
-from icwaves.preprocessing import _get_ics_and_labels
+from icwaves.preprocessing import _get_ics_and_labels, load_or_build_ics_and_labels
 
 
 if __name__ == "__main__":
@@ -44,8 +44,8 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load data
-    ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = _get_ics_and_labels(
-        args
+    ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
+        load_or_build_ics_and_labels(args)
     )
 
     input_or_output_aggregation_method = ["count_pooling", "majority_vote"]
