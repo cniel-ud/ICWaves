@@ -49,12 +49,13 @@ if __name__ == "__main__":
     )
 
     input_or_output_aggregation_method = ["count_pooling", "majority_vote"]
-    training_segment_length = int(args.training_segment_length * srate)
+    training_segment_length = [int(l * srate) for l in args.training_segment_length]
     validation_segment_length = args.validation_segment_length
     if validation_segment_length == -1:
         validation_segment_length = None
     else:
         validation_segment_length = int(validation_segment_length * srate)
+    validation_segment_length = [validation_segment_length]
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
 
