@@ -37,12 +37,10 @@ def _fit_and_score(
     )
 
     # Get n_training_windows_per_segment
-    n_training_windows_per_segment = parameters.pop("n_training_windows_per_segment")
+    train_segment_length = parameters.pop("n_training_windows_per_segment")
 
     # Get n_validation_windows_per_segment
-    n_validation_windows_per_segment = parameters.pop(
-        "n_validation_windows_per_segment"
-    )
+    validation_segment_length = parameters.pop("n_validation_windows_per_segment")
 
     # Get scorer_kwargs
     scorer_kwargs = parameters.pop("scorer_kwargs", {})
@@ -57,7 +55,7 @@ def _fit_and_score(
 
     # Build train feature vector for a given segment length
     # TODO: rename `n_training_windows_per_segment` to `train_segment_len`
-    X_train = feature_extractor(X_train, n_training_windows_per_segment)
+    X_train = feature_extractor(X_train, train_segment_length)
 
     # X_train.shape = (n_time_series, n_segments, n_features)
     n_segments = X_train.shape[1]
@@ -84,9 +82,9 @@ def _fit_and_score(
     # Aggregate input at either training segment length or validation segment length
     # TODO: rename `count_pooling` to `pooling`
     if input_or_output_aggregation_method == "count_pooling":
-        X_test = feature_extractor(X_test, n_validation_windows_per_segment)
+        X_test = feature_extractor(X_test, validation_segment_length)
     else:
-        X_test = feature_extractor(X_test, n_training_windows_per_segment)
+        X_test = feature_extractor(X_test, train_segment_length)
 
     n_segments = X_test.shape[1]
     # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
@@ -98,26 +96,25 @@ def _fit_and_score(
     # Predictions were made on segments of length n_training_windows_per_segment.
     if input_or_output_aggregation_method == "majority_vote":
         # Aggregate all the predictions
-        if n_validation_windows_per_segment is None:
+        if validation_segment_length is None:
             y_pred = y_pred.reshape(-1, n_segments)
             y_pred = scipy.stats.mode(y_pred, axis=1)[0]
             n_segments = 1
         # Aggregate predictions every n_validation_windows_per_segment > n_training_windows_per_segment
         else:
-            n_validation_segments_per_time_series = (
-                n_segments * n_training_windows_per_segment
-            ) // n_validation_windows_per_segment
+            n_validation_segments = (
+                n_segments * train_segment_length
+            ) // validation_segment_length
 
             n_train_segments_per_validation_segment = (
-                n_segments // n_validation_segments_per_time_series
+                n_segments // n_validation_segments
             )
 
             # Discard some predictions if the number of training segments is not
             # divisible by the number of validation segments.
-            if n_segments % n_validation_segments_per_time_series:
+            if n_segments % n_validation_segments:
                 trimmed_n_segments = (
-                    n_train_segments_per_validation_segment
-                    * n_validation_segments_per_time_series
+                    n_train_segments_per_validation_segment * n_validation_segments
                 )
                 y_pred = y_pred.reshape(-1, n_segments)
                 y_pred = y_pred[:, :trimmed_n_segments]
@@ -129,7 +126,7 @@ def _fit_and_score(
 
             y_pred = y_pred.reshape(-1, n_train_segments_per_validation_segment)
             y_pred = scipy.stats.mode(y_pred, axis=1)[0]
-            n_segments = n_validation_segments_per_time_series
+            n_segments = n_validation_segments
 
     # expand test labels to match test BoWav vectors
     y_test = np.repeat(y_test, n_segments)
@@ -161,12 +158,8 @@ def _fit_and_score(
     parameters.update(
         {"input_or_output_aggregation_method": input_or_output_aggregation_method}
     )
-    parameters.update(
-        {"n_training_windows_per_segment": n_training_windows_per_segment}
-    )
-    parameters.update(
-        {"n_validation_windows_per_segment": n_validation_windows_per_segment}
-    )
+    parameters.update({"n_training_windows_per_segment": train_segment_length})
+    parameters.update({"n_validation_windows_per_segment": validation_segment_length})
     result["test_scores"] = test_scores
     result["fit_time"] = fit_time
     result["score_time"] = score_time
