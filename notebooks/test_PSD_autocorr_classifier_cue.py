@@ -30,13 +30,13 @@ print(f"Root folder is {root}")
 
 train_subj_ids = list(range(8, 36))
 train_subj_ids.remove(22)  # subject 22 is not present
-test_subj_ids = list(range(1, 8))
+cue_subj_ids = list(range(1, 13))
 
 
 class Args:
-    path_to_raw_data = root.joinpath("data/emotion_study/raw_data_and_IC_labels")
+    path_to_raw_data = root.joinpath("data/cue/raw_data_and_IC_labels")
     path_to_results = root.joinpath("results/emotion_study/classifier")
-    path_to_preprocessed_data = root.joinpath("data/emotion_study/preprocessed_data")
+    path_to_preprocessed_data = root.joinpath("data/cue/preprocessed_data")
     window_length = 1.5
     minutes_per_ic = 50.0
     num_clusters = 128
@@ -69,7 +69,7 @@ best_params = copy.deepcopy(results["params"][best_index])
 input_or_output_aggregation_method = best_params["input_or_output_aggregation_method"]
 training_segment_length = best_params["n_training_windows_per_segment"]
 # %% Load or build preprocessed data
-args.subj_ids = test_subj_ids
+args.subj_ids = cue_subj_ids
 ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
     load_or_build_ics_and_labels(args)
 )
@@ -90,7 +90,6 @@ validation_segment_len_samples_arr = validation_segment_len_samples_arr.astype(i
 # Jack knife: when computing mean F1 for each subject, compute mean F1 in the
 # hold out to put error bars on the mean F1 across all ICs
 # get variance across subjects
-# TODO: do this for ICLabel and PSD+autocorr
 columns = [
     "Prediction window [minutes]",
     "Subject ID",
@@ -110,7 +109,7 @@ feature_extractor = (
 )
 for validation_segment_length in validation_segment_len_samples_arr:
     print(f"Computing F1 score after aggregating {validation_segment_length} samples")
-    for subj_id in test_subj_ids:
+    for subj_id in cue_subj_ids:
         print(f"Subject {subj_id}")
         subj_mask = subj_ind == subj_id
 
@@ -177,10 +176,10 @@ columns = [
     "Number of ICs",
 ]
 f1_scores_ICLabel_df = pd.DataFrame(columns=columns)
-emotion_study_dir = Path("../data/emotion_study/")
+cue_dir = Path("../data/cue/")
 fnames = [f"subj-{i:02}.mat" for i in args.subj_ids]
 for test_segment_len in validation_segment_len_seconds_arr:
-    subdir = emotion_study_dir.joinpath(f"IC_labels_at_{test_segment_len:.1f}_seconds")
+    subdir = cue_dir.joinpath(f"IC_labels_at_{test_segment_len:.1f}_seconds")
     for subj_id in args.subj_ids:
         file = subdir.joinpath(f"subj-{subj_id:02}.mat")
         with file.open("rb") as f:
