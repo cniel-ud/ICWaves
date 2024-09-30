@@ -25,6 +25,7 @@ from scipy.io import loadmat
 from sklearn.metrics import f1_score
 
 from icwaves.feature_extractors.bowav import (
+    build_bowav_from_centroid_assignments,
     build_or_load_centroid_assignments_and_labels,
 )
 from icwaves.viz import plot_line_with_error_area
@@ -117,7 +118,6 @@ n_validation_windows_per_segment_arr = n_validation_windows_per_segment_arr.asty
 # Jack knife: when computing mean F1 for each subject, compute mean F1 in the
 # hold out to put error bars on the mean F1 across all ICs
 # get variance across subjects
-# TODO: do this for ICLabel and PSD+autocorr
 columns = [
     "Prediction window [minutes]",
     "Subject ID",
@@ -125,6 +125,13 @@ columns = [
     "Number of ICs",
 ]
 f1_scores_df = pd.DataFrame(columns=columns)
+# build_bowav_from_centroid_assignments has args (centroid_assignments, n_centroids, n_windows_per_segment)
+# `feature_extractor` has args (time_series, segment_len)
+feature_extractor = (
+    lambda time_series, segment_len: build_bowav_from_centroid_assignments(
+        time_series, n_centroids, segment_len
+    )
+)
 for n_validation_windows_per_segment in n_validation_windows_per_segment_arr:
     print(
         f"Computing F1 score after aggregating {n_validation_windows_per_segment * args.window_length} seconds"
@@ -138,8 +145,8 @@ for n_validation_windows_per_segment in n_validation_windows_per_segment_arr:
             centroid_assignments,
             labels,
             expert_label_mask,
-            n_centroids,
             input_or_output_aggregation_method,
+            feature_extractor,
             n_validation_windows_per_segment,
             n_training_windows_per_segment,
             subj_mask,

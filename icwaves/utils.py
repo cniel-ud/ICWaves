@@ -3,70 +3,79 @@ import pandas as pd
 import scipy
 from sklearn.metrics import f1_score
 
-from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
 
-
-def build_bowav_based_on_aggregation_method(
-    centroid_assignments,
-    n_centroids,
+def build_features_based_on_aggregation_method(
+    feature_extractor,
+    X,
+    validation_segment_length,
+    training_segment_length,
     agg_method,
-    n_validation_windows_per_segment,
-    n_training_windows_per_segment,
     subj_mask=slice(None),
 ):
+    """
+    Arguments
+    ---------
+    feature_extractor: function used to extract features from X
+    X: input data. Shape and meaning depend on the feature extractor used,
+                   but X.shape[0] is the number of samples, and X.shape[-1]
+                   is the length of each sample.
+    validation_segment_length: length of the validation segment. If None,
+                               use the entire sample. If not None, it
+                               should be larger than or equal to the training segment length.
+    training_segment_length: length of the training segment
+    agg_method: method used to aggregate the features or the predictions.
+                With "count_pooling", the features are computed over a segment of length
+                validation_segment_length, and predictions over such segment.
+                With "majority_vote", the features are computed over segments of length
+                training_segment_length, predictions over all such segments, and the mode
+                of the predictions is taken.
+    subj_mask: mask to select subjects from X
+
+    Returns
+    -------
+    features: features computed according to agg_method. Shape is (n_samples, n_segments, n_features),
+              where n_segments is equal 1 if agg_method is "count_pooling", or equal to
+              k = floor(X.shape[-1] / training_segment_length) if agg_method is "majority_vote".
+    """
+    X = X[subj_mask, ..., slice(0, validation_segment_length)]
     if agg_method == "count_pooling":
-        bowav_test = build_bowav_from_centroid_assignments(
-            centroid_assignments[subj_mask],
-            n_centroids,
-            n_validation_windows_per_segment,
+        features = feature_extractor(
+            X,
+            validation_segment_length,
         )
-        bowav_test = np.expand_dims(bowav_test[:, 0, :], axis=1)
     else:
-        # TODO: using `n_training_windows_per_segment` does not make sense,
-        # as the test segment length might be smaller. Majority vote is useful
-        # when classifying short (noisy) segments, so we need to impose a restriction
-        # that there are at least 2-3 windows (counts) per segment.
-        bowav_test = build_bowav_from_centroid_assignments(
-            centroid_assignments[subj_mask],
-            n_centroids,
-            n_training_windows_per_segment,
+        if validation_segment_length is not None:
+            assert training_segment_length <= validation_segment_length
+        features = feature_extractor(
+            X,
+            training_segment_length,
         )
-        n_segments_per_time_series = bowav_test.shape[1]
-        if n_validation_windows_per_segment is not None:
-            n_validation_segments_per_time_series = (
-                n_segments_per_time_series * n_training_windows_per_segment
-            ) // n_validation_windows_per_segment
 
-            n_train_segments_per_validation_segment = (
-                n_segments_per_time_series // n_validation_segments_per_time_series
-            )
-            bowav_test = bowav_test[:, :n_train_segments_per_validation_segment, :]
-
-    return bowav_test
+    return features
 
 
 def compute_brain_F1_score_per_subject(
     clf,
-    centroid_assignments,
+    X,
     labels,
     expert_label_mask,
-    n_centroids,
     agg_method,
-    n_validation_windows_per_segment,
-    n_training_windows_per_segment,
+    feature_extractor,
+    validation_segment_length,
+    training_segment_length,
     subj_mask=slice(None),
 ):
 
-    bowav_test = build_bowav_based_on_aggregation_method(
-        centroid_assignments,
-        n_centroids,
+    bowav_test = build_features_based_on_aggregation_method(
+        feature_extractor,
+        X,
+        validation_segment_length,
+        training_segment_length,
         agg_method,
-        n_validation_windows_per_segment,
-        n_training_windows_per_segment,
         subj_mask,
     )
 
-    n_segments_per_time_series = bowav_test.shape[1]
+    n_segments = bowav_test.shape[1]
     # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
     bowav_test = np.vstack(bowav_test)
     y_pred = clf.predict(bowav_test)
@@ -76,16 +85,12 @@ def compute_brain_F1_score_per_subject(
         # Aggregate all the predictions
         # TODO: include None in n_validation_windows_per_segment_arr
         # to get all the time series
-        if n_validation_windows_per_segment is None:
-            y_pred = y_pred.reshape(-1, n_segments_per_time_series)
-            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
-            n_segments_per_time_series = 1
+        y_pred = y_pred.reshape(-1, n_segments)
+        y_pred = scipy.stats.mode(y_pred, axis=1)[0]
 
     # expand labels and expert mask to match test BoWav vectors
-    y = np.repeat(labels[subj_mask], n_segments_per_time_series)
-    ext_expert_label_mask = np.repeat(
-        expert_label_mask[subj_mask], n_segments_per_time_series
-    )
+    y = labels[subj_mask]
+    ext_expert_label_mask = expert_label_mask[subj_mask]
 
     y_expert = y[ext_expert_label_mask]
     y_pred_expert = y_pred[ext_expert_label_mask]
