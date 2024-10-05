@@ -33,6 +33,7 @@ train_subj_ids.remove(22)  # subject 22 is not present
 cue_subj_ids = list(range(1, 13))
 
 
+# TODO: generalize these scripts to work with any dataset/feature/classifier
 class Args:
     path_to_raw_data = root.joinpath("data/cue/raw_data_and_IC_labels")
     path_to_results = root.joinpath("results/emotion_study/classifier")
@@ -228,6 +229,15 @@ ax = plot_line_with_error_area(
     "StdDev - ICLabel",
     color="red",
 )
+# TODO: save these f1_* dataframes and load them to skip computation
+# ax = plot_line_with_error_area(
+#     ax,
+#     f1_across_subj_bowav_sub,
+#     "Prediction window [minutes]",
+#     "Brain F1 score - BoWav",
+#     "StdDev - BoWav",
+#     color="green",
+# )
 ax.set_xscale("log")
 ax.set_xticks([1, 2, 3, 5, 10, 30, 50], labels=[1, 2, 3, 5, 10, 30, 50])
 ax.set_xlim(1, 50)
