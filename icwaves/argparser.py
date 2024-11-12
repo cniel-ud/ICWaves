@@ -4,6 +4,13 @@ from argparse import ArgumentParser
 def create_argparser_one_parameter_one_split():
     parser = ArgumentParser()
     parser.add_argument(
+        "--feature_extractor",
+        type=str,
+        choices=["bowav", "psd_autocorr"],
+        required=True,
+        help="Type of feature extractor to use",
+    )
+    parser.add_argument(
         "--path-to-config-file",
         help="Path to config file with all the parameters",
         required=True,
@@ -28,12 +35,26 @@ def create_argparser_aggregate_results():
         help="Path to config file with all the parameters",
         required=True,
     )
+    parser.add_argument(
+        "--feature_extractor",
+        type=str,
+        choices=["bowav", "psd_autocorr"],
+        required=True,
+        help="Type of feature extractor to use",
+    )
 
     return parser
 
 
-def create_base_argparser_all_params():
+def create_argparser_all_params(feature_extractor: str):
     parser = ArgumentParser()
+    parser.add_argument(
+        "--classifier_type",
+        type=str,
+        choices=["logistic", "random_forest"],
+        required=True,
+        help="Type of classifier to use",
+    )
     parser.add_argument("--path-to-raw-data", help="Path to raw data", required=True)
     parser.add_argument(
         "--path-to-preprocessed-data", help="Path to preprocessed data", required=True
@@ -91,12 +112,20 @@ def create_base_argparser_all_params():
     parser.add_argument(
         "--penalty", default="elasticnet", choices=["l1", "l2", "elasticnet", "none"]
     )
+    parser.add_argument(
+        "--min-samples-split",
+        type=int,
+        nargs="+",
+        default=[1, 10],
+        help="Minimum samples per split",
+    )
 
+    if feature_extractor == "bowav":
+        parser = _add_bowav_args(parser)
     return parser
 
 
-def create_argparser_all_params():
-    parser = create_base_argparser_all_params()
+def _add_bowav_args(parser):
     parser.add_argument(
         "--path-to-centroid-assignments",
         help="Path to centroid assignments",

@@ -1,6 +1,7 @@
 from pathlib import Path
 from pprint import pprint
 
+from argparse import Namespace
 import numpy as np
 from threadpoolctl import threadpool_info
 from tqdm import tqdm
@@ -9,6 +10,7 @@ from icwaves.data_loaders import load_codebooks_wrapper
 from icwaves.preprocessing import load_labels, load_or_build_preprocessed_data
 from icwaves.sikmeans.shift_kmeans import _asignment_step
 from icwaves.file_utils import _build_centroid_assignments_file
+from icwaves.data.types import DataBundle
 
 
 def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
@@ -57,7 +59,7 @@ def _compute_centroid_assignments(X, codebooks, metric="cosine", n_jobs=1):
     return centroid_assignments
 
 
-def build_or_load_centroid_assignments_and_labels(args):
+def build_or_load_centroid_assignments_and_labels(args: Namespace) -> DataBundle:
 
     data_folder = Path(args.path_to_centroid_assignments)
     data_folder.mkdir(exist_ok=True, parents=True)
@@ -80,13 +82,14 @@ def build_or_load_centroid_assignments_and_labels(args):
         with centroid_assignments_file.open("wb") as f:
             np.save(f, centroid_assignments, allow_pickle=False)
 
-    return (
-        centroid_assignments,
-        labels,
-        expert_label_mask,
-        subj_ind,
-        noisy_labels,
-        n_centroids,
+    return DataBundle(
+        data=centroid_assignments,
+        labels=labels,
+        expert_label_mask=expert_label_mask,
+        subj_ind=subj_ind,
+        n_centroids=n_centroids,
+        noisy_labels=noisy_labels,
+        srate=srate,
     )
 
 

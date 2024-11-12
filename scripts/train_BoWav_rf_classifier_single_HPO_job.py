@@ -6,11 +6,9 @@ import pickle
 
 import numpy as np
 from numpy.random import default_rng
-from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
 from sklearn.model_selection import ParameterGrid
-from sklearn.pipeline import Pipeline
 
 from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
 
@@ -27,12 +25,6 @@ from icwaves.argparser import (
 import sklearn
 import scipy
 
-
-TF_IDF_NORM_MAP = {
-    "none": None,
-    "l1": "l1",
-    "l2": "l2",
-}
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -80,18 +72,14 @@ if __name__ == "__main__":
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
 
-    pipe = Pipeline([("scaler", TfidfTransformer()), ("clf", LogisticRegression())])
+    clf = RandomForestClassifier()
 
     clf_params = dict(
-        clf__class_weight="balanced",
-        clf__solver="saga",
-        clf__penalty=args.penalty,
-        clf__random_state=old_rng,
-        clf__multi_class="multinomial",
-        clf__warm_start=True,
-        clf__max_iter=args.max_iter,
+        n_estimators=300,
+        random_state=old_rng,
+        class_weight="balanced",
     )
-    pipe.set_params(**clf_params)
+    clf.set_params(**clf_params)
 
     # Wrap single-value params as a list. TODO: check and convert for all params
     validation_segment_length = [validation_segment_length]
@@ -99,9 +87,7 @@ if __name__ == "__main__":
         args.tf_idf_norm = [args.tf_idf_norm]
 
     candidate_params = dict(
-        clf__C=args.regularization_factor,
-        clf__l1_ratio=args.l1_ratio,
-        scaler__norm=[TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm],
+        min_samples_split=args.min_samples_split,
         expert_weight=args.expert_weight,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
         training_segment_length=training_segment_length,
@@ -134,7 +120,7 @@ if __name__ == "__main__":
     )
 
     result = _fit_and_score(
-        pipe,
+        clf,
         centroid_assignments,
         labels,
         expert_label_mask,
@@ -147,7 +133,7 @@ if __name__ == "__main__":
         candidate_progress=(cand_idx, n_candidates),
     )
 
-    results_folder = Path(args.path_to_results, "temporal_results")
+    results_folder = Path(args.path_to_results, "tmp_random_forest_bowav")
     results_folder.mkdir(exist_ok=True, parents=True)
     results_file = f"candidate_{cand_idx}_split_{split_idx}.pkl"
     results_file = results_folder.joinpath(results_file)

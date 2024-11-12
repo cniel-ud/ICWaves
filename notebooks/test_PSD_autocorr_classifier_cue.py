@@ -57,7 +57,7 @@ rng = default_rng(13)
 results_folder = Path(args.path_to_results)
 results_folder.mkdir(exist_ok=True, parents=True)
 # TODO: generate this file name dynamically
-results_file = "PSD_autocorr_valseg_none.pkl"
+results_file = "PSD_autocorr_rf_trainseg30720_valseglenNone_expw64.pkl"
 results_file = results_folder.joinpath(results_file)
 clf_path = args.path_to_results.joinpath(results_file)
 with clf_path.open("rb") as f:
@@ -68,7 +68,7 @@ best_index = results["rank_test_scores"].argmin()
 best_score = results[f"mean_test_scores"][best_index]
 best_params = copy.deepcopy(results["params"][best_index])
 input_or_output_aggregation_method = best_params["input_or_output_aggregation_method"]
-training_segment_length = best_params["n_training_windows_per_segment"]
+training_segment_length = best_params["training_segment_length"]
 # %% Load or build preprocessed data
 args.subj_ids = cue_subj_ids
 ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
@@ -80,7 +80,7 @@ ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
 # 1-5 min: 1 minutes
 # 5-end: 5 minutes
 validation_segment_len_seconds_arr = np.r_[
-    np.arange(60, 5 * 60 + 1, 60),
+    np.arange(2 * 60, 5 * 60 + 1, 60),
     np.arange(10 * 60, 50 * 60 + 1, 5 * 60),
 ]
 validation_segment_len_samples_arr = validation_segment_len_seconds_arr * srate

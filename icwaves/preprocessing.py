@@ -1,11 +1,13 @@
 import logging
 from pathlib import Path
+from argparse import Namespace
 
 import numpy as np
 from scipy.io import loadmat
 from tqdm import tqdm
 
 from icwaves.file_utils import _build_ics_and_labels_file, _build_preprocessed_data_file
+from icwaves.data.types import DataBundle
 
 
 def _get_base_metadata(args):
@@ -145,7 +147,7 @@ def load_labels(args):
     return labels, srate, expert_label_mask, subj_ind, noisy_labels
 
 
-def load_or_build_ics_and_labels(args):
+def load_or_build_ics_and_labels(args: Namespace) -> DataBundle:
     data_folder = Path(args.path_to_preprocessed_data)
     data_folder.mkdir(exist_ok=True, parents=True)
     preprocessed_data_file = _build_ics_and_labels_file(args)
@@ -172,7 +174,14 @@ def load_or_build_ics_and_labels(args):
                 subj_ind=subj_ind,
                 noisy_labels=noisy_labels,
             )
-    return ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
+    return DataBundle(
+        data=ics,
+        labels=labels,
+        expert_label_mask=expert_label_mask,
+        subj_ind=subj_ind,
+        srate=srate,
+        noisy_labels=noisy_labels,
+    )
 
 
 def load_or_build_preprocessed_data(args):

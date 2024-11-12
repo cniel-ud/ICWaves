@@ -1,98 +1,105 @@
-# %%
 import copy
 import logging
-import pickle
-from pathlib import Path
 import time
+from collections import defaultdict
+from functools import partial
 
 import numpy as np
-from numpy.random import default_rng
-import scipy
-import sklearn
+from numpy.ma import MaskedArray
+from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.base import clone
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import ParameterGrid
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection._search import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
-
-from icwaves.feature_extractors.iclabel_features import get_iclabel_features_per_segment
-from icwaves.file_utils import build_results_file, read_args_from_file
-from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
-from icwaves.model_selection.utils import _store
+from sklearn.pipeline import Pipeline
 from icwaves.argparser import (
     create_argparser_aggregate_results,
     create_argparser_all_params,
 )
-from icwaves.preprocessing import load_or_build_ics_and_labels
+from icwaves.feature_extractors.bowav import (
+    build_bowav_from_centroid_assignments,
+    build_or_load_centroid_assignments_and_labels,
+)
 
+from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
+from icwaves.model_selection.utils import _store
+from icwaves.file_utils import build_results_file, read_args_from_file
+from pathlib import Path
+import pickle
+import sklearn
+import scipy
+
+TF_IDF_NORM_MAP = {
+    "none": None,
+    "l1": "l1",
+    "l2": "l2",
+}
 
 if __name__ == "__main__":
-
     logging.basicConfig(
         format="%(levelname)s:%(filename)s:%(message)s", level=logging.DEBUG
     )
     logging.info("Started")
 
     parser = create_argparser_aggregate_results()
-    one_run_args = parser.parse_args()
-
-    args_list = read_args_from_file(one_run_args.path_to_config_file)
-
+    agg_args = parser.parse_args()
+    args_list = read_args_from_file(agg_args.path_to_config_file)
     all_params_parser = create_argparser_all_params()
     args = all_params_parser.parse_args(args_list)
 
-    new_rng = default_rng(13)
-    # scikit-learn doesn't support the new numpy Generator:
-    old_rng = np.random.RandomState(13)
-
-    # Load data
-    X_train, y_train, srate, expert_label_mask, subj_ind, noisy_labels = (
-        load_or_build_ics_and_labels(args)
+    # Load or build centroid assignments
+    centroid_assignments, labels, expert_label_mask, subj_ind, _, n_centroids = (
+        build_or_load_centroid_assignments_and_labels(args)
     )
-
     input_or_output_aggregation_method = ["count_pooling", "majority_vote"]
-    training_segment_length = [int(l * srate) for l in args.training_segment_length]
+    training_segment_length = args.training_segment_length
+    # Compute training_segment_length
+    training_segment_length = [
+        int(s / args.window_length) for s in training_segment_length
+    ]
     validation_segment_length = args.validation_segment_length
+    # Compute validation_segment_length
     if validation_segment_length == -1:
         validation_segment_length = None
     else:
-        validation_segment_length = int(validation_segment_length * srate)
+        validation_segment_length = int(validation_segment_length / args.window_length)
     validation_segment_length = [validation_segment_length]
+    if not isinstance(args.tf_idf_norm, list):
+        args.tf_idf_norm = [args.tf_idf_norm]
 
     cv = LeaveOneSubjectOutExpertOnly(expert_label_mask)
 
-    # ICLabel max-scale PSDs and autocorrelation functions
-    # Do we still need to scale the features here?
-    # My intuition tells me not...I checked and although the features are not
-    # zero mean, their mean is not widely different, and the variances are
-    # rather small.
-    clf = LogisticRegression()
+    clf = RandomForestClassifier()
 
+    rng = np.random.RandomState(13)
     clf_params = dict(
+        n_estimators=300,
+        random_state=rng,
         class_weight="balanced",
-        solver="saga",
-        penalty=args.penalty,
-        random_state=old_rng,
-        multi_class="multinomial",
-        warm_start=True,
-        max_iter=args.max_iter,
     )
     clf.set_params(**clf_params)
 
     candidate_params = dict(
-        C=args.regularization_factor,
-        l1_ratio=args.l1_ratio,
+        min_samples_split=args.min_samples_split,
+        # min_samples_leaf=args.min_samples_leaf,
         expert_weight=args.expert_weight,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
         training_segment_length=training_segment_length,
         validation_segment_length=validation_segment_length,
     )
-
     candidate_params = list(ParameterGrid(candidate_params))
     n_candidates = len(candidate_params)
-    n_splits = cv.get_n_splits(X_train, y_train, groups=subj_ind)
-
     all_out = []
-    results_path = Path(args.path_to_results, "tmp_PSD_autocorr")
+
+    estimator = clf
+    X = centroid_assignments
+    y = labels
+    n_splits = cv.get_n_splits(centroid_assignments, labels, groups=subj_ind)
+
+    # TODO: use a folder name that is parametrized by the specific HPO that was used,
+    # instead of "temporal_results"
+    results_path = Path(args.path_to_results, "tmp_random_forest_bowav")
+
     for candidate_idx in range(n_candidates):
         for split_idx in range(n_splits):
             file = results_path.joinpath(
@@ -108,7 +115,11 @@ if __name__ == "__main__":
 
     results = {**fit_time_dict, **test_time_dict}
     results["params"] = candidate_params
+    # TODO: We save back candidate parameters in the "parameters" key of `result`
+    # in validation.py, but we never access that key here. Maybe remove that in
+    # validation.py?
     test_scores_dict = {"scores": all_out["test_scores"]}
+    # Computed the (weighted) mean and std for test scores alone
     results.update(
         _store(
             "test_scores",
@@ -125,41 +136,36 @@ if __name__ == "__main__":
     best_params = copy.deepcopy(results["params"][best_index])
     logging.info("Best score: %s", best_score)
     logging.info("Best params: %s", best_params)
-
     best_expert_weight = best_params.pop("expert_weight", 1)
     best_training_segment_length = best_params.pop("training_segment_length")
     del best_params["validation_segment_length"]
     del best_params["input_or_output_aggregation_method"]
-    best_estimator = clone(clone(clf).set_params(**best_params))
+    best_estimator = clone(clone(estimator).set_params(**best_params))
 
     refit_start_time = time.time()
-    sample_weight_train = np.ones(X_train.shape[0])
-    sample_weight_train[expert_label_mask] = best_expert_weight
+    sample_weight = np.ones(X.shape[0])
+    sample_weight[expert_label_mask] = best_expert_weight
 
-    # Build feature vector
-    X_train = get_iclabel_features_per_segment(
-        signal=X_train,
-        sfreq=srate,
-        use_autocorr=True,
-        segment_len=best_training_segment_length,
+    # Build train BoWav vector for a given segment length
+    bowav = build_bowav_from_centroid_assignments(
+        X, n_centroids, best_training_segment_length
     )
+    del X
 
-    # X_train.shape = (n_time_series, n_segments, n_features)
-    n_segments = X_train.shape[1]
-    # vertically concatenate train feature vectors: (m, n, p) -> (m*n, p)
-    X_train = np.vstack(X_train)
-    # expand train labels to match train feature vectors
-    y_train = np.repeat(y_train, n_segments)
-    # expand train sample weights to match train feature vectors
-    sample_weight_train = np.repeat(sample_weight_train, n_segments)
+    n_segments_per_time_series = bowav.shape[1]
+    # vertically concatenate train BoWav vectors: (m, n, p) -> (m*n, p)
+    bowav = np.vstack(bowav)
+    # expand train labels to match train BoWav vectors
+    y = np.repeat(y, n_segments_per_time_series)
+    # expand train sample weights to match train BoWav vectors
+    sample_weight = np.repeat(sample_weight, n_segments_per_time_series)
 
     logging.info("Fitting best estimator")
-
-    named_steps = getattr(best_estimator, "named_steps", None)
+    named_steps = getattr(estimator, "named_steps", None)
     if named_steps is not None:
-        best_estimator.fit(X_train, y_train, clf__sample_weight=sample_weight_train)
+        best_estimator.fit(bowav, y, clf__sample_weight=sample_weight)
     else:
-        best_estimator.fit(X_train, y_train, sample_weight=sample_weight_train)
+        best_estimator.fit(bowav, y, sample_weight=sample_weight)
 
     refit_end_time = time.time()
     refit_time = refit_end_time - refit_start_time
@@ -177,9 +183,10 @@ if __name__ == "__main__":
     results["numpy_version"] = np.__version__
     results["scipy_version"] = scipy.__version__
 
-    # create results file name using best hyperparameters
-    # TODO: improve the creation of this file name
-    results_file = f"PSD_autocorr_seglen{best_training_segment_length}_expw{int(best_expert_weight)}_.pkl"
+    # TODO: Use a simpler file name. Maybe using only the best parameters, and
+    # create a corresponging README or log file with the rest of the information,
+    # like the full HPO grid.
+    results_file = f"BoWav_random_forest_seglen{best_training_segment_length}_expw{int(best_expert_weight)}.pkl"
     results_file = results_folder.joinpath(results_file)
     with results_file.open("wb") as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)

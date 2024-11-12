@@ -10,7 +10,7 @@ from numpy.random import default_rng
 import scipy
 import sklearn
 from sklearn.base import clone
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
 
@@ -65,22 +65,17 @@ if __name__ == "__main__":
     # My intuition tells me not...I checked and although the features are not
     # zero mean, their mean is not widely different, and the variances are
     # rather small.
-    clf = LogisticRegression()
+    clf = RandomForestClassifier()
 
     clf_params = dict(
-        class_weight="balanced",
-        solver="saga",
-        penalty=args.penalty,
+        n_estimators=300,
         random_state=old_rng,
-        multi_class="multinomial",
-        warm_start=True,
-        max_iter=args.max_iter,
+        class_weight="balanced",
     )
     clf.set_params(**clf_params)
 
     candidate_params = dict(
-        C=args.regularization_factor,
-        l1_ratio=args.l1_ratio,
+        min_samples_split=args.min_samples_split,
         expert_weight=args.expert_weight,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
         training_segment_length=training_segment_length,
@@ -92,7 +87,7 @@ if __name__ == "__main__":
     n_splits = cv.get_n_splits(X_train, y_train, groups=subj_ind)
 
     all_out = []
-    results_path = Path(args.path_to_results, "tmp_PSD_autocorr")
+    results_path = Path(args.path_to_results, "tmp_random_forest_PSD_autocorr")
     for candidate_idx in range(n_candidates):
         for split_idx in range(n_splits):
             file = results_path.joinpath(
@@ -179,7 +174,7 @@ if __name__ == "__main__":
 
     # create results file name using best hyperparameters
     # TODO: improve the creation of this file name
-    results_file = f"PSD_autocorr_seglen{best_training_segment_length}_expw{int(best_expert_weight)}_.pkl"
+    results_file = f"PSD_autocorr_rf_trainseg{best_training_segment_length}_valseglen300_expw{int(best_expert_weight)}.pkl"
     results_file = results_folder.joinpath(results_file)
     with results_file.open("wb") as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)

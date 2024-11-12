@@ -102,10 +102,8 @@ def grid_search_cv(
     best_score = results[f"mean_test_scores"][best_index]
     best_params = copy.deepcopy(results["params"][best_index])
     best_expert_weight = best_params.pop("expert_weight", 1)
-    best_n_training_windows_per_segment = best_params.pop(
-        "n_training_windows_per_segment"
-    )
-    del best_params["n_validation_windows_per_segment"]
+    best_training_segment_length = best_params.pop("training_segment_length")
+    del best_params["validation_segment_length"]
     del best_params["input_or_output_aggregation_method"]
     best_estimator = clone(clone(estimator).set_params(**best_params))
 
@@ -114,7 +112,7 @@ def grid_search_cv(
     sample_weight[expert_label_mask] = best_expert_weight
 
     # Build train BoWav vector for a given segment length
-    X = feature_extractor(X, best_n_training_windows_per_segment)
+    X = feature_extractor(X, best_training_segment_length)
 
     n_segments = X.shape[1]
     # vertically concatenate train BoWav vectors: (m, n, p) -> (m*n, p)

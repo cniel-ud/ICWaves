@@ -53,20 +53,18 @@ if __name__ == "__main__":
     )
     input_or_output_aggregation_method = ["count_pooling", "majority_vote"]
     training_segment_length = args.training_segment_length
-    # Compute n_training_windows_per_segment
-    n_training_windows_per_segment = [
+    # Compute training_segment_length
+    training_segment_length = [
         int(s / args.window_length) for s in training_segment_length
     ]
     validation_segment_length = args.validation_segment_length
-    # Compute n_validation_windows_per_segment
+    # Compute validation_segment_length
     if validation_segment_length == -1:
-        n_validation_windows_per_segment = None
+        validation_segment_length = None
     else:
-        n_validation_windows_per_segment = int(
-            validation_segment_length / args.window_length
-        )
+        validation_segment_length = int(validation_segment_length / args.window_length)
     n_centroids = [n_centroids]
-    n_validation_windows_per_segment = [n_validation_windows_per_segment]
+    validation_segment_length = [validation_segment_length]
     if not isinstance(args.tf_idf_norm, list):
         args.tf_idf_norm = [args.tf_idf_norm]
 
@@ -92,8 +90,8 @@ if __name__ == "__main__":
         scaler__norm=[TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm],
         expert_weight=args.expert_weight,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
-        n_training_windows_per_segment=n_training_windows_per_segment,
-        n_validation_windows_per_segment=n_validation_windows_per_segment,
+        training_segment_length=training_segment_length,
+        validation_segment_length=validation_segment_length,
         n_centroids=n_centroids,
     )
     candidate_params = list(ParameterGrid(candidate_params))
@@ -163,11 +161,9 @@ if __name__ == "__main__":
     logging.info("Best score: %s", best_score)
     logging.info("Best params: %s", best_params)
     best_expert_weight = best_params.pop("expert_weight", 1)
-    best_n_training_windows_per_segment = best_params.pop(
-        "n_training_windows_per_segment"
-    )
+    best_training_segment_length = best_params.pop("training_segment_length")
     n_centroids = best_params.pop("n_centroids")
-    del best_params["n_validation_windows_per_segment"]
+    del best_params["validation_segment_length"]
     del best_params["input_or_output_aggregation_method"]
     best_estimator = clone(clone(estimator).set_params(**best_params))
 
@@ -177,7 +173,7 @@ if __name__ == "__main__":
 
     # Build train BoWav vector for a given segment length
     bowav = build_bowav_from_centroid_assignments(
-        X, n_centroids, best_n_training_windows_per_segment
+        X, n_centroids, best_training_segment_length
     )
     del X
 

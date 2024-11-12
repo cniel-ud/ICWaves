@@ -94,7 +94,7 @@ best_index = results["rank_test_scores"].argmin()
 best_score = results[f"mean_test_scores"][best_index]
 best_params = copy.deepcopy(results["params"][best_index])
 input_or_output_aggregation_method = best_params["input_or_output_aggregation_method"]
-n_training_windows_per_segment = best_params["n_training_windows_per_segment"]
+training_segment_length = best_params["training_segment_length"]
 # %% Load or build preprocessed data
 args.subj_ids = cue_subj_ids
 centroid_assignments, labels, expert_label_mask, subj_ind, noisy_labels, n_centroids = (
@@ -110,10 +110,8 @@ validation_segment_length_arr = np.r_[
     np.arange(2 * 60, 5 * 60 + 1, 60),
     np.arange(10 * 60, 50 * 60 + 1, 5 * 60),
 ]
-n_validation_windows_per_segment_arr = (
-    validation_segment_length_arr / args.window_length
-)
-n_validation_windows_per_segment_arr = n_validation_windows_per_segment_arr.astype(int)
+validation_segment_length_arr = validation_segment_length_arr / args.window_length
+validation_segment_length_arr = validation_segment_length_arr.astype(int)
 
 # %%
 # average F1 per subject
@@ -135,9 +133,9 @@ feature_extractor = (
         time_series, n_centroids, segment_len
     )
 )
-for n_validation_windows_per_segment in n_validation_windows_per_segment_arr:
+for validation_segment_length in validation_segment_length_arr:
     print(
-        f"Computing F1 score after aggregating {n_validation_windows_per_segment * args.window_length} seconds"
+        f"Computing F1 score after aggregating {validation_segment_length * args.window_length} seconds"
     )
     for subj_id in cue_subj_ids:
         print(f"Subject {subj_id}")
@@ -150,13 +148,13 @@ for n_validation_windows_per_segment in n_validation_windows_per_segment_arr:
             expert_label_mask,
             input_or_output_aggregation_method,
             feature_extractor,
-            n_validation_windows_per_segment,
-            n_training_windows_per_segment,
+            validation_segment_length,
+            training_segment_length,
             subj_mask,
         )
 
         f1_scores_df.loc[len(f1_scores_df)] = {
-            "Prediction window [minutes]": n_validation_windows_per_segment
+            "Prediction window [minutes]": validation_segment_length
             * args.window_length
             / 60,
             "Subject ID": subj_id,
@@ -200,9 +198,7 @@ ax.set_title("Mean brain F1 score across subjects")
 ax.legend()
 ax.grid(True)
 # %%
-validation_segment_length_arr = (
-    n_validation_windows_per_segment_arr * args.window_length
-)
+validation_segment_length_arr = validation_segment_length_arr * args.window_length
 columns = [
     "Prediction window [minutes]",
     "Subject ID",

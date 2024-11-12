@@ -73,12 +73,16 @@ TF_IDF_NORM_MAP = {
 
 results_folder = Path(args.path_to_results)
 results_folder.mkdir(exist_ok=True, parents=True)
-results_file = build_results_file(args=args)
+# TODO: create this programatically
+results_file = "BoWav_rf_valseglenNone_trainseglen200_expw16.pkl"
 results_file = results_folder.joinpath(results_file)
 clf_path = args.path_to_results.joinpath(results_file)
 with clf_path.open("rb") as f:
     results = pickle.load(f)
-clf = results["best_estimator"]["clf"]
+if "clf" in results["best_estimator"]:
+    clf = results["best_estimator"]["clf"]
+else:
+    clf = results["best_estimator"]
 # %%
 best_index = results["rank_test_scores"].argmin()
 best_score = results[f"mean_test_scores"][best_index]
@@ -95,16 +99,15 @@ centroid_assignments, labels, expert_label_mask, subj_ind, noisy_labels, n_centr
 # 1-5 min: 1 minutes
 # 5-end: 5 minutes
 validation_segment_length_arr = np.r_[
-    np.arange(10, 60 + 1, 10),
-    np.arange(2 * 60, 5 * 60 + 1, 60),
+    # np.arange(10, 60 + 1, 10),
+    # np.arange(2 * 60, 5 * 60 + 1, 60),
+    np.arange(5 * 60, 5 * 60 + 1, 60),
     np.arange(10 * 60, 50 * 60 + 1, 5 * 60),
 ]
-n_validation_windows_per_segment_arr = (
-    validation_segment_length_arr / args.window_length
-)
-n_validation_windows_per_segment_arr = n_validation_windows_per_segment_arr.astype(int)
+validation_segment_length_arr = validation_segment_length_arr / args.window_length
+validation_segment_length_arr = validation_segment_length_arr.astype(int)
 input_or_output_aggregation_method = best_params["input_or_output_aggregation_method"]
-n_training_windows_per_segment = best_params["n_training_windows_per_segment"]
+training_segment_length = best_params["training_segment_length"]
 
 # %%
 # average F1 per subject
@@ -126,9 +129,9 @@ feature_extractor = (
         time_series, n_centroids, segment_len
     )
 )
-for n_validation_windows_per_segment in n_validation_windows_per_segment_arr:
+for validation_segment_length in validation_segment_length_arr:
     print(
-        f"Computing F1 score after aggregating {n_validation_windows_per_segment * args.window_length} seconds"
+        f"Computing F1 score after aggregating {validation_segment_length * args.window_length} seconds"
     )
     for subj_id in test_subj_ids:
         print(f"Subject {subj_id}")
@@ -141,13 +144,13 @@ for n_validation_windows_per_segment in n_validation_windows_per_segment_arr:
             expert_label_mask,
             input_or_output_aggregation_method,
             feature_extractor,
-            n_validation_windows_per_segment,
-            n_training_windows_per_segment,
+            validation_segment_length,
+            training_segment_length,
             subj_mask,
         )
 
         f1_scores_df.loc[len(f1_scores_df)] = {
-            "Prediction window [minutes]": n_validation_windows_per_segment
+            "Prediction window [minutes]": validation_segment_length
             * args.window_length
             / 60,
             "Subject ID": subj_id,
@@ -181,19 +184,19 @@ ax = plot_line_with_error_area(
     "StdDev - BoWav",
 )
 ax.set_xscale("log")
-ax.set_xticks(
-    [0.15, 0.5, 1, 2, 3, 5, 10, 30, 50], labels=[0.15, 0.5, 1, 2, 3, 5, 10, 30, 50]
-)
-ax.set_xlim(0.15, 50)
+ax.set_xticks([5, 10, 15, 20, 30, 40, 50], labels=[5, 10, 15, 20, 30, 40, 50])
+ax.set_xlim(5, 50)
+# ax.set_xticks(
+#     [0.15, 0.5, 1, 2, 3, 5, 10, 30, 50], labels=[0.15, 0.5, 1, 2, 3, 5, 10, 30, 50]
+# )
+# ax.set_xlim(0.15, 50)
 ax.set_xlabel("Prediction window [minutes]")
 ax.set_ylabel("Mean Brain F1 score")
 ax.set_title("Mean brain F1 score across subjects")
 ax.legend()
 ax.grid(True)
 # %%
-validation_segment_length_arr = (
-    n_validation_windows_per_segment_arr * args.window_length
-)
+validation_segment_length_arr = validation_segment_length_arr * args.window_length
 columns = [
     "Prediction window [minutes]",
     "Subject ID",
@@ -254,10 +257,12 @@ ax = plot_line_with_error_area(
     color="red",
 )
 ax.set_xscale("log")
-ax.set_xticks(
-    [0.15, 0.5, 1, 2, 3, 5, 10, 30, 50], labels=[0.15, 0.5, 1, 2, 3, 5, 10, 30, 50]
-)
-ax.set_xlim(0.15, 50)
+ax.set_xticks([5, 10, 15, 20, 30, 40, 50], labels=[5, 10, 15, 20, 30, 40, 50])
+ax.set_xlim(5, 50)
+# ax.set_xticks(
+#     [0.15, 0.5, 1, 2, 3, 5, 10, 30, 50], labels=[0.15, 0.5, 1, 2, 3, 5, 10, 30, 50]
+# )
+# ax.set_xlim(0.15, 50)
 ax.set_xlabel("Prediction window [minutes]")
 ax.set_ylabel("Mean Brain F1 score")
 ax.set_title("Mean brain F1 score across subjects")

@@ -36,11 +36,11 @@ def _fit_and_score(
         "input_or_output_aggregation_method"
     )
 
-    # Get n_training_windows_per_segment
-    train_segment_length = parameters.pop("n_training_windows_per_segment")
+    # Get training_segment_length
+    train_segment_length = parameters.pop("training_segment_length")
 
-    # Get n_validation_windows_per_segment
-    validation_segment_length = parameters.pop("n_validation_windows_per_segment")
+    # Get validation_segment_length
+    validation_segment_length = parameters.pop("validation_segment_length")
 
     # Get scorer_kwargs
     scorer_kwargs = parameters.pop("scorer_kwargs", {})
@@ -54,7 +54,7 @@ def _fit_and_score(
     sample_weight_train = sample_weight[train]
 
     # Build train feature vector for a given segment length
-    # TODO: rename `n_training_windows_per_segment` to `train_segment_len`
+    # TODO: rename `training_segment_length` to `train_segment_len`
     X_train = feature_extractor(X_train, train_segment_length)
 
     # X_train.shape = (n_time_series, n_segments, n_features)
@@ -93,14 +93,14 @@ def _fit_and_score(
     y_pred = estimator.predict(X_test)
     del X_test
 
-    # Predictions were made on segments of length n_training_windows_per_segment.
+    # Predictions were made on segments of length training_segment_length.
     if input_or_output_aggregation_method == "majority_vote":
         # Aggregate all the predictions
         if validation_segment_length is None:
             y_pred = y_pred.reshape(-1, n_segments)
             y_pred = scipy.stats.mode(y_pred, axis=1)[0]
             n_segments = 1
-        # Aggregate predictions every n_validation_windows_per_segment > n_training_windows_per_segment
+        # Aggregate predictions every validation_segment_length > training_segment_length
         else:
             n_validation_segments = (
                 n_segments * train_segment_length
@@ -158,8 +158,8 @@ def _fit_and_score(
     parameters.update(
         {"input_or_output_aggregation_method": input_or_output_aggregation_method}
     )
-    parameters.update({"n_training_windows_per_segment": train_segment_length})
-    parameters.update({"n_validation_windows_per_segment": validation_segment_length})
+    parameters.update({"training_segment_length": train_segment_length})
+    parameters.update({"validation_segment_length": validation_segment_length})
     result["test_scores"] = test_scores
     result["fit_time"] = fit_time
     result["score_time"] = score_time

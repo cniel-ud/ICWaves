@@ -83,7 +83,7 @@ def compute_brain_F1_score_per_subject(
     # Maybe aggregate output
     if agg_method == "majority_vote":
         # Aggregate all the predictions
-        # TODO: include None in n_validation_windows_per_segment_arr
+        # TODO: include None in validation_segment_length_arr
         # to get all the time series
         y_pred = y_pred.reshape(-1, n_segments)
         y_pred = scipy.stats.mode(y_pred, axis=1)[0]

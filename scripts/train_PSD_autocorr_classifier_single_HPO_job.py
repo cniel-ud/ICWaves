@@ -17,7 +17,7 @@ from icwaves.file_utils import read_args_from_file
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.argparser import (
     create_argparser_one_parameter_one_split,
-    create_base_argparser_all_params,
+    create_argparser_all_params,
 )
 from icwaves.model_selection.validation import _fit_and_score
 from icwaves.preprocessing import _get_ics_and_labels, load_or_build_ics_and_labels
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     args_list = read_args_from_file(one_run_args.path_to_config_file)
     job_id = one_run_args.job_id
 
-    all_params_parser = create_base_argparser_all_params()
+    all_params_parser = create_argparser_all_params()
     args = all_params_parser.parse_args(args_list)
 
     new_rng = default_rng(13)
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     # ICLabel max-scale PSDs and autocorrelation functions
     # Do we still need to scale the features here?
     # My intuition tells me not...I checked and although the features are not
-    # zero mean, their mean is not widely different, and the variances are
+    # zero mean, their mean is n    ot widely different, and the variances are
     # rather small.
     clf = LogisticRegression()
 
@@ -82,8 +82,8 @@ if __name__ == "__main__":
         l1_ratio=args.l1_ratio,
         expert_weight=args.expert_weight,
         input_or_output_aggregation_method=input_or_output_aggregation_method,
-        n_training_windows_per_segment=training_segment_length,
-        n_validation_windows_per_segment=validation_segment_length,
+        training_segment_length=training_segment_length,
+        validation_segment_length=validation_segment_length,
     )
 
     candidate_params = list(ParameterGrid(candidate_params))
