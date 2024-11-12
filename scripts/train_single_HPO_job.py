@@ -136,7 +136,7 @@ if __name__ == "__main__":
     )
 
     valseglen = (
-        "none"
+        "None"
         if args.validation_segment_length == -1
         else int(args.validation_segment_length)
     )
