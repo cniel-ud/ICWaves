@@ -1,11 +1,6 @@
 import logging
 import copy
 import pickle
-import numpy as np
-from collections import defaultdict
-from functools import partial
-from numpy.ma import MaskedArray
-from sklearn.base import clone
 from pathlib import Path
 from sklearn.model_selection import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
