@@ -4,7 +4,65 @@ import pickle
 from pathlib import Path
 from sklearn.model_selection import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
+from icwaves.feature_extractors.utils import calculate_segment_length
 from icwaves.model_selection.utils import _store
+
+TF_IDF_NORM_MAP = {
+    "none": None,
+    "l1": "l1",
+    "l2": "l2",
+}
+
+
+def get_base_parameters(args, rng):
+    if args.classifier_type == "logistic":
+        params = dict(
+            penalty=args.penalty,
+            max_iter=args.max_iter,
+            random_state=rng,
+            class_weight="balanced",
+            solver="saga",
+            warm_start=True,
+            multi_class="multinomial",
+        )
+    elif args.classifier_type == "random_forest":
+        params = dict(
+            n_estimators=300,
+            random_state=rng,
+            class_weight="balanced",
+        )
+    return params
+
+
+def build_grid_parameters(args, srate):
+    candidate_params = {}
+    candidate_params["input_or_output_aggregation_method"] = [
+        "count_pooling",
+        "majority_vote",
+    ]
+    candidate_params["training_segment_length"] = calculate_segment_length(
+        args, srate, train=True
+    )
+    candidate_params["validation_segment_length"] = calculate_segment_length(
+        args, srate, train=False
+    )
+    candidate_params["expert_weight"] = args.expert_weight
+    if args.classifier_type == "logistic":
+        if args.feature_extractor == "bowav":
+            candidate_params["clf__C"] = args.regularization_factor
+            candidate_params["clf__l1_ratio"] = args.l1_ratio
+            candidate_params["scaler__norm"] = [
+                TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+            ]
+        else:
+            candidate_params["C"] = args.regularization_factor
+            candidate_params["l1_ratio"] = args.l1_ratio
+    elif args.classifier_type == "random_forest":
+        candidate_params["min_samples_split"] = args.min_samples_split
+
+    candidate_params = list(ParameterGrid(candidate_params))
+
+    return candidate_params
 
 
 def get_grid_size(candidate_params, cv, data_bundle):
