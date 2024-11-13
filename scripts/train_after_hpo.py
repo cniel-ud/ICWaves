@@ -11,14 +11,16 @@ from sklearn.base import clone
 
 from icwaves.factories import create_estimator
 from icwaves.file_utils import read_args_from_file
-from icwaves.model_selection.hpo_utils import get_grid_size, process_candidate_results
+from icwaves.model_selection.hpo_utils import (
+    process_candidate_results,
+    get_base_parameters,
+)
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.argparser import (
     create_argparser_aggregate_results,
     create_argparser_all_params,
 )
 from icwaves.data.loading import get_data_and_feature_extractor
-from scripts.train_single_HPO_job import build_grid_parameters, get_base_parameters
 
 
 def train_final_model(
@@ -102,6 +104,7 @@ if __name__ == "__main__":
     args_list = read_args_from_file(agg_args.path_to_config_file)
     all_params_parser = create_argparser_all_params(agg_args.feature_extractor)
     args = all_params_parser.parse_args(args_list)
+    args.feature_extractor = agg_args.feature_extractor
 
     # Setup RNG
     new_rng = default_rng(13)
@@ -116,14 +119,8 @@ if __name__ == "__main__":
     clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
     logging.info(f"clf: {clf}")
 
-    # Generate candidate parameters
-    candidate_params = build_grid_parameters(args, data_bundle.srate)
-    n_candidates, n_splits = get_grid_size(candidate_params, cv, data_bundle)
-
     # Get best parameters from HPO results
-    best_params, results = process_candidate_results(
-        args, n_candidates, n_splits, candidate_params
-    )
+    best_params, results = process_candidate_results(args, cv, data_bundle)
 
     # Train final model with best parameters
     best_estimator, refit_time = train_final_model(
@@ -154,7 +151,7 @@ if __name__ == "__main__":
     )
     results_file = Path(
         args.path_to_results,
-        f"final_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}.pkl",
+        f"train_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}.pkl",
     )
     with results_file.open("wb") as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
