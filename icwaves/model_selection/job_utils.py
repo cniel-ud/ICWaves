@@ -33,13 +33,10 @@ def get_job_parameters(
     Returns:
         Tuple of (parameters, train_indices, test_indices, candidate_index, split_index, n_splits, n_candidates)
     """
-    # Convert parameter grid to list of parameter combinations
-    candidate_params = list(ParameterGrid(param_grid))
-
     # Get all combinations of parameters and CV splits
     all_combinations = list(
         product(
-            enumerate(candidate_params),
+            enumerate(param_grid),
             enumerate(
                 cv.split(data_bundle.data, data_bundle.labels, data_bundle.subj_ind)
             ),
@@ -52,7 +49,7 @@ def get_job_parameters(
     n_splits = cv.get_n_splits(
         data_bundle.data, data_bundle.labels, groups=data_bundle.subj_ind
     )
-    n_candidates = len(candidate_params)
+    n_candidates = len(param_grid)
 
     return JobParameters(
         parameters=parameters,
