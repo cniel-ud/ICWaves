@@ -151,7 +151,7 @@ if __name__ == "__main__":
     )
     results_file = Path(
         args.path_to_results,
-        f"final_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}.pkl",
+        f"train_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}.pkl",
     )
     with results_file.open("wb") as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
