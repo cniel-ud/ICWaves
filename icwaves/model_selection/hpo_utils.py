@@ -68,7 +68,7 @@ def build_grid_parameters(args, srate):
 def get_grid_size(candidate_params, cv, data_bundle):
     n_candidates = len(candidate_params)
     n_splits = cv.get_n_splits(
-        data_bundle.centroid_assignments,
+        data_bundle.data,
         data_bundle.labels,
         groups=data_bundle.subj_ind,
     )
