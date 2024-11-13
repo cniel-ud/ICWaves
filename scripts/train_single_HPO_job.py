@@ -1,20 +1,15 @@
 # scripts/train_classifier_single_HPO_job.py
-from itertools import product
 import logging
 from pathlib import Path
 import pickle
-from typing import Dict
+import shutil
 import numpy as np
 from numpy.random import default_rng
 import scipy
 import sklearn
 from sklearn.metrics import f1_score
-from sklearn.model_selection import ParameterGrid
 
-from icwaves.factories import create_estimator, create_feature_extractor
-from icwaves.feature_extractors.bowav import (
-    build_or_load_centroid_assignments_and_labels,
-)
+from icwaves.factories import create_estimator
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
 from icwaves.model_selection.job_utils import get_job_parameters
@@ -23,64 +18,8 @@ from icwaves.argparser import (
     create_argparser_all_params,
     create_argparser_one_parameter_one_split,
 )
-from icwaves.preprocessing import load_or_build_ics_and_labels
 from icwaves.data.loading import get_data_and_feature_extractor
-from icwaves.feature_extractors.utils import calculate_segment_length
-
-TF_IDF_NORM_MAP = {
-    "none": None,
-    "l1": "l1",
-    "l2": "l2",
-}
-
-
-def get_base_parameters(args, rng):
-    if args.classifier_type == "logistic":
-        params = dict(
-            penalty=args.penalty,
-            max_iter=args.max_iter,
-            random_state=rng,
-            class_weight="balanced",
-            solver="saga",
-            warm_start=True,
-            multi_class="multinomial",
-        )
-    elif args.classifier_type == "random_forest":
-        params = dict(
-            n_estimators=300,
-            random_state=rng,
-            class_weight="balanced",
-        )
-    return params
-
-
-def build_grid_parameters(args, srate):
-    candidate_params = {}
-    candidate_params["input_or_output_aggregation_method"] = [
-        "count_pooling",
-        "majority_vote",
-    ]
-    candidate_params["training_segment_length"] = calculate_segment_length(
-        args, srate, train=True
-    )
-    candidate_params["validation_segment_length"] = calculate_segment_length(
-        args, srate, train=False
-    )
-    candidate_params["expert_weight"] = args.expert_weight
-    if args.classifier_type == "logistic":
-        if args.feature_extractor == "bowav":
-            candidate_params["clf__C"] = args.regularization_factor
-            candidate_params["clf__l1_ratio"] = args.l1_ratio
-            candidate_params["scaler__norm"] = [
-                TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
-            ]
-        else:
-            candidate_params["C"] = args.regularization_factor
-            candidate_params["l1_ratio"] = args.l1_ratio
-    elif args.classifier_type == "random_forest":
-        candidate_params["min_samples_split"] = args.min_samples_split
-
-    return candidate_params
+from icwaves.model_selection.hpo_utils import get_base_parameters, build_grid_parameters
 
 
 if __name__ == "__main__":
@@ -149,6 +88,10 @@ if __name__ == "__main__":
     results_file = results_folder.joinpath(
         f"candidate_{job_params.candidate_index}_split_{job_params.split_index}.pkl"
     )
+
+    if job_id == 0:
+        # Save a copy of the config file in the results directory
+        shutil.copy(one_run_args.path_to_config_file, results_folder)
 
     # Add to results the version of scikit-learn, numpy, and
     # scipy to improve reproducibility
