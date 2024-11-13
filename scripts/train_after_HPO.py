@@ -119,14 +119,8 @@ if __name__ == "__main__":
     clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
     logging.info(f"clf: {clf}")
 
-    # Generate candidate parameters
-    candidate_params = build_grid_parameters(args, data_bundle.srate)
-    n_candidates, n_splits = get_grid_size(candidate_params, cv, data_bundle)
-
     # Get best parameters from HPO results
-    best_params, results = process_candidate_results(
-        args, n_candidates, n_splits, candidate_params
-    )
+    best_params, results = process_candidate_results(args, cv, data_bundle)
 
     # Train final model with best parameters
     best_estimator, refit_time = train_final_model(
