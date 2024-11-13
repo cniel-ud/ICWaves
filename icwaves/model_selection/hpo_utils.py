@@ -116,7 +116,7 @@ def get_best_parameters(results):
     return best_params
 
 
-def process_candidate_results(args, n_candidates, n_splits, candidate_params):
+def process_candidate_results(args, cv, data_bundle):
     """Process all candidate results and return the best estimator configuration.
 
     Args:
@@ -129,8 +129,12 @@ def process_candidate_results(args, n_candidates, n_splits, candidate_params):
     Returns:
         tuple: (best_params, results)
     """
+
+    candidate_params = build_grid_parameters(args, data_bundle.srate)
+    n_candidates, n_splits = get_grid_size(candidate_params, cv, data_bundle)
+
     valseglen = (
-        "none"
+        "None"
         if args.validation_segment_length == -1
         else int(args.validation_segment_length)
     )
