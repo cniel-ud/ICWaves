@@ -104,6 +104,7 @@ if __name__ == "__main__":
     args_list = read_args_from_file(agg_args.path_to_config_file)
     all_params_parser = create_argparser_all_params(agg_args.feature_extractor)
     args = all_params_parser.parse_args(args_list)
+    args.feature_extractor = agg_args.feature_extractor
 
     # Setup RNG
     new_rng = default_rng(13)
