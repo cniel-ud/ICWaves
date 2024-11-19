@@ -4,30 +4,34 @@ from typing import Callable, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.pipeline import Pipeline
+from tqdm import tqdm
 
 from icwaves.data.types import DataBundle
 from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
+from icwaves.model_selection.hpo_utils import get_best_parameters
+from icwaves.feature_extractors.utils import _get_conversion_factor
 
 
 def load_classifier(config: EvalConfig) -> Tuple[BaseEstimator, dict]:
     """Load trained classifier and its best parameters."""
-    clf_path = config.paths["results_file"]
+    clf_path = config.path_to_results
     with clf_path.open("rb") as f:
         results = pickle.load(f)
 
     clf = (
         results["best_estimator"]["clf"]
-        if "clf" in results["best_estimator"]
+        if isinstance(results["best_estimator"], Pipeline)
         else results["best_estimator"]
     )
 
-    best_params = results["best_params"]
+    best_params = get_best_parameters(results)
 
     return clf, best_params
 
 
-def evaluate_classifier(
+def eval_classifier_per_subject_brain_F1(
     config: EvalConfig,
     clf: BaseEstimator,
     feature_extractor: Callable,
@@ -36,43 +40,88 @@ def evaluate_classifier(
     input_or_output_aggregation_method: str,
     training_segment_length: int,
 ) -> pd.DataFrame:
-    """Evaluate classifier performance across different time windows."""
-    columns = [
-        "Prediction window [minutes]",
-        "Subject ID",
-        "Brain F1 score",
-        "Number of ICs",
-    ]
-    results_df = pd.DataFrame(columns=columns)
+    """Evaluate classifier performance across different time windows.
 
-    if config.feature_extractor == "psd_autocorr":
-        conversion_factor = 1 / data_bundle.srate / 60
-    elif config.feature_extractor == "bowav":
-        conversion_factor = 1 / 60
+    Args:
+        config: Evaluation configuration.
+        clf: Trained classifier.
+        feature_extractor: Feature extractor.
+        validation_segment_lengths: Array of validation segment lengths in seconds.
+        data_bundle: Data bundle.
+        input_or_output_aggregation_method: Input or output aggregation method.
+        training_segment_length: Training segment length in either number of
+                                 windows (BoWav) or number of samples (other features).
+
+    Returns:
+        A data frame with evaluation results.
+    """
+    results_path = config.root / "results" / config.eval_dataset / "evaluation"
+    valseglen = (
+        "none"
+        if config.validation_segment_length == -1
+        else int(config.validation_segment_length)
+    )
+    results_file = (
+        results_path
+        / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}.csv"
+    )
+
+    # Try to load cached results if they exist
+    if results_file.exists():
+        print(f"Loading cached results from {results_file}")
+        results_df = pd.read_csv(results_file)
     else:
-        raise ValueError(f"Unknown feature extractor {config.feature_extractor}")
+        # Create directories if they don't exist
+        results_path.mkdir(parents=True, exist_ok=True)
 
-    for val_segment_len in validation_segment_lengths:
-        for subj_id in config.subj_ids:
-            print(f"Subject {subj_id}")
-            subj_mask = data_bundle.subj_ind == subj_id
-            score = compute_brain_F1_score_per_subject(
-                clf,
-                data_bundle.data,
-                data_bundle.labels,
-                data_bundle.expert_label_mask,
-                input_or_output_aggregation_method,
-                feature_extractor,
-                val_segment_len,
-                training_segment_length,
-                subj_mask,
-            )
+        columns = [
+            "Prediction window [minutes]",
+            "Subject ID",
+            "Brain F1 score",
+            "Number of ICs",
+        ]
+        results_df = pd.DataFrame(columns=columns)
 
-            results_df.loc[len(results_df)] = {
-                "Prediction window [minutes]": val_segment_len * conversion_factor,
-                "Subject ID": subj_id,
-                "Brain F1 score": score,
-                "Number of ICs": data_bundle.expert_label_mask.sum(),
-            }
+        conversion_factor = _get_conversion_factor(config, data_bundle.srate)
+        total_iterations = len(validation_segment_lengths) * len(config.subj_ids)
+        with tqdm(total=total_iterations) as pbar:
+            for val_segment_len in validation_segment_lengths:
+                converted_val_segment_len = int(val_segment_len * conversion_factor)
+                # TODO: move this logic inside compute_brain_F1_score_per_subject?
+                if input_or_output_aggregation_method == "majority_vote":
+                    if converted_val_segment_len < training_segment_length:
+                        continue
+                for subj_id in config.subj_ids:
+                    subj_mask = data_bundle.subj_ind == subj_id
+                    score = compute_brain_F1_score_per_subject(
+                        clf,
+                        data_bundle.data,
+                        data_bundle.labels,
+                        data_bundle.expert_label_mask,
+                        input_or_output_aggregation_method,
+                        feature_extractor,
+                        converted_val_segment_len,
+                        training_segment_length,
+                        subj_mask,
+                    )
 
-    return results_df
+                    results_df.loc[len(results_df)] = {
+                        "Prediction window [minutes]": val_segment_len / 60,
+                        "Subject ID": subj_id,
+                        "Brain F1 score": score,
+                        "Number of ICs": data_bundle.expert_label_mask.sum(),
+                    }
+                    pbar.update(1)
+        results_df.to_csv(results_file, index=False)
+
+    std_df = results_df.groupby("Prediction window [minutes]")["Brain F1 score"].std()
+    std_df = std_df.rename(f"StdDev - {config.feature_extractor}").reset_index()
+    mean_df = (
+        results_df.groupby("Prediction window [minutes]")["Brain F1 score"]
+        .mean()
+        .rename(f"Brain F1 score - {config.feature_extractor}")
+        .reset_index()
+    )
+    mean_and_std_df = pd.merge(std_df, mean_df, on="Prediction window [minutes]")
+
+    return mean_and_std_df
