@@ -4,7 +4,7 @@ from typing import List
 
 def _get_conversion_factor(args, srate):
     """
-    Computes factor to be multiplied with segment length to get:
+    Computes factor to be multiplied with segment length (in seconds) to get:
         - number of windows for BoWav feature
         - number of samples for psd_autocorr feature
 
