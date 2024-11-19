@@ -1,0 +1,69 @@
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from scipy.io import loadmat
+from sklearn.metrics import f1_score
+from icwaves.evaluation.config import EvalConfig
+from numpy.typing import NDArray
+from icwaves.feature_extractors.utils import _get_conversion_factor
+
+
+def calculate_iclabel_f1_scores(
+    config: EvalConfig, validation_segment_lengths: NDArray[int]
+):
+    """
+    Calculate ICLabel F1 scores for different segment lengths and subjects.
+
+    Parameters
+    ----------
+    config : EvalConfig
+        Evaluation configuration.
+    validation_segment_lengths : NDArray[np.int]
+        Array of validation segment lengths in seconds.
+
+    Returns
+    -------
+    f1_scores_ICLabel_df : pd.DataFrame
+        Data frame with ICLabel F1 scores.
+    """
+    columns = [
+        "Prediction window [minutes]",
+        "Subject ID",
+        "Brain F1 score",
+        "Number of ICs",
+    ]
+    df = pd.DataFrame(columns=columns)
+    dataset_dir = config.path_to_eval_data
+
+    for test_segment_len in validation_segment_lengths:
+        subdir = dataset_dir.joinpath(f"IC_labels_at_{test_segment_len:.1f}_seconds")
+        for subj_id in config.subj_ids:
+            file = subdir.joinpath(f"subj-{subj_id:02}.mat")
+            with file.open("rb") as f:
+                data = loadmat(f)
+                expert_label_mask = data["expert_label_mask"].flatten().astype(bool)
+                labels = data["labels"] - 1
+                noisy_labels = data["noisy_labels"]
+
+            ICLabel_labels = np.argmax(noisy_labels, axis=1)
+            y_expert = labels[expert_label_mask]
+            y_pred_expert = ICLabel_labels[expert_label_mask]
+            brain_f1_score = f1_score(y_expert, y_pred_expert, labels=[0], average=None)
+
+            df.loc[len(df)] = {
+                "Prediction window [minutes]": test_segment_len / 60,
+                "Subject ID": subj_id,
+                "Brain F1 score": brain_f1_score[0],
+                "Number of ICs": expert_label_mask.sum(),
+            }
+    std_df = df.groupby("Prediction window [minutes]")["Brain F1 score"].std()
+    std_df = std_df.rename("StdDev - iclabel").reset_index()
+    mean_df = (
+        df.groupby("Prediction window [minutes]")["Brain F1 score"]
+        .mean()
+        .rename("Brain F1 score - iclabel")
+        .reset_index()
+    )
+    mean_and_std_df = pd.merge(std_df, mean_df, on="Prediction window [minutes]")
+
+    return mean_and_std_df
