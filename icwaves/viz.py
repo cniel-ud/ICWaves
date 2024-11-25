@@ -66,19 +66,20 @@ def plot_confusion_matrix(
     return fig, ax
 
 
-def plot_line_with_error_area(ax, df, x, y, error, color="blue"):
+def plot_line_with_error_area(ax, df, x, y, error, color="blue", add_std_label=False):
     ax.plot(
         df[x],
         df[y],
         label=y,
         color=f"tab:{color}",
     )
+    std_label = error if add_std_label else None
     ax.fill_between(
         df[x],
         df[y] - df[error],
         df[y] + df[error],
         color=f"tab:{color}",
         alpha=0.2,
-        label=error,
+        label=std_label,
     )
     return ax
