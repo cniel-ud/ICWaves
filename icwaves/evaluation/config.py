@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
+from icwaves.file_utils import get_validation_segment_length_string
 
 
 @dataclass
@@ -34,9 +35,6 @@ class EvalConfig:
 
     @property
     def subj_ids(self) -> List[int]:
-        # TODO: once we refactor `load_raw_train_set_per_class` and the train_dict.py
-        # scripts, we need to make the distinction between sub_ids for training and evaluation,
-        # here and it other parts of the code (e.g., in the load/build of the centroid assignments)
         if self.eval_dataset == "emotion_study":
             return list(range(1, 8))  # test subjects
         elif self.eval_dataset == "cue":
@@ -76,17 +74,13 @@ class EvalConfig:
             raise ValueError(f"Codebooks not available for {self.feature_extractor}")
 
     @property
-    def path_to_results(self) -> Path:
-        train_dataset = self.train_dataset or self.eval_dataset
-        valseglen = (
-            "none"
-            if self.validation_segment_length == -1
-            else int(self.validation_segment_length)
+    def path_to_classifier(self) -> Path:
+        valseglen = get_validation_segment_length_string(
+            int(self.validation_segment_length)
         )
         path = (
-            self.root
-            / "results"
-            / f"{train_dataset}/classifier"
+            self.path_to_train_output
+            / "classifier"
             / f"train_{self.classifier_type}_{self.feature_extractor}_valSegLen{valseglen}.pkl"
         )
         return path

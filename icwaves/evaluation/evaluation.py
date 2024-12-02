@@ -1,4 +1,5 @@
 import copy
+from pathlib import Path
 import pickle
 from typing import Callable, Tuple
 import numpy as np
@@ -12,12 +13,12 @@ from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import _get_conversion_factor
+from icwaves.file_utils import get_validation_segment_length_string
 
 
-def load_classifier(config: EvalConfig) -> Tuple[BaseEstimator, dict]:
+def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
     """Load trained classifier and its best parameters."""
-    clf_path = config.path_to_results
-    with clf_path.open("rb") as f:
+    with path.open("rb") as f:
         results = pickle.load(f)
 
     clf = (
@@ -56,10 +57,8 @@ def eval_classifier_per_subject_brain_F1(
         A data frame with evaluation results.
     """
     results_path = config.root / "results" / config.eval_dataset / "evaluation"
-    valseglen = (
-        "none"
-        if config.validation_segment_length == -1
-        else int(config.validation_segment_length)
+    valseglen = get_validation_segment_length_string(
+        int(config.validation_segment_length)
     )
     results_file = (
         results_path
