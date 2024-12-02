@@ -5,11 +5,17 @@ from typing import List, Optional
 
 @dataclass
 class EvalConfig:
+    """Configuration for the evaluation pipeline.
+
+    This configuration assumes that both the BoWav dictionaries and the
+    classifier was trained on the 'emotion_study' dataset, using subjects
+    8 to 35 (excluding subject 22, which is missing).
+    """
+
     eval_dataset: str  # 'emotion_study' or 'cue'
     classifier_type: str  # 'random_forest' or 'logistic'
     feature_extractor: str  # 'bowav' or 'psd_autocorr'
     root: Path
-    train_dataset: Optional[str] = None  # For cross-dataset evaluation
     window_length: float = 1.5
     minutes_per_ic: float = 50.0
     num_clusters: int = 128
@@ -37,6 +43,11 @@ class EvalConfig:
             return list(range(1, 13))
 
     @property
+    def path_to_train_output(self) -> Path:
+        path = self.root / "results/emotion_study"
+        return path
+
+    @property
     def path_to_eval_data(self) -> Path:
         path = self.root / f"data/{self.eval_dataset}"
         return path
@@ -59,9 +70,7 @@ class EvalConfig:
     @property
     def path_to_codebooks(self) -> Path:
         if self.feature_extractor == "bowav":
-            if self.train_dataset is None:
-                raise ValueError("train_dataset must be specified for bowav")
-            path = self.root / f"results/{self.train_dataset}/dictionaries"
+            path = self.path_to_train_output / "dictionaries"
             return path
         else:
             raise ValueError(f"Codebooks not available for {self.feature_extractor}")
