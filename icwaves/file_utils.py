@@ -6,6 +6,11 @@ import scipy
 from sklearn.metrics import f1_score
 
 
+def get_validation_segment_length_string(valseglen: int):
+    valseglen = "none" if valseglen == -1 else valseglen
+    return valseglen
+
+
 def read_args_from_file(file_path):
     # Read the file
     with open(file_path, "r") as file:

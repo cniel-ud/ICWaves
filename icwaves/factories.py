@@ -1,7 +1,7 @@
 # icwaves/factories.py
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from typing import Callable, Dict, Any, Union
+from typing import Callable, Union
 
 from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction.text import TfidfTransformer

@@ -11,7 +11,6 @@ from sklearn.base import clone
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection._search import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
-from icwaves.feature_extractors.bowav import build_bowav_from_centroid_assignments
 
 from icwaves.model_selection.utils import _store
 from icwaves.model_selection.validation import _fit_and_score

@@ -65,8 +65,35 @@ def compute_brain_F1_score_per_subject(
     training_segment_length,
     subj_mask=slice(None),
 ):
+    """Compute the brain F1 score for each subject. It assumes that the label for the 'brain' ICLabel
+    class is 0.
 
-    bowav_test = build_features_based_on_aggregation_method(
+    Arguments
+    ---------
+    clf: classifier used to predict the labels
+    X: input data. Shape and meaning depend on the feature extractor used,
+                   but X.shape[0] is the number of samples, and X.shape[-1]
+                   is the length of each sample.
+    labels: labels of the input data
+    expert_label_mask: mask to select the expert labels
+    agg_method: method used to aggregate the features or the predictions.
+                With "count_pooling", the features are computed over a segment of length
+                validation_segment_length, and predictions over such segment.
+                With "majority_vote", the features are computed over segments of length
+                training_segment_length, predictions over all such segments, and the mode
+                of the predictions is taken.
+    feature_extractor: function used to extract features from X
+    validation_segment_length: length of the validation segment. If None,
+                               use the entire sample. If not None, it
+                               should be larger than or equal to the training segment length.
+    training_segment_length: length of the training segment
+    subj_mask: mask to select subjects from X
+
+    Returns
+    -------
+    brain_f1_score: brain F1 score for each subject.
+    """
+    X = build_features_based_on_aggregation_method(
         feature_extractor,
         X,
         validation_segment_length,
@@ -75,10 +102,10 @@ def compute_brain_F1_score_per_subject(
         subj_mask,
     )
 
-    n_segments = bowav_test.shape[1]
+    n_segments = X.shape[1]
     # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
-    bowav_test = np.vstack(bowav_test)
-    y_pred = clf.predict(bowav_test)
+    X = np.vstack(X)
+    y_pred = clf.predict(X)
 
     # Maybe aggregate output
     if agg_method == "majority_vote":
