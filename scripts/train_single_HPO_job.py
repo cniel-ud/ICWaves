@@ -1,4 +1,3 @@
-# scripts/train_classifier_single_HPO_job.py
 import logging
 from pathlib import Path
 import pickle
