@@ -7,7 +7,7 @@ from threadpoolctl import threadpool_info
 from tqdm import tqdm
 
 from icwaves.data_loaders import load_codebooks_wrapper
-from icwaves.preprocessing import load_labels, load_or_build_preprocessed_data
+from icwaves.preprocessing import load_or_build_preprocessed_data
 from icwaves.sikmeans.shift_kmeans import _asignment_step
 from icwaves.file_utils import _build_centroid_assignments_file
 from icwaves.data.types import DataBundle
@@ -67,30 +67,22 @@ def build_or_load_centroid_assignments_and_labels(args: Namespace) -> DataBundle
     centroid_assignments_file = data_folder.joinpath(centroid_assignments_file)
     codebooks = load_codebooks_wrapper(args)
     n_centroids = codebooks[0].shape[0]
+
     if centroid_assignments_file.is_file():
-        centroid_assignments = np.load(centroid_assignments_file)
         # Load labels
-        labels, srate, expert_label_mask, subj_ind, noisy_labels = load_labels(args)
+        db = load_or_build_preprocessed_data(args)
+        with centroid_assignments_file.open("rb") as f:
+            db.data = np.load(f)
     else:
         # Load or build preprocessed data
-        (windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels) = (
-            load_or_build_preprocessed_data(args)
-        )
-
-        centroid_assignments = _compute_centroid_assignments(windowed_ics, codebooks)
-
+        db = load_or_build_preprocessed_data(args)
+        db.data = _compute_centroid_assignments(db.data, codebooks)
         with centroid_assignments_file.open("wb") as f:
-            np.save(f, centroid_assignments, allow_pickle=False)
+            np.save(f, db.data, allow_pickle=False)
 
-    return DataBundle(
-        data=centroid_assignments,
-        labels=labels,
-        expert_label_mask=expert_label_mask,
-        subj_ind=subj_ind,
-        n_centroids=n_centroids,
-        noisy_labels=noisy_labels,
-        srate=srate,
-    )
+    db.n_centroids = n_centroids
+
+    return db
 
 
 def build_bowav_from_centroid_assignments(

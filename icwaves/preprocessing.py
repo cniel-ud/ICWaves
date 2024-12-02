@@ -93,7 +93,14 @@ def _get_windowed_ics_and_labels(args):
 
         logging.info("Done building data matrix, labels, and other metadata")
 
-    return windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
+    return DataBundle(
+        data=windowed_ics,
+        labels=labels,
+        expert_label_mask=expert_label_mask,
+        subj_ind=subj_ind,
+        noisy_labels=noisy_labels,
+        srate=srate,
+    )
 
 
 def _get_ics_and_labels(args):
@@ -134,17 +141,14 @@ def _get_ics_and_labels(args):
 
     logging.info("Done building data matrix, labels, and other metadata")
 
-    return ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
-
-
-def load_labels(args):
-    # TODO: make a function to compute/extract only the labels, without
-    # `windowed_ics`.
-    _, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
-        load_or_build_preprocessed_data(args)
+    return DataBundle(
+        data=ics,
+        labels=labels,
+        expert_label_mask=expert_label_mask,
+        subj_ind=subj_ind,
+        noisy_labels=noisy_labels,
+        srate=srate,
     )
-
-    return labels, srate, expert_label_mask, subj_ind, noisy_labels
 
 
 def load_or_build_ics_and_labels(args: Namespace) -> DataBundle:
@@ -191,30 +195,25 @@ def load_or_build_preprocessed_data(args):
     preprocessed_data_file = data_folder.joinpath(preprocessed_data_file)
     if preprocessed_data_file.is_file():
         with np.load(preprocessed_data_file) as data:
-            windowed_ics = data["windowed_ics"]
-            labels = data["labels"]
-            srate = data["srate"]
-            expert_label_mask = data["expert_label_mask"]
-            subj_ind = data["subj_ind"]
-            noisy_labels = data["noisy_labels"]
+            db = DataBundle(
+                data=data["windowed_ics"],
+                labels=data["labels"],
+                expert_label_mask=data["expert_label_mask"],
+                subj_ind=data["subj_ind"],
+                noisy_labels=data["noisy_labels"],
+                srate=data["srate"],
+            )
     else:
-        (
-            windowed_ics,
-            labels,
-            srate,
-            expert_label_mask,
-            subj_ind,
-            noisy_labels,
-        ) = _get_windowed_ics_and_labels(args)
+        db = _get_windowed_ics_and_labels(args)
         with preprocessed_data_file.open("wb") as f:
             np.savez(
                 f,
-                windowed_ics=windowed_ics,
-                labels=labels,
-                srate=srate,
-                expert_label_mask=expert_label_mask,
-                subj_ind=subj_ind,
-                noisy_labels=noisy_labels,
+                windowed_ics=db.data,
+                labels=db.labels,
+                srate=db.srate,
+                expert_label_mask=db.expert_label_mask,
+                subj_ind=db.subj_ind,
+                noisy_labels=db.noisy_labels,
             )
 
-    return windowed_ics, labels, srate, expert_label_mask, subj_ind, noisy_labels
+    return db
