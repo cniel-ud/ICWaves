@@ -1,10 +1,6 @@
 from pathlib import Path
 import shlex
 
-import numpy as np
-import scipy
-from sklearn.metrics import f1_score
-
 
 def get_validation_segment_length_string(valseglen: int):
     valseglen = "none" if valseglen == -1 else valseglen

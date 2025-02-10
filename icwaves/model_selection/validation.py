@@ -4,6 +4,7 @@ import numpy as np
 import scipy
 from joblib import logger
 import logging
+from icwaves.model_selection.utils import _gather
 
 
 def _fit_and_score(
@@ -50,11 +51,10 @@ def _fit_and_score(
 
     result = {}
     start_time = time.time()
-    X_train, y_train = X[train], y[train]
+    X_train, y_train = _gather(X, y, train)
     sample_weight_train = sample_weight[train]
 
     # Build train feature vector for a given segment length
-    # TODO: rename `training_segment_length` to `train_segment_len`
     X_train = feature_extractor(X_train, train_segment_length)
 
     # X_train.shape = (n_time_series, n_segments, n_features)
@@ -76,7 +76,7 @@ def _fit_and_score(
 
     fit_time = time.time() - start_time
 
-    X_test, y_test = X[test], y[test]
+    X_test, y_test = _gather(X, y, test)
     sample_weight_test = sample_weight[test]
 
     # Aggregate input at either training segment length or validation segment length
