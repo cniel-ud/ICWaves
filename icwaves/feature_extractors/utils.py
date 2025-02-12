@@ -34,22 +34,23 @@ def _get_conversion_factor(args: Namespace, srate: float) -> dict[str, float]:
 
 def _validate_segment_length(segment: float, factor: float) -> None:
     """Validates if segment length is compatible with conversion factor."""
-    if factor < 1 and segment % factor != 0:
-        raise ValueError(
-            f"Segment length {segment} is not divisible by conversion factor {factor}"
-        )
+    if factor < 1 and int(segment * factor) < segment * factor != 0:
+        raise ValueError(f"Segment length {segment} is not divisible by {1 / factor}")
 
 
-def _process_training_segments(
+def _process_list_of_segments(
     segments: list[float], conversion_factors: dict[str, float]
 ) -> list[dict[str, int]]:
-    """Process training segments with their conversion factors."""
-    result = []
+    """Process list of segments with their conversion factors."""
+    processed_segments = []
     for segment in segments:
+        segment_dict = {}
         for extractor, factor in conversion_factors.items():
             _validate_segment_length(segment, factor)
-            result.append({extractor: int(segment * factor)})
-    return result
+            segment_dict[extractor] = int(segment * factor)
+        processed_segments.append(segment_dict)
+
+    return processed_segments
 
 
 def _process_validation_segment(
@@ -59,11 +60,7 @@ def _process_validation_segment(
     if segment_length == -1:
         return [{extractor: None for extractor in conversion_factors}]
 
-    result = []
-    for extractor, factor in conversion_factors.items():
-        _validate_segment_length(segment_length, factor)
-        result.append({extractor: int(segment_length * factor)})
-    return result
+    return _process_list_of_segments([segment_length], conversion_factors)
 
 
 def calculate_segment_length(
@@ -83,7 +80,7 @@ def calculate_segment_length(
     conversion_factors = _get_conversion_factor(args, srate)
 
     if train:
-        return _process_training_segments(
+        return _process_list_of_segments(
             args.training_segment_length, conversion_factors
         )
     else:
