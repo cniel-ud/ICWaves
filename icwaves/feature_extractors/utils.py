@@ -1,5 +1,5 @@
 from argparse import Namespace
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 def _get_conversion_factor(args: Namespace, srate: float) -> Dict[str, float | None]:
@@ -15,15 +15,20 @@ def _get_conversion_factor(args: Namespace, srate: float) -> Dict[str, float | N
     Returns:
         Conversion factor to be multiplied with segment length to get number of samples.
     """
-    # Validate feature extractors upfront
-    valid_extractors = {"bowav", "psd_autocorr"}
-    if not any(extractor in args.feature_extractor for extractor in valid_extractors):
+    conversion_factors = {
+        "bowav": 1 / args.window_length,
+        "psd_autocorr": srate,
+    }
+    if not any(
+        extractor in args.feature_extractor for extractor in conversion_factors.keys()
+    ):
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 
     # Create conversion factors
     return {
-        "bowav": 1 / args.window_length if "bowav" in args.feature_extractor else None,
-        "psd_autocorr": srate if "psd_autocorr" in args.feature_extractor else None,
+        extractor: factor
+        for extractor, factor in conversion_factors.items()
+        if extractor in args.feature_extractor
     }
 
 
@@ -33,20 +38,27 @@ def calculate_segment_length(
     """Convert training segment lengths based on feature extractor type."""
     conversion_factors = _get_conversion_factor(args, srate)
 
-    segment_lengths: Dict[str, List[int | None]] = {}
+    segment_lengths: list[dict[str, Optional[int]]] = []
 
-    for extractor, factor in conversion_factors.items():
-        if factor is not None:  # Only process active extractors
-            if train:
-                segment_lengths[extractor] = [
-                    int(segment * factor) for segment in args.training_segment_length
-                ]
-            else:
-                if args.validation_segment_length == -1:
-                    segment_lengths[extractor] = [None]
-                else:
-                    segment_lengths[extractor] = [
-                        int(args.validation_segment_length * factor)
-                    ]
+    if train:
+        for segment in args.training_segment_length:
+            segment_lengths.append(
+                {
+                    extractor: int(segment * factor)
+                    for extractor, factor in conversion_factors.items()
+                }
+            )
+    else:
+        if args.validation_segment_length == -1:
+            segment_lengths.append(
+                {extractor: None for extractor in conversion_factors.keys()}
+            )
+        else:
+            segment_lengths.append(
+                {
+                    extractor: int(args.validation_segment_length * factor)
+                    for extractor, factor in conversion_factors.items()
+                }
+            )
 
     return segment_lengths

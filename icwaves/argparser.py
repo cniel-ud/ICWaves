@@ -38,7 +38,7 @@ def create_argparser_aggregate_results():
     parser.add_argument(
         "--feature_extractor",
         type=str,
-        choices=["bowav", "psd_autocorr"],
+        choices=["bowav", "psd_autocorr", "bowav_psd_autocorr"],
         required=True,
         help="Type of feature extractor to use",
     )
@@ -120,7 +120,7 @@ def create_argparser_all_params(feature_extractor: str):
         help="Minimum samples per split",
     )
 
-    if feature_extractor == "bowav":
+    if "bowav" in feature_extractor:
         parser = _add_bowav_args(parser)
     return parser
 

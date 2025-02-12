@@ -42,7 +42,15 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load or prepare data based on feature extractor type
-    data_bundle, feature_extractor = get_data_and_feature_extractor(args)
+    data_bundles, feature_extractor = get_data_and_feature_extractor(args)
+
+    # the DataBundle for bowav and psd_autocorr only differs in the `data` attribute
+    # TODO: find a more efficient way of doing this
+    data_bundle = (
+        data_bundles["bowav"]
+        if "bowav" in data_bundles
+        else data_bundles["psd_autocorr"]
+    )
 
     # Create cross-validation splitter
     cv = LeaveOneSubjectOutExpertOnly(data_bundle.expert_label_mask)
@@ -59,11 +67,12 @@ if __name__ == "__main__":
     logging.info(f"candidate_index: {job_params.candidate_index}")
     logging.info(f"split_index: {job_params.split_index}")
 
+    X = {k: v.data for k, v in data_bundles.items()}
     result = _fit_and_score(
         clf,
-        data_bundle.data,
-        data_bundle.labels,
-        data_bundle.expert_label_mask,
+        X=X,
+        y=data_bundle.labels,
+        expert_label_mask=data_bundle.expert_label_mask,
         train=job_params.train_indices,
         test=job_params.test_indices,
         parameters=job_params.parameters,

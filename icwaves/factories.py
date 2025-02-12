@@ -46,7 +46,17 @@ def create_estimator(
 
 
 def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
-    """Create a feature extractor function based on type."""
+    """Create a feature extractor function based on type.
+
+    For bowav, time_series are the centroid assignments and have shape
+    (n_ics, 7, n_win_per_ic), and the output of the extractor has shape
+    (n_ics, n_segments, n_centroids*7). 7 is the number of ICLabel classes.
+
+    For psd_autocorr, time_series are ICs, and have shape (n_ics, n_samples),
+    and the output of the extractor has shape (n_ics, n_segments, 200). 200
+    comes from the fact that we use 100 samples for the PSD and 100 samples
+    for the autocorrelation.
+    """
 
     def bowav(
         time_series: dict[str, npt.ArrayLike], segment_len: Dict[str, int | None]
@@ -67,14 +77,9 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
 
     # TODO: this concatenation is not performing any pre-scaling of bowav or psd_autocorr.
     # For random forest, that is OK, but we will need to improve this if we want to use logistic regression.
-    # TODO:
-    #   * test concatenation
-    #   * document shape of extractor outputs
     def bowav_psd_autocorr(time_series: dict[str, npt.ArrayLike], segment_len: int):
-        bowav_features = bowav(time_series["bowav"], segment_len["bowav"])
-        psd_autocorr_features = psd_autocorr(
-            time_series["psd_autocorr"], segment_len["psd_autocorr"]
-        )
+        bowav_features = bowav(time_series, segment_len)
+        psd_autocorr_features = psd_autocorr(time_series, segment_len)
         return np.concatenate([bowav_features, psd_autocorr_features], axis=2)
 
     feature_extractors = {

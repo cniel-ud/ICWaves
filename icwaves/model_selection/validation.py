@@ -29,7 +29,8 @@ def _fit_and_score(
 
     # Build sample_weights
     expert_weight = parameters.pop("expert_weight", 1)
-    sample_weight = np.ones(X.shape[0])
+    feature_extractors = list(X.keys())
+    sample_weight = np.ones(X[feature_extractors[0]].shape[0])
     sample_weight[expert_label_mask] = expert_weight
 
     # Get input/output aggregation method
