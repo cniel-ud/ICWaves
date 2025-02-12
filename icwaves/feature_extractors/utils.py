@@ -1,8 +1,8 @@
 from argparse import Namespace
-from typing import Dict, List, Optional
+from typing import Optional
 
 
-def _get_conversion_factor(args: Namespace, srate: float) -> Dict[str, float | None]:
+def _get_conversion_factor(args: Namespace, srate: float) -> dict[str, float]:
     """
     Computes factor to be multiplied with segment length (in seconds) to get:
         - number of windows for bowav feature
@@ -32,33 +32,61 @@ def _get_conversion_factor(args: Namespace, srate: float) -> Dict[str, float | N
     }
 
 
+def _validate_segment_length(segment: float, factor: float) -> None:
+    """Validates if segment length is compatible with conversion factor."""
+    if factor < 1 and segment % factor != 0:
+        raise ValueError(
+            f"Segment length {segment} is not divisible by conversion factor {factor}"
+        )
+
+
+def _process_training_segments(
+    segments: list[float], conversion_factors: dict[str, float]
+) -> list[dict[str, int]]:
+    """Process training segments with their conversion factors."""
+    result = []
+    for segment in segments:
+        for extractor, factor in conversion_factors.items():
+            _validate_segment_length(segment, factor)
+            result.append({extractor: int(segment * factor)})
+    return result
+
+
+def _process_validation_segment(
+    segment_length: float, conversion_factors: dict[str, float]
+) -> list[dict[str, Optional[int]]]:
+    """Process validation segment with conversion factors."""
+    if segment_length == -1:
+        return [{extractor: None for extractor in conversion_factors}]
+
+    result = []
+    for extractor, factor in conversion_factors.items():
+        _validate_segment_length(segment_length, factor)
+        result.append({extractor: int(segment_length * factor)})
+    return result
+
+
 def calculate_segment_length(
     args: Namespace, srate: float, train: bool = True
-) -> Dict[str, List[int | None]]:
-    """Convert training segment lengths based on feature extractor type."""
+) -> list[dict[str, Optional[int]]]:
+    """
+    Convert segment lengths based on feature extractor type.
+
+    Args:
+        args: Arguments containing feature extractor parameters
+        srate: Sampling rate of the data
+        train: Whether processing training or validation segments
+
+    Returns:
+        List of dictionaries mapping feature extractors to segment lengths
+    """
     conversion_factors = _get_conversion_factor(args, srate)
 
-    segment_lengths: list[dict[str, Optional[int]]] = []
-
     if train:
-        for segment in args.training_segment_length:
-            segment_lengths.append(
-                {
-                    extractor: int(segment * factor)
-                    for extractor, factor in conversion_factors.items()
-                }
-            )
+        return _process_training_segments(
+            args.training_segment_length, conversion_factors
+        )
     else:
-        if args.validation_segment_length == -1:
-            segment_lengths.append(
-                {extractor: None for extractor in conversion_factors.keys()}
-            )
-        else:
-            segment_lengths.append(
-                {
-                    extractor: int(args.validation_segment_length * factor)
-                    for extractor, factor in conversion_factors.items()
-                }
-            )
-
-    return segment_lengths
+        return _process_validation_segment(
+            args.validation_segment_length, conversion_factors
+        )
