@@ -1,7 +1,7 @@
 # icwaves/factories.py
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Optional, Union
 
 from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction.text import TfidfTransformer
@@ -59,14 +59,15 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
     """
 
     def bowav(
-        time_series: dict[str, npt.ArrayLike], segment_len: Dict[str, int | None]
+        time_series: dict[str, npt.ArrayLike],
+        segment_len: Dict[str, Optional[int]],
     ):
         return build_bowav_from_centroid_assignments(
             time_series["bowav"], kwargs["n_centroids"], segment_len["bowav"]
         )
 
     def psd_autocorr(
-        time_series: dict[str, npt.ArrayLike], segment_len: Dict[str, int | None]
+        time_series: dict[str, npt.ArrayLike], segment_len: Dict[str, Optional[int]]
     ):
         return get_iclabel_features_per_segment(
             signal=time_series["psd_autocorr"],
