@@ -15,21 +15,24 @@ def _get_conversion_factor(args: Namespace, srate: float) -> dict[str, float]:
     Returns:
         Conversion factor to be multiplied with segment length to get number of samples.
     """
-    conversion_factors = {
-        "bowav": 1 / args.window_length,
-        "psd_autocorr": srate,
-    }
-    if not any(
-        extractor in args.feature_extractor for extractor in conversion_factors.keys()
-    ):
+    conversion_factors = {}
+
+    # Only add bowav if it's in feature_extractor and has window_length
+    if "bowav" in args.feature_extractor:
+        if not hasattr(args, "window_length"):
+            raise ValueError(
+                "window_length must be specified when using bowav feature extractor"
+            )
+        conversion_factors["bowav"] = 1 / args.window_length
+
+    # Add psd_autocorr if it's in feature_extractor
+    if "psd_autocorr" in args.feature_extractor:
+        conversion_factors["psd_autocorr"] = srate
+
+    if not conversion_factors:
         raise ValueError(f"Unsupported feature extractor: {args.feature_extractor}")
 
-    # Create conversion factors
-    return {
-        extractor: factor
-        for extractor, factor in conversion_factors.items()
-        if extractor in args.feature_extractor
-    }
+    return conversion_factors
 
 
 def _validate_segment_length(segment: float, factor: float) -> None:
