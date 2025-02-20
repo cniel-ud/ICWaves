@@ -94,6 +94,18 @@ def _fit_and_score(
     y_pred = estimator.predict(X_test)
     del X_test
 
+    # TODO: improve this:
+    validation_segment_length = (
+        validation_segment_length["bowav"]
+        if "bowav" in validation_segment_length
+        else validation_segment_length["psd_autocorr"]
+    )
+    train_segment_length = (
+        train_segment_length["bowav"]
+        if "bowav" in train_segment_length
+        else train_segment_length["psd_autocorr"]
+    )
+
     # Predictions were made on segments of length training_segment_length.
     if input_or_output_aggregation_method == "majority_vote":
         # Aggregate all the predictions
