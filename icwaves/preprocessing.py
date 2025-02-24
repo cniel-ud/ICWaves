@@ -164,28 +164,30 @@ def load_or_build_ics_and_labels(args: Namespace) -> DataBundle:
             expert_label_mask = data["expert_label_mask"]
             subj_ind = data["subj_ind"]
             noisy_labels = data["noisy_labels"]
-    else:
-        ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
-            _get_ics_and_labels(args)
+
+        return DataBundle(
+            data=ics,
+            labels=labels,
+            expert_label_mask=expert_label_mask,
+            subj_ind=subj_ind,
+            srate=srate,
+            noisy_labels=noisy_labels,
         )
+
+    else:
+        db = _get_ics_and_labels(args)
         with preprocessed_data_file.open("wb") as f:
             np.savez(
                 f,
-                ics=ics,
-                labels=labels,
-                srate=srate,
-                expert_label_mask=expert_label_mask,
-                subj_ind=subj_ind,
-                noisy_labels=noisy_labels,
+                ics=db.data,
+                labels=db.labels,
+                srate=db.srate,
+                expert_label_mask=db.expert_label_mask,
+                subj_ind=db.subj_ind,
+                noisy_labels=db.noisy_labels,
             )
-    return DataBundle(
-        data=ics,
-        labels=labels,
-        expert_label_mask=expert_label_mask,
-        subj_ind=subj_ind,
-        srate=srate,
-        noisy_labels=noisy_labels,
-    )
+
+        return db
 
 
 def load_or_build_preprocessed_data(args):
