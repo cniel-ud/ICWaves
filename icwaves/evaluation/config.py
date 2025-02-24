@@ -30,7 +30,11 @@ class EvalConfig:
             raise ValueError(f"Unknown eval dataset {self.eval_dataset}")
         if self.classifier_type not in ["random_forest", "logistic"]:
             raise ValueError(f"Unknown classifier type {self.classifier_type}")
-        if self.feature_extractor not in ["bowav", "psd_autocorr"]:
+        if self.feature_extractor not in [
+            "bowav",
+            "psd_autocorr",
+            "bowav_psd_autocorr",
+        ]:
             raise ValueError(f"Unknown feature extractor {self.feature_extractor}")
 
     @property
