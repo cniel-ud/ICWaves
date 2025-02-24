@@ -32,8 +32,8 @@ def train_final_model(
     ----------
     estimator : estimator object
         The base estimator to be trained
-    X : array-like
-        Training data
+    X : Dict[str, array-like]
+        Training data for each feature in {'bowav', 'psd_autocorr'}
     y : array-like
         Target values
     expert_label_mask : array-like
@@ -65,7 +65,8 @@ def train_final_model(
     best_estimator = clone(clone(estimator).set_params(**best_params))
 
     # Prepare sample weights
-    sample_weight = np.ones(X.shape[0])
+    feature_extractors = list(X.keys())
+    sample_weight = np.ones(X[feature_extractors[0]].shape[0])
     sample_weight[expert_label_mask] = best_expert_weight
 
     # Feature extraction if needed
@@ -111,7 +112,13 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load or prepare data based on feature extractor type
-    data_bundle, feature_extractor = get_data_and_feature_extractor(args)
+    data_bundles, feature_extractor = get_data_and_feature_extractor(args)
+
+    data_bundle = (
+        data_bundles["bowav"]
+        if "bowav" in data_bundles
+        else data_bundles["psd_autocorr"]
+    )
 
     # Create cross-validation splitter and estimator
     cv = LeaveOneSubjectOutExpertOnly(data_bundle.expert_label_mask)
@@ -120,12 +127,15 @@ if __name__ == "__main__":
     logging.info(f"clf: {clf}")
 
     # Get best parameters from HPO results
-    best_params, results = process_candidate_results(args, cv, data_bundle)
+    best_params, results = process_candidate_results(
+        args, cv, data_bundle.srate, data_bundle.subj_ind
+    )
 
     # Train final model with best parameters
+    X = {k: v.data for k, v in data_bundles.items()}
     best_estimator, refit_time = train_final_model(
         clf,
-        data_bundle.data,
+        X,
         data_bundle.labels,
         data_bundle.expert_label_mask,
         best_params,
