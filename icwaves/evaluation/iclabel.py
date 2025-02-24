@@ -1,11 +1,9 @@
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 from sklearn.metrics import f1_score
 from icwaves.evaluation.config import EvalConfig
 from numpy.typing import NDArray
-from icwaves.feature_extractors.utils import _get_conversion_factor
 
 
 def calculate_iclabel_f1_scores(

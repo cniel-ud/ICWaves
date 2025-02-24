@@ -12,7 +12,7 @@ from icwaves.data.types import DataBundle
 from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
 from icwaves.model_selection.hpo_utils import get_best_parameters
-from icwaves.feature_extractors.utils import _get_conversion_factor
+from icwaves.feature_extractors.utils import convert_segment_length
 from icwaves.file_utils import get_validation_segment_length_string
 
 
@@ -32,14 +32,22 @@ def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
     return clf, best_params
 
 
+def _should_skip_segment(val_segment_len, train_segment_length, aggregation_method):
+    if aggregation_method == "majority_vote":
+        return any(
+            val_segment_len[k] < train_segment_length[k] for k in val_segment_len.keys()
+        )
+    return False
+
+
 def eval_classifier_per_subject_brain_F1(
     config: EvalConfig,
     clf: BaseEstimator,
     feature_extractor: Callable,
     validation_segment_lengths: np.ndarray,
-    data_bundle: DataBundle,
+    data_bundles: dict[str, DataBundle],
     input_or_output_aggregation_method: str,
-    training_segment_length: int,
+    training_segment_length: dict[str, int],
 ) -> pd.DataFrame:
     """Evaluate classifier performance across different time windows.
 
@@ -81,6 +89,13 @@ def eval_classifier_per_subject_brain_F1(
         ]
         results_df = pd.DataFrame(columns=columns)
 
+        # the DataBundle for bowav and psd_autocorr only differs in the `data` attribute
+        # TODO: find a more efficient way of doing this
+        data_bundle = (
+            data_bundles["bowav"]
+            if "bowav" in data_bundles
+            else data_bundles["psd_autocorr"]
+        )
 
         converted_val_segment_lengths = convert_segment_length(
             validation_segment_lengths.tolist(),
@@ -89,18 +104,24 @@ def eval_classifier_per_subject_brain_F1(
             config.window_length,
         )
         total_iterations = len(validation_segment_lengths) * len(config.subj_ids)
+        X = {k: v.data for k, v in data_bundles.items()}
         with tqdm(total=total_iterations) as pbar:
-            for val_segment_len in validation_segment_lengths:
-                converted_val_segment_len = int(val_segment_len * conversion_factor)
-                # TODO: move this logic inside compute_brain_F1_score_per_subject?
-                if input_or_output_aggregation_method == "majority_vote":
-                    if converted_val_segment_len < training_segment_length:
-                        continue
+            for converted_val_segment_len, val_segment_len in zip(
+                converted_val_segment_lengths, validation_segment_lengths
+            ):
+
+                if _should_skip_segment(
+                    converted_val_segment_len,
+                    training_segment_length,
+                    input_or_output_aggregation_method,
+                ):
+                    continue
+
                 for subj_id in config.subj_ids:
                     subj_mask = data_bundle.subj_ind == subj_id
                     score = compute_brain_F1_score_per_subject(
                         clf,
-                        data_bundle.data,
+                        X,
                         data_bundle.labels,
                         data_bundle.expert_label_mask,
                         input_or_output_aggregation_method,
