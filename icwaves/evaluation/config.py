@@ -71,9 +71,11 @@ class EvalConfig:
 
     @property
     def path_to_codebooks(self) -> Path:
-        if self.feature_extractor == "bowav":
-            path = self.path_to_train_output / "dictionaries"
-            return path
+        if "bowav" in self.feature_extractor:
+            if self.eval_dataset == "emotion_study":
+                return self.path_to_train_output / "dictionaries"
+            else:  # cue
+                return self.path_to_train_output / "dictionaries_resampled"
         else:
             raise ValueError(f"Codebooks not available for {self.feature_extractor}")
 
