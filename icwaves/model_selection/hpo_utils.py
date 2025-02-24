@@ -4,7 +4,7 @@ import pickle
 from pathlib import Path
 from sklearn.model_selection import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
-from icwaves.feature_extractors.utils import calculate_segment_length
+from icwaves.feature_extractors.utils import convert_segment_length
 from icwaves.model_selection.utils import _store
 
 TF_IDF_NORM_MAP = {
@@ -40,11 +40,12 @@ def build_grid_parameters(args, srate):
         "count_pooling",
         "majority_vote",
     ]
-    candidate_params["training_segment_length"] = calculate_segment_length(
-        args, srate, train=True
+    window_length = args.window_length if "bowav" in args.feature_extractor else None
+    candidate_params["training_segment_length"] = convert_segment_length(
+        args.training_segment_length, args.feature_extractor, srate, window_length
     )
-    candidate_params["validation_segment_length"] = calculate_segment_length(
-        args, srate, train=False
+    candidate_params["validation_segment_length"] = convert_segment_length(
+        args.validation_segment_length, args.feature_extractor, srate, window_length
     )
     candidate_params["expert_weight"] = args.expert_weight
     if args.classifier_type == "logistic":

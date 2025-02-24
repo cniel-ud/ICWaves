@@ -81,7 +81,13 @@ def eval_classifier_per_subject_brain_F1(
         ]
         results_df = pd.DataFrame(columns=columns)
 
-        conversion_factor = _get_conversion_factor(config, data_bundle.srate)
+
+        converted_val_segment_lengths = convert_segment_length(
+            validation_segment_lengths.tolist(),
+            config.feature_extractor,
+            data_bundle.srate,
+            config.window_length,
+        )
         total_iterations = len(validation_segment_lengths) * len(config.subj_ids)
         with tqdm(total=total_iterations) as pbar:
             for val_segment_len in validation_segment_lengths:
