@@ -66,12 +66,12 @@ def build_grid_parameters(args, srate):
     return candidate_params
 
 
-def get_grid_size(candidate_params, cv, data_bundle):
+def get_grid_size(candidate_params, cv, subj_ind):
     n_candidates = len(candidate_params)
     n_splits = cv.get_n_splits(
-        data_bundle.data,
-        data_bundle.labels,
-        groups=data_bundle.subj_ind,
+        X=None,
+        y=None,
+        groups=subj_ind,
     )
     return n_candidates, n_splits
 
@@ -117,22 +117,21 @@ def get_best_parameters(results):
     return best_params
 
 
-def process_candidate_results(args, cv, data_bundle):
+def process_candidate_results(args, cv, srate, subj_ind):
     """Process all candidate results and return the best estimator configuration.
 
     Args:
         args: Arguments containing path information
-        estimator: Base estimator to clone
-        n_candidates (int): Number of hyperparameter candidates
-        n_splits (int): Number of cross-validation splits
-        candidate_params (list): List of parameter dictionaries
+        cv: Cross validator
+        srate: sampling rate
+        subj_ind: indices of subjects
 
     Returns:
         tuple: (best_params, results)
     """
 
-    candidate_params = build_grid_parameters(args, data_bundle.srate)
-    n_candidates, n_splits = get_grid_size(candidate_params, cv, data_bundle)
+    candidate_params = build_grid_parameters(args, srate)
+    n_candidates, n_splits = get_grid_size(candidate_params, cv, subj_ind)
 
     valseglen = (
         "None"
