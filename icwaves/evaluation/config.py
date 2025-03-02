@@ -30,7 +30,11 @@ class EvalConfig:
             raise ValueError(f"Unknown eval dataset {self.eval_dataset}")
         if self.classifier_type not in ["random_forest", "logistic"]:
             raise ValueError(f"Unknown classifier type {self.classifier_type}")
-        if self.feature_extractor not in ["bowav", "psd_autocorr"]:
+        if self.feature_extractor not in [
+            "bowav",
+            "psd_autocorr",
+            "bowav_psd_autocorr",
+        ]:
             raise ValueError(f"Unknown feature extractor {self.feature_extractor}")
 
     @property
@@ -67,9 +71,11 @@ class EvalConfig:
 
     @property
     def path_to_codebooks(self) -> Path:
-        if self.feature_extractor == "bowav":
-            path = self.path_to_train_output / "dictionaries"
-            return path
+        if "bowav" in self.feature_extractor:
+            if self.eval_dataset == "emotion_study":
+                return self.path_to_train_output / "dictionaries"
+            else:  # cue
+                return self.path_to_train_output / "dictionaries_resampled"
         else:
             raise ValueError(f"Codebooks not available for {self.feature_extractor}")
 

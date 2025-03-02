@@ -37,15 +37,21 @@ def build_features_based_on_aggregation_method(
               where n_segments is equal 1 if agg_method is "count_pooling", or equal to
               k = floor(X.shape[-1] / training_segment_length) if agg_method is "majority_vote".
     """
-    X = X[subj_mask, ..., slice(0, validation_segment_length)]
+    # X is a dict. Make a deep copy to avoid messing with upstream data.
+    X = {k: np.copy(v) for k, v in X.items()}
+    for k in X.keys():
+        X[k] = X[k][subj_mask, ..., slice(0, validation_segment_length[k])]
+
     if agg_method == "count_pooling":
         features = feature_extractor(
             X,
             validation_segment_length,
         )
     else:
-        if validation_segment_length is not None:
-            assert training_segment_length <= validation_segment_length
+        for k in X.keys():
+            if validation_segment_length[k] is not None:
+                assert training_segment_length[k] <= validation_segment_length[k]
+
         features = feature_extractor(
             X,
             training_segment_length,
