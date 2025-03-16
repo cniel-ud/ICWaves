@@ -17,7 +17,7 @@ from icwaves.argparser import (
     create_argparser_all_params,
     create_argparser_one_parameter_one_split,
 )
-from icwaves.data.loading import get_data_and_feature_extractor
+from icwaves.data.loading import get_feature_extractor, load_data_bundles
 from icwaves.model_selection.hpo_utils import get_base_parameters, build_grid_parameters
 
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     job_id = one_run_args.job_id
 
     all_params_parser = create_argparser_all_params(one_run_args.feature_extractor)
-    args = all_params_parser.parse_args(args_list)
+    args, _ = all_params_parser.parse_known_args(args_list)
     args.feature_extractor = one_run_args.feature_extractor
 
     # Setup RNG
@@ -68,21 +68,6 @@ if __name__ == "__main__":
     logging.info(f"candidate_index: {job_params.candidate_index}")
     logging.info(f"split_index: {job_params.split_index}")
 
-    X = {k: v.data for k, v in data_bundles.items()}
-    result = _fit_and_score(
-        clf,
-        X=X,
-        y=data_bundle.labels,
-        expert_label_mask=data_bundle.expert_label_mask,
-        train=job_params.train_indices,
-        test=job_params.test_indices,
-        parameters=job_params.parameters,
-        scorer=f1_score,
-        feature_extractor=feature_extractor,
-        split_progress=(job_params.split_index, job_params.n_splits),
-        candidate_progress=(job_params.candidate_index, job_params.n_candidates),
-    )
-
     valseglen = (
         "None"
         if args.validation_segment_length == -1
@@ -96,6 +81,25 @@ if __name__ == "__main__":
 
     results_file = results_folder.joinpath(
         f"candidate_{job_params.candidate_index}_split_{job_params.split_index}.pkl"
+    )
+
+    if results_file.exists():
+        logging.info(f"Results file {results_file} already exists. Skipping.")
+        exit(0)
+
+    X = {k: v.data for k, v in data_bundles.items()}
+    result = _fit_and_score(
+        clf,
+        X=X,
+        y=data_bundle.labels,
+        expert_label_mask=data_bundle.expert_label_mask,
+        train=job_params.train_indices,
+        test=job_params.test_indices,
+        parameters=job_params.parameters,
+        scorer=f1_score,
+        feature_extractor=feature_extractor,
+        split_progress=(job_params.split_index, job_params.n_splits),
+        candidate_progress=(job_params.candidate_index, job_params.n_candidates),
     )
 
     if job_id == 0:
