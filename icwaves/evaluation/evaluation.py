@@ -33,10 +33,10 @@ def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
 
 
 def _should_skip_segment(val_segment_len, train_segment_length, aggregation_method):
-    if aggregation_method == "majority_vote":
-        return any(
-            val_segment_len[k] < train_segment_length[k] for k in val_segment_len.keys()
-        )
+    for feature_type in val_segment_len.keys():
+        if aggregation_method[feature_type] == "majority_vote":
+            if val_segment_len[feature_type] < train_segment_length[feature_type]:
+                return True
     return False
 
 
@@ -46,7 +46,7 @@ def eval_classifier_per_subject_brain_F1(
     feature_extractor: Callable,
     validation_segment_lengths: np.ndarray,
     data_bundles: dict[str, DataBundle],
-    input_or_output_aggregation_method: str,
+    input_or_output_aggregation_method: dict[str, str],
     training_segment_length: dict[str, int],
 ) -> pd.DataFrame:
     """Evaluate classifier performance across different time windows.
