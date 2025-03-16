@@ -42,8 +42,8 @@ def _should_skip_segment(val_segment_len, train_segment_length, aggregation_meth
 
 def eval_classifier_per_subject_brain_F1(
     config: EvalConfig,
-    clf: BaseEstimator,
-    feature_extractor: Callable,
+    clf: dict[str, BaseEstimator],
+    feature_extractor: dict[str, Callable],
     validation_segment_lengths: np.ndarray,
     data_bundles: dict[str, DataBundle],
     input_or_output_aggregation_method: dict[str, str],

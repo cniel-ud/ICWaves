@@ -39,23 +39,29 @@ def build_features_based_on_aggregation_method(
     """
     # X is a dict. Make a deep copy to avoid messing with upstream data.
     X = {k: np.copy(v) for k, v in X.items()}
-    for k in X.keys():
-        X[k] = X[k][subj_mask, ..., slice(0, validation_segment_length[k])]
+    for feature_type in X.keys():
+        X[feature_type] = X[feature_type][
+            subj_mask, ..., slice(0, validation_segment_length[feature_type])
+        ]
 
-    if agg_method == "count_pooling":
-        features = feature_extractor(
-            X,
-            validation_segment_length,
-        )
-    else:
-        for k in X.keys():
-            if validation_segment_length[k] is not None:
-                assert training_segment_length[k] <= validation_segment_length[k]
+    features = {}
+    for feature_type in feature_extractor.keys():
+        if agg_method[feature_type] == "count_pooling":
+            features[feature_type] = feature_extractor[feature_type](
+                X,
+                validation_segment_length,
+            )
+        else:
+            if validation_segment_length[feature_type] is not None:
+                assert (
+                    training_segment_length[feature_type]
+                    <= validation_segment_length[feature_type]
+                )
 
-        features = feature_extractor(
-            X,
-            training_segment_length,
-        )
+            features[feature_type] = feature_extractor[feature_type](
+                X,
+                training_segment_length,
+            )
 
     return features
 
@@ -108,18 +114,48 @@ def compute_brain_F1_score_per_subject(
         subj_mask,
     )
 
-    n_segments = X.shape[1]
-    # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
-    X = np.vstack(X)
-    y_pred = clf.predict(X)
+    n_segments = {k: v.shape[1] for k, v in X.items()}
+    n_feature_types = len(X.keys())
+    y_preds_log_proba_agg = 0
 
-    # Maybe aggregate output
-    if agg_method == "majority_vote":
-        # Aggregate all the predictions
-        # TODO: include None in validation_segment_length_arr
-        # to get all the time series
-        y_pred = y_pred.reshape(-1, n_segments)
-        y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+    for feature_type in X.keys():
+        n_time_series, n_segments, n_features = X[feature_type].shape
+        # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
+        features = np.vstack(X[feature_type])
+        y_pred = clf[feature_type].predict(features)
+        y_preds_proba = clf[feature_type].predict_proba(X)
+        y_preds_log_proba = np.log(y_preds_proba + 1e-12)
+
+        # Maybe aggregate output
+        if agg_method[feature_type] == "majority_vote":
+            # Aggregate all the predictions
+            # TODO: include None in validation_segment_length_arr
+            # to get all the time series
+            y_pred = y_pred.reshape(-1, n_segments)
+            y_pred = scipy.stats.mode(y_pred, axis=1)[0]
+            n_classes = y_preds_proba.shape[1]
+            y_preds_log_proba = y_preds_log_proba.reshape(
+                n_time_series, n_segments, n_classes
+            )
+            y_preds_log_proba = np.sum(y_preds_log_proba, axis=1)
+            y_preds_log_proba = scipy.special.logsumexp(y_preds_log_proba, axis=1)
+
+        y_preds_log_proba_agg += y_preds_log_proba
+
+    y_preds_log_proba_agg_norm = y_preds_log_proba_agg - scipy.special.logsumexp(
+        y_preds_log_proba_agg, axis=1, keepdims=True
+    )
+    y_preds_proba_agg = np.exp(y_preds_log_proba_agg_norm)
+    y_preds_agg = np.argmax(y_preds_proba_agg, axis=1)
+
+    # if we passed two classifiers (each trained on a different feature type)
+    # use the aggregated predictions to compute the F1 score
+    if n_feature_types == 2:
+        feature_types = list(X.keys())
+        print(
+            f"Using aggregated predictions from {feature_types[0]} and {feature_types[1]}..."
+        )
+        y_pred = y_preds_agg
 
     # expand labels and expert mask to match test BoWav vectors
     y = labels[subj_mask]
