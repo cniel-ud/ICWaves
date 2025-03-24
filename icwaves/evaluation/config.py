@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import List
 from icwaves.file_utils import get_validation_segment_length_string
 
+SUPPORTED_CLASSIFIERS = ["random_forest", "logistic", "ensembled_logistic"]
+SUPPORTED_DATASETS = ["emotion_study", "cue"]
+SUPPORTED_FEATURES = ["bowav", "psd_autocorr", "bowav_psd_autocorr"]
+
 
 @dataclass
 class EvalConfig:
@@ -26,15 +30,11 @@ class EvalConfig:
     codebook_ics_per_subject: int = 2
 
     def __post_init__(self):
-        if self.eval_dataset not in ["emotion_study", "cue"]:
+        if self.eval_dataset not in SUPPORTED_DATASETS:
             raise ValueError(f"Unknown eval dataset {self.eval_dataset}")
-        if self.classifier_type not in ["random_forest", "logistic"]:
+        if self.classifier_type not in SUPPORTED_CLASSIFIERS:
             raise ValueError(f"Unknown classifier type {self.classifier_type}")
-        if self.feature_extractor not in [
-            "bowav",
-            "psd_autocorr",
-            "bowav_psd_autocorr",
-        ]:
+        if self.feature_extractor not in SUPPORTED_FEATURES:
             raise ValueError(f"Unknown feature extractor {self.feature_extractor}")
 
     @property
@@ -80,13 +80,44 @@ class EvalConfig:
             raise ValueError(f"Codebooks not available for {self.feature_extractor}")
 
     @property
-    def path_to_classifier(self) -> Path:
+    def path_to_classifier(self) -> dict[str, Path]:
         valseglen = get_validation_segment_length_string(
             int(self.validation_segment_length)
         )
-        path = (
-            self.path_to_train_output
-            / "classifier"
-            / f"train_{self.classifier_type}_{self.feature_extractor}_valSegLen{valseglen}.pkl"
-        )
-        return path
+        # Base path for all classifiers
+        base_path = self.path_to_train_output / "classifier"
+
+        # Common filename pattern
+        filename_pattern = "train_{classifier}_{feature}_valSegLen{valseglen}.pkl"
+
+        if self.classifier_type == "ensembled_logistic":
+            return {
+                "bowav": base_path
+                / f"{filename_pattern}".format(
+                    classifier="logistic",
+                    feature="bowav",
+                    valseglen=valseglen,
+                ),
+                "psd_autocorr": base_path
+                / f"{filename_pattern}".format(
+                    classifier="logistic",
+                    feature="psd_autocorr",
+                    valseglen=valseglen,
+                ),
+            }
+        else:
+            return {
+                self.feature_extractor: base_path
+                / f"{filename_pattern}".format(
+                    classifier=self.classifier_type,
+                    feature=self.feature_extractor,
+                    valseglen=valseglen,
+                )
+            }
+
+
+# path = (
+#     self.path_to_train_output
+#     / "classifier"
+#     / f"train_{self.classifier_type}_{self.feature_extractor}_valSegLen{valseglen}.pkl"
+# )

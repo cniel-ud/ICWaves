@@ -68,7 +68,7 @@ def build_features_based_on_aggregation_method(
 
 def compute_brain_F1_score_per_subject(
     clf,
-    X,
+    features_dict,
     labels,
     expert_label_mask,
     agg_method,
@@ -105,25 +105,24 @@ def compute_brain_F1_score_per_subject(
     -------
     brain_f1_score: brain F1 score for each subject.
     """
-    X = build_features_based_on_aggregation_method(
+    features_dict = build_features_based_on_aggregation_method(
         feature_extractor,
-        X,
+        features_dict,
         validation_segment_length,
         training_segment_length,
         agg_method,
         subj_mask,
     )
 
-    n_segments = {k: v.shape[1] for k, v in X.items()}
-    n_feature_types = len(X.keys())
+    n_feature_types = len(features_dict.keys())
     y_preds_log_proba_agg = 0
 
-    for feature_type in X.keys():
-        n_time_series, n_segments, n_features = X[feature_type].shape
+    for feature_type, feature_array in features_dict.items():
+        n_time_series, n_segments, n_features = feature_array.shape
         # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
-        features = np.vstack(X[feature_type])
-        y_pred = clf[feature_type].predict(features)
-        y_preds_proba = clf[feature_type].predict_proba(X)
+        feature_array = np.vstack(feature_array)
+        y_pred = clf[feature_type].predict(feature_array)
+        y_preds_proba = clf[feature_type].predict_proba(feature_array)
         y_preds_log_proba = np.log(y_preds_proba + 1e-12)
 
         # Maybe aggregate output
@@ -138,7 +137,9 @@ def compute_brain_F1_score_per_subject(
                 n_time_series, n_segments, n_classes
             )
             y_preds_log_proba = np.sum(y_preds_log_proba, axis=1)
-            y_preds_log_proba = scipy.special.logsumexp(y_preds_log_proba, axis=1)
+            y_preds_log_proba = y_preds_log_proba - scipy.special.logsumexp(
+                y_preds_log_proba, axis=1, keepdims=True
+            )
 
         y_preds_log_proba_agg += y_preds_log_proba
 
@@ -151,7 +152,7 @@ def compute_brain_F1_score_per_subject(
     # if we passed two classifiers (each trained on a different feature type)
     # use the aggregated predictions to compute the F1 score
     if n_feature_types == 2:
-        feature_types = list(X.keys())
+        feature_types = list(features_dict.keys())
         print(
             f"Using aggregated predictions from {feature_types[0]} and {feature_types[1]}..."
         )
