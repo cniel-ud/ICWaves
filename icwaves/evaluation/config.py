@@ -114,10 +114,3 @@ class EvalConfig:
                     valseglen=valseglen,
                 )
             }
-
-
-# path = (
-#     self.path_to_train_output
-#     / "classifier"
-#     / f"train_{self.classifier_type}_{self.feature_extractor}_valSegLen{valseglen}.pkl"
-# )
