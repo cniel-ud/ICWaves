@@ -1,6 +1,6 @@
 _private/
-results/
-data/
+/results/
+/data/
 __pycache__/
 *.asv
 .vscode/
