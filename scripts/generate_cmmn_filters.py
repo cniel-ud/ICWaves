@@ -1,7 +1,6 @@
 # imports
 import scipy
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.io import loadmat
 from scipy.signal import butter, sosfilt, welch, freqz, sosfreqz, filtfilt, lfilter
@@ -278,15 +277,15 @@ def main(make_psds=False):
     # grab raw data
     emotion_data = []
     for subj in emotion_subj_list:
-    emotion_data.append(loadmat(emotion_filepath / f'subj-{subj}.mat')['data'])
+        emotion_data.append(loadmat(emotion_filepath / f'subj-{subj}.mat')['data'])
 
     frolich_data = []
     for subj in frolich_subj_list:
-    frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
+        frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
 
     if make_psds:
-    (emotion_filepath / 'psds').mkdir(parents=True, exist_ok=True)
-    (frolich_filepath / 'psds').mkdir(parents=True, exist_ok=True)
+        (emotion_filepath / 'psds').mkdir(parents=True, exist_ok=True)
+        (frolich_filepath / 'psds').mkdir(parents=True, exist_ok=True)
 
     for i, subj in enumerate(emotion_data):
         f, Pxx = psd(subj)
@@ -300,12 +299,12 @@ def main(make_psds=False):
     frolich_data_psds_raw = []
 
     if (emotion_filepath / 'psds').exists():
-    for subj in emotion_subj_list:
-        emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
+        for subj in emotion_subj_list:
+            emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
 
     if (frolich_filepath / 'psds').exists():
-    for subj in frolich_subj_list:
-        frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
+        for subj in frolich_subj_list:
+            frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
 
 
     # compute normed barycenter
