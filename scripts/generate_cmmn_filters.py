@@ -262,6 +262,9 @@ def transform_data_subj_subj(data, time_filter_subj_subj):
 def main(make_psds=False):
     """
     If first time running, set make_psds to True. Otherwise don't re-generate every time.
+
+
+    Slightly modified this script to get the per subj filters for emotion. So Carlos can train a new clf on it.
     """
 
     # note emotion dataset missing 22
@@ -335,6 +338,19 @@ def main(make_psds=False):
 
     for i, filter in enumerate(time_filter_subj_subj):
         np.savez(save_path / f'frolich_subj_subj_time_filter_{frolich_subj_list[i]}.npz', filter)
+
+
+    # below also computing the emotion filters to its own barycenter. for training a new clf. original CMMN paper formulation 
+    
+    freq_filter_emotion, time_filter_emotion = compute_filter_original(emotion_data, normed_emotion_barycenter)
+
+    # save emotion filters
+    for i, filter in enumerate(freq_filter_emotion):
+        np.savez(save_path / f'emotion_original_freq_filter_{emotion_subj_list[i]}.npz', filter)
+
+    for i, filter in enumerate(time_filter_emotion):
+        np.savez(save_path / f'emotion_original_time_filter_{emotion_subj_list[i]}.npz', filter)
+
 
 
 
