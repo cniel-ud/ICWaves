@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 from icwaves.file_utils import get_validation_segment_length_string
+from typing import Optional
 
 SUPPORTED_CLASSIFIERS = ["random_forest", "logistic", "ensembled_logistic"]
 SUPPORTED_DATASETS = ["emotion_study", "cue"]
 SUPPORTED_FEATURES = ["bowav", "psd_autocorr", "bowav_psd_autocorr"]
+SUPPORTED_CMNN_FILTERS = ["original", "subj_to_subj"]
 
 
 @dataclass
@@ -28,6 +30,7 @@ class EvalConfig:
     validation_segment_length: int = -1
     codebook_minutes_per_ic: float = 50.0
     codebook_ics_per_subject: int = 2
+    cmmn_filter: Optional[str] = None
 
     def __post_init__(self):
         if self.eval_dataset not in SUPPORTED_DATASETS:
@@ -36,6 +39,13 @@ class EvalConfig:
             raise ValueError(f"Unknown classifier type {self.classifier_type}")
         if self.feature_extractor not in SUPPORTED_FEATURES:
             raise ValueError(f"Unknown feature extractor {self.feature_extractor}")
+        if (
+            self.cmmn_filter is not None
+            and self.cmmn_filter not in SUPPORTED_CMNN_FILTERS
+        ):
+            raise ValueError(f"Unknown cmmn filter {self.cmmn_filter}")
+        if self.cmmn_filter is not None and self.eval_dataset != "cue":
+            raise ValueError(f"cmmn filter only supported for cue dataset")
 
     @property
     def subj_ids(self) -> List[int]:
@@ -57,6 +67,13 @@ class EvalConfig:
     @property
     def path_to_raw_data(self) -> Path:
         path = self.path_to_eval_data / "raw_data_and_IC_labels"
+        return path
+
+    @property
+    def path_to_cmmn_filters(self) -> Path:
+        if self.cmmn_filter is None:
+            return None
+        path = self.path_to_eval_data / f"cmmn_filters/{self.cmmn_filter}"
         return path
 
     @property
@@ -88,7 +105,9 @@ class EvalConfig:
         base_path = self.path_to_train_output / "classifier"
 
         # Common filename pattern
-        filename_pattern = "train_{classifier}_{feature}_valSegLen{valseglen}.pkl"
+        filename_pattern = (
+            "train_{classifier}_{feature}_valSegLen{valseglen}_cmmn{cmmn}.pkl"
+        )
 
         if self.classifier_type == "ensembled_logistic":
             return {
@@ -97,12 +116,14 @@ class EvalConfig:
                     classifier="logistic",
                     feature="bowav",
                     valseglen=valseglen,
+                    cmmn=self.cmmn_filter,
                 ),
                 "psd_autocorr": base_path
                 / f"{filename_pattern}".format(
                     classifier="logistic",
                     feature="psd_autocorr",
                     valseglen=valseglen,
+                    cmmn=self.cmmn_filter,
                 ),
             }
         else:
@@ -112,5 +133,6 @@ class EvalConfig:
                     classifier=self.classifier_type,
                     feature=self.feature_extractor,
                     valseglen=valseglen,
+                    cmmn=self.cmmn_filter,
                 )
             }

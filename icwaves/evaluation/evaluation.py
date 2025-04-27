@@ -68,9 +68,10 @@ def eval_classifier_per_subject_brain_F1(
     valseglen = get_validation_segment_length_string(
         int(config.validation_segment_length)
     )
+    cmmn_suffix = get_cmmn_suffix(config.cmmn_filter)
     results_file = (
         results_path
-        / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}.csv"
+        / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}{cmmn_suffix}.csv"
     )
 
     # Try to load cached results if they exist
@@ -141,11 +142,15 @@ def eval_classifier_per_subject_brain_F1(
         results_df.to_csv(results_file, index=False)
 
     std_df = results_df.groupby("Prediction window [minutes]")["Brain F1 score"].std()
-    std_df = std_df.rename(f"StdDev - {config.feature_extractor}").reset_index()
+    std_df = std_df.rename(
+        f"StdDev - {config.feature_extractor} - cmmn-{config.cmmn_filter}"
+    ).reset_index()
     mean_df = (
         results_df.groupby("Prediction window [minutes]")["Brain F1 score"]
         .mean()
-        .rename(f"Brain F1 score - {config.feature_extractor}")
+        .rename(
+            f"Brain F1 score - {config.feature_extractor} - cmmn-{config.cmmn_filter}"
+        )
         .reset_index()
     )
     mean_and_std_df = pd.merge(std_df, mean_df, on="Prediction window [minutes]")
