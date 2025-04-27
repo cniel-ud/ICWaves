@@ -82,7 +82,7 @@ def create_argparser_all_params(feature_extractor: str):
     )
     parser.add_argument(
         "--validation-segment-length",
-        type=int,
+        type=float,
         default=300,
         help="Length in seconds of segment used during validation. Use -1 if you want to use all the time series.",
     )

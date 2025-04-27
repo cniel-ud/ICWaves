@@ -20,7 +20,7 @@ from icwaves.argparser import (
     create_argparser_aggregate_results,
     create_argparser_all_params,
 )
-from icwaves.data.loading import get_data_and_feature_extractor
+from icwaves.data.loading import get_feature_extractor, load_data_bundles
 
 
 def train_final_model(
@@ -112,7 +112,8 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load or prepare data based on feature extractor type
-    data_bundles, feature_extractor = get_data_and_feature_extractor(args)
+    data_bundles = load_data_bundles(args)
+    feature_extractor = get_feature_extractor(args.feature_extractor, data_bundles)
 
     data_bundle = (
         data_bundles["bowav"]
