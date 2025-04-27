@@ -13,7 +13,7 @@ from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import get_validation_segment_length_string
+from icwaves.file_utils import get_validation_segment_length_string, get_cmmn_suffix
 
 
 def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
@@ -32,11 +32,27 @@ def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
     return clf, best_params
 
 
-def _should_skip_segment(val_segment_len, train_segment_length, aggregation_method):
-    for feature_type in val_segment_len.keys():
-        if aggregation_method[feature_type] == "majority_vote":
-            if val_segment_len[feature_type] < train_segment_length[feature_type]:
-                return True
+def _should_skip_segment(val_segment_len, train_segment_len, agg_method):
+    """
+    The keys in val_segment_len and train_segment_len will always be individual feature
+    types (e.g., "bowav", "psd_autocorr"). The keys in agg_method can be either individual
+    feature types or concatenated (e.g., "bowav_psd_autocorr").
+    """
+    seg_len_keys = list(val_segment_len.keys())
+    agg_method_keys = list(agg_method.keys())
+    if len(seg_len_keys) == len(agg_method_keys):
+        for k in seg_len_keys:
+            if agg_method[k] == "majority_vote":
+                if val_segment_len[k] < train_segment_len[k]:
+                    return True
+
+    else:  # len(seg_len_keys) > len(agg_method_keys)
+        agg_key = agg_method_keys[0]
+        for k in seg_len_keys:
+            if agg_method[agg_key] == "majority_vote":
+                if val_segment_len[k] < train_segment_len[k]:
+                    return True
+
     return False
 
 

@@ -45,20 +45,44 @@ def build_features_based_on_aggregation_method(
         ]
 
     features = {}
-    for feature_type in feature_extractor.keys():
-        if agg_method[feature_type] == "count_pooling":
-            features[feature_type] = feature_extractor[feature_type](
+    feature_extractor_keys = list(feature_extractor.keys())
+    seg_len_keys = list(validation_segment_length.keys())
+    if len(feature_extractor_keys) == len(seg_len_keys):
+        """Individual features (e.g., 'bowav', 'psd_autocorr')"""
+        for feature_type in feature_extractor.keys():
+            if agg_method[feature_type] == "count_pooling":
+                features[feature_type] = feature_extractor[feature_type](
+                    X,
+                    validation_segment_length,
+                )
+            else:
+                if validation_segment_length[feature_type] is not None:
+                    assert (
+                        training_segment_length[feature_type]
+                        <= validation_segment_length[feature_type]
+                    )
+
+                features[feature_type] = feature_extractor[feature_type](
+                    X,
+                    training_segment_length,
+                )
+    else:
+        """Concatenated features (e.g., 'bowav_psd_autocorr')"""
+        extractor_key = feature_extractor_keys[0]
+        if agg_method[extractor_key] == "count_pooling":
+            features[extractor_key] = feature_extractor[extractor_key](
                 X,
                 validation_segment_length,
             )
         else:
-            if validation_segment_length[feature_type] is not None:
-                assert (
-                    training_segment_length[feature_type]
-                    <= validation_segment_length[feature_type]
-                )
+            for feature_type in seg_len_keys:
+                if validation_segment_length[feature_type] is not None:
+                    assert (
+                        training_segment_length[feature_type]
+                        <= validation_segment_length[feature_type]
+                    )
 
-            features[feature_type] = feature_extractor[feature_type](
+            features[extractor_key] = feature_extractor[extractor_key](
                 X,
                 training_segment_length,
             )
