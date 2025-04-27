@@ -12,7 +12,11 @@ from icwaves.factories import create_estimator
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
 from icwaves.model_selection.job_utils import get_job_parameters
-from icwaves.file_utils import read_args_from_file
+from icwaves.file_utils import (
+    get_cmmn_suffix,
+    get_validation_segment_length_string,
+    read_args_from_file,
+)
 from icwaves.argparser import (
     create_argparser_all_params,
     create_argparser_one_parameter_one_split,
@@ -68,16 +72,16 @@ if __name__ == "__main__":
     logging.info(f"candidate_index: {job_params.candidate_index}")
     logging.info(f"split_index: {job_params.split_index}")
 
-    valseglen = (
-        "None"
-        if args.validation_segment_length == -1
-        else int(args.validation_segment_length)
+    valseglen = get_validation_segment_length_string(
+        int(args.validation_segment_length)
     )
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+
     results_folder = Path(
         args.path_to_results,
-        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}",
+        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}",
     )
-    results_folder.mkdir(exist_ok=True, parents=True)
+    results_folder.mkdir(parents=True, exist_ok=True)
 
     results_file = results_folder.joinpath(
         f"candidate_{job_params.candidate_index}_split_{job_params.split_index}.pkl"
