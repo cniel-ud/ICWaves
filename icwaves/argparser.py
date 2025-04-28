@@ -60,6 +60,19 @@ def create_argparser_all_params(feature_extractor: str):
         "--path-to-preprocessed-data", help="Path to preprocessed data", required=True
     )
     parser.add_argument(
+        "--cmmn-filter",
+        type=str,
+        choices=["original", "subj_to_subj"],
+        default=None,
+        help="Type of CMMN filter to use",
+    )
+    parser.add_argument(
+        "--path-to-cmmn-filters",
+        type=str,
+        help="Path to CMMN filters.",
+        default=None,
+    )
+    parser.add_argument(
         "--minutes-per-ic",
         type=float,
         default=50,
