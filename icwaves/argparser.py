@@ -67,6 +67,11 @@ def create_argparser_all_params(feature_extractor: str):
         help="Type of CMMN filter to use",
     )
     parser.add_argument(
+        "--is-cmmn-filter-resampled",
+        action="store_true",
+        help="Whether to use resampled CMMN filters",
+    )
+    parser.add_argument(
         "--path-to-cmmn-filters",
         type=str,
         help="Path to CMMN filters.",

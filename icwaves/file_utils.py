@@ -8,9 +8,14 @@ def get_validation_segment_length_string(valseglen: int) -> str:
     return valseglen
 
 
-def get_cmmn_suffix(cmmn_filter: Optional[str]) -> str:
+def get_cmmn_suffix(
+    cmmn_filter: Optional[str], is_cmmn_filter_resampled: bool = False
+) -> str:
     if cmmn_filter is not None:
-        cmmn_suffix = f"_cmmn-{cmmn_filter}"
+        if is_cmmn_filter_resampled:
+            cmmn_suffix = f"_cmmn-{cmmn_filter}-resampled"
+        else:
+            cmmn_suffix = f"_cmmn-{cmmn_filter}"
     else:
         cmmn_suffix = ""
     return cmmn_suffix
@@ -30,7 +35,7 @@ def read_args_from_file(file_path):
 
 def _build_centroid_assignments_file(args):
     subj_str = list_to_base36(args.subj_ids)
-    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter, args.is_cmmn_filter_resampled)
     base_name = (
         f"k-{args.num_clusters}_P-{args.centroid_length}"
         f"_winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
@@ -46,7 +51,7 @@ def _build_centroid_assignments_file(args):
 def _build_ics_and_labels_file(args):
     subj_str = list_to_base36(args.subj_ids)
     # add suffix to signal that CMMN filter was applied
-    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter, args.is_cmmn_filter_resampled)
     base_name = f"minPerIC-{args.minutes_per_ic}_subj-{subj_str}{cmmn_suffix}"
     file_name = f"{base_name}.npz"
 
@@ -55,7 +60,7 @@ def _build_ics_and_labels_file(args):
 
 def _build_preprocessed_data_file(args):
     subj_str = list_to_base36(args.subj_ids)
-    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter, args.is_cmmn_filter_resampled)
     base_name = f"winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}_subj-{subj_str}{cmmn_suffix}"
     file_name = f"{base_name}.npz"
 

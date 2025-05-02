@@ -84,7 +84,7 @@ def eval_classifier_per_subject_brain_F1(
     valseglen = get_validation_segment_length_string(
         int(config.validation_segment_length)
     )
-    cmmn_suffix = get_cmmn_suffix(config.cmmn_filter)
+    cmmn_suffix = get_cmmn_suffix(config.cmmn_filter, config.is_cmmn_filter_resampled)
     results_file = (
         results_path
         / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}{cmmn_suffix}.csv"
@@ -157,6 +157,7 @@ def eval_classifier_per_subject_brain_F1(
                     pbar.update(1)
         results_df.to_csv(results_file, index=False)
 
+    # TODO: move this renaming of columns outside this function
     std_df = results_df.groupby("Prediction window [minutes]")["Brain F1 score"].std()
     std_df = std_df.rename(
         f"StdDev - {config.feature_extractor} - cmmn-{config.cmmn_filter}"

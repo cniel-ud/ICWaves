@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
-from icwaves.file_utils import get_validation_segment_length_string
+from icwaves.file_utils import get_cmmn_suffix, get_validation_segment_length_string
 from typing import Optional
 
 SUPPORTED_CLASSIFIERS = ["random_forest", "logistic", "ensembled_logistic"]
@@ -31,6 +31,8 @@ class EvalConfig:
     codebook_minutes_per_ic: float = 50.0
     codebook_ics_per_subject: int = 2
     cmmn_filter: Optional[str] = None
+    is_cmmn_filter_resampled: bool = False
+    is_classifier_trained_on_normalized_data: bool = False
 
     def __post_init__(self):
         if self.eval_dataset not in SUPPORTED_DATASETS:
@@ -73,7 +75,10 @@ class EvalConfig:
     def path_to_cmmn_filters(self) -> Path:
         if self.cmmn_filter is None:
             return None
-        path = self.path_to_eval_data / f"cmmn_filters/{self.cmmn_filter}"
+        if self.is_cmmn_filter_resampled:
+            path = self.path_to_eval_data / f"cmmn_filters_resampled/{self.cmmn_filter}"
+        else:
+            path = self.path_to_eval_data / f"cmmn_filters/{self.cmmn_filter}"
         return path
 
     @property
@@ -101,13 +106,17 @@ class EvalConfig:
         valseglen = get_validation_segment_length_string(
             int(self.validation_segment_length)
         )
+        if self.is_classifier_trained_on_normalized_data:
+            cmmn_suffix = get_cmmn_suffix(
+                self.cmmn_filter, self.is_cmmn_filter_resampled
+            )
+        else:
+            cmmn_suffix = get_cmmn_suffix(None)
         # Base path for all classifiers
         base_path = self.path_to_train_output / "classifier"
 
         # Common filename pattern
-        filename_pattern = (
-            "train_{classifier}_{feature}_valSegLen{valseglen}_cmmn{cmmn}.pkl"
-        )
+        filename_pattern = "train_{classifier}_{feature}_valSegLen{valseglen}{cmmn}.pkl"
 
         if self.classifier_type == "ensembled_logistic":
             return {
@@ -116,14 +125,14 @@ class EvalConfig:
                     classifier="logistic",
                     feature="bowav",
                     valseglen=valseglen,
-                    cmmn=self.cmmn_filter,
+                    cmmn=cmmn_suffix,
                 ),
                 "psd_autocorr": base_path
                 / f"{filename_pattern}".format(
                     classifier="logistic",
                     feature="psd_autocorr",
                     valseglen=valseglen,
-                    cmmn=self.cmmn_filter,
+                    cmmn=cmmn_suffix,
                 ),
             }
         else:
@@ -133,6 +142,6 @@ class EvalConfig:
                     classifier=self.classifier_type,
                     feature=self.feature_extractor,
                     valseglen=valseglen,
-                    cmmn=self.cmmn_filter,
+                    cmmn=cmmn_suffix,
                 )
             }
