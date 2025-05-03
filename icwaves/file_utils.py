@@ -4,7 +4,7 @@ from typing import Optional
 
 
 def get_validation_segment_length_string(valseglen: int) -> str:
-    valseglen = "none" if valseglen == -1 else str(valseglen)
+    valseglen = "None" if valseglen == -1 else str(valseglen)
     return valseglen
 
 
