@@ -16,6 +16,8 @@ def _get_base_metadata(args):
         raise FileNotFoundError(f"Directory {data_dir} does not exist.")
 
     fnames = [f"subj-{i:02}.mat" for i in args.subj_ids]
+
+    # TODO: build a dict instead, to keep a map of subj_id and file
     file_list = [data_dir.joinpath(f) for f in fnames]
 
     logging.info("Getting number of time series and sampling rate...")
