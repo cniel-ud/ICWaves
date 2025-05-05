@@ -59,7 +59,7 @@ def load_raw_train_set_per_class(args, rng):
     win_start = 0
     for i_subj, file in tqdm(file_dict.items()):
         with file.open("rb") as f:
-            matdict = loadmat(f, variable_names="icaact")
+            matdict = loadmat(f)
             data = matdict["data"]
             icaweights = matdict["icaweights"]
             icasphere = matdict["icasphere"]
