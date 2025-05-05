@@ -32,7 +32,7 @@ def load_raw_train_set_per_class(args, rng):
     for i_subj, file in zip(args.subj_ids, file_list):
         with file.open("rb") as f:
             matdict = loadmat(f, variable_names=["labels"])
-            labels = matdict["expert_labels"]
+            labels = matdict["labels"]
 
         ic_ind = (labels == args.class_label).nonzero()[0]
 
