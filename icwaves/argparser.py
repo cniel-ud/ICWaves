@@ -196,13 +196,6 @@ def create_argparser_train_dict():
         required=True,
     )
     parser.add_argument(
-        "--class-label",
-        type=int,
-        help="Class label to be used for training",
-        required=True,
-    )
-    # window_length
-    parser.add_argument(
         "--window-length",
         type=float,
         default=1.5,
@@ -260,6 +253,12 @@ def create_argparser_train_dict_config():
         type=int,
         default=1,
         help="Value for n_jobs (sklearn)",
+    )
+    parser.add_argument(
+        "--class-label",
+        type=int,
+        help="Class label to be used for training",
+        required=True,
     )
 
     return parser
