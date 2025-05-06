@@ -1,7 +1,6 @@
 # imports
 import scipy
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.io import loadmat
 from scipy.signal import butter, sosfilt, welch, freqz, sosfreqz, filtfilt, lfilter
@@ -263,6 +262,9 @@ def transform_data_subj_subj(data, time_filter_subj_subj):
 def main(make_psds=False):
     """
     If first time running, set make_psds to True. Otherwise don't re-generate every time.
+
+
+    Slightly modified this script to get the per subj filters for emotion. So Carlos can train a new clf on it.
     """
 
     # note emotion dataset missing 22
@@ -278,15 +280,15 @@ def main(make_psds=False):
     # grab raw data
     emotion_data = []
     for subj in emotion_subj_list:
-      emotion_data.append(loadmat(emotion_filepath / f'subj-{subj}.mat')['data'])
+        emotion_data.append(loadmat(emotion_filepath / f'subj-{subj}.mat')['data'])
 
     frolich_data = []
     for subj in frolich_subj_list:
-      frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
+        frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
 
     if make_psds:
-      (emotion_filepath / 'psds').mkdir(parents=True, exist_ok=True)
-      (frolich_filepath / 'psds').mkdir(parents=True, exist_ok=True)
+        (emotion_filepath / 'psds').mkdir(parents=True, exist_ok=True)
+        (frolich_filepath / 'psds').mkdir(parents=True, exist_ok=True)
 
     for i, subj in enumerate(emotion_data):
         f, Pxx = psd(subj)
@@ -300,12 +302,12 @@ def main(make_psds=False):
     frolich_data_psds_raw = []
 
     if (emotion_filepath / 'psds').exists():
-      for subj in emotion_subj_list:
-          emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
+        for subj in emotion_subj_list:
+            emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
 
     if (frolich_filepath / 'psds').exists():
-      for subj in frolich_subj_list:
-          frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
+        for subj in frolich_subj_list:
+            frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
 
 
     # compute normed barycenter
@@ -336,6 +338,19 @@ def main(make_psds=False):
 
     for i, filter in enumerate(time_filter_subj_subj):
         np.savez(save_path / f'frolich_subj_subj_time_filter_{frolich_subj_list[i]}.npz', filter)
+
+
+    # below also computing the emotion filters to its own barycenter. for training a new clf. original CMMN paper formulation 
+    
+    freq_filter_emotion, time_filter_emotion = compute_filter_original(emotion_data, normed_emotion_barycenter)
+
+    # save emotion filters
+    for i, filter in enumerate(freq_filter_emotion):
+        np.savez(save_path / f'emotion_original_freq_filter_{emotion_subj_list[i]}.npz', filter)
+
+    for i, filter in enumerate(time_filter_emotion):
+        np.savez(save_path / f'emotion_original_time_filter_{emotion_subj_list[i]}.npz', filter)
+
 
 
 

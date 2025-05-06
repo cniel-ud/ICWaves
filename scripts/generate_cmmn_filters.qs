@@ -11,8 +11,8 @@
 #SBATCH --mem=128G
 #export UD_JOB_EXIT_FN_SIGNALS="SIGTERM EXIT"
 
-vpkg_devrequire anaconda/5.2.0:python3
-source activate /work/cniel/ajmeek/ICWaves/venv/
+vpkg_devrequire intel-python
+source ../venv/bin/activate
 
 # Run bash / python script below
 
