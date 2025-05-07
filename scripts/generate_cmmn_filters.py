@@ -310,6 +310,7 @@ def main(make_psds=False):
     emotion_data_psds_raw = []
     frolich_data_psds_raw = []
 
+    print('Loading PSDs...')
     if (emotion_filepath / 'psds').exists():
         for subj in emotion_subj_list:
             emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
@@ -331,6 +332,7 @@ def main(make_psds=False):
     freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter)
 
     # save filters
+    print('Saving filters for frolich original method...')
     for i, filter in enumerate(freq_filter):
         np.savez(save_path / f'frolich_original_freq_filter_{frolich_subj_list[i]}.npz', filter)
 
@@ -343,6 +345,7 @@ def main(make_psds=False):
     freq_filter_subj_subj, time_filter_subj_subj = compute_filter_subj_subj(frolich_data_psds_raw, emotion_data_psds_raw, subj_subj_matches)
 
     # save subj-subj filters
+    print('Saving filters for frolich subj-subj method...')
     for i, filter in enumerate(freq_filter_subj_subj):
         np.savez(save_path / f'frolich_subj_subj_freq_filter_{frolich_subj_list[i]}.npz', filter)
 
@@ -355,6 +358,7 @@ def main(make_psds=False):
     freq_filter_emotion, time_filter_emotion = compute_filter_original(emotion_data, normed_emotion_barycenter)
 
     # save emotion filters
+    print('Saving filters for emotion original method...')
     for i, filter in enumerate(freq_filter_emotion):
         np.savez(save_path / f'emotion_original_freq_filter_{emotion_subj_list[i]}.npz', filter)
 
@@ -366,6 +370,7 @@ def main(make_psds=False):
     freq_filter_emotion_unnormed, time_filter_emotion_unnormed = compute_filter_original(emotion_data, unnormed_emotion_barycenter)
 
     # save unnormalized emotion filters
+    print('Saving filters for emotion original method (unnormalized)...')
     for i, filter in enumerate(freq_filter_emotion_unnormed):
         np.savez(save_path / f'emotion_original_freq_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
     
