@@ -28,7 +28,7 @@ def psd(data, fs=256, nperseg=256):
     f, Pxx = welch(data, fs=fs, nperseg=nperseg)
     return f, Pxx
 
-def compute_normed_barycenter(data, psds=None):
+def compute_normed_barycenter(data, psds=None, normalize=True):
   """
 
   """
@@ -40,9 +40,15 @@ def compute_normed_barycenter(data, psds=None):
       if psds is None:
           f, Pxx = psd(subj)
           psds.append(Pxx)
-          normalized_psds.append(Pxx / np.sum(Pxx))
+          if normalize:
+            normalized_psds.append(Pxx / np.sum(Pxx))
+          else:
+            normalized_psds.append(Pxx)
       else:
-          normalized_psds.append(psds[i] / np.sum(psds[i]))
+          if normalize:
+            normalized_psds.append(psds[i] / np.sum(psds[i]))
+          else:
+            normalized_psds.append(psds[i])
 
   # now average all together
   per_subj_avgs = []
@@ -287,14 +293,17 @@ def main(make_psds=False):
         frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
 
     if make_psds:
-        (emotion_filepath / 'psds').mkdir(parents=True, exist_ok=True)
-        (frolich_filepath / 'psds').mkdir(parents=True, exist_ok=True)
 
-    for i, subj in enumerate(emotion_data):
+      # note, these psds are not normalized.
+
+      (emotion_filepath / 'psds').mkdir(parents=True, exist_ok=True)
+      (frolich_filepath / 'psds').mkdir(parents=True, exist_ok=True)
+
+      for i, subj in enumerate(emotion_data):
         f, Pxx = psd(subj)
         np.savez(emotion_filepath / 'psds' / f'subj-{emotion_subj_list[i]}_psds', Pxx)
 
-    for i, subj in enumerate(frolich_data):
+      for i, subj in enumerate(frolich_data):
         f, Pxx = psd(subj)
         np.savez(frolich_filepath / 'psds' / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds', Pxx)
 
@@ -311,7 +320,8 @@ def main(make_psds=False):
 
 
     # compute normed barycenter
-    normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=emotion_data_psds_raw)
+    normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=emotion_data_psds_raw, normalize=True)
+    unnormed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=emotion_data_psds_raw, normalize=False)
 
     # compute filters and save them
     save_path = Path('../data/frolich_filters')
@@ -352,6 +362,16 @@ def main(make_psds=False):
         np.savez(save_path / f'emotion_original_time_filter_{emotion_subj_list[i]}.npz', filter)
 
 
+    # compute unnormalized emotion filters
+    freq_filter_emotion_unnormed, time_filter_emotion_unnormed = compute_filter_original(emotion_data, unnormed_emotion_barycenter)
+
+    # save unnormalized emotion filters
+    for i, filter in enumerate(freq_filter_emotion_unnormed):
+        np.savez(save_path / f'emotion_original_freq_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
+    
+    for i, filter in enumerate(time_filter_emotion_unnormed):
+        np.savez(save_path / f'emotion_original_time_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
+        
 
 
 if __name__ == "__main__":
