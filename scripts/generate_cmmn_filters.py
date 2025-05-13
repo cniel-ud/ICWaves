@@ -11,7 +11,7 @@ from typing import List, Tuple
 
 # all helper functions from gdrive notebook here. I know this is messy right now
 
-def psd(data, fs=256, nperseg=256):
+def psd(data, fs=256, nperseg=256, normalize=False):
     """
     Compute the Power Spectral Density (PSD) of the given data.
 
@@ -26,6 +26,13 @@ def psd(data, fs=256, nperseg=256):
     """
 
     f, Pxx = welch(data, fs=fs, nperseg=nperseg)
+
+    # note, when normalizing, I'm normalizing the average PSD per subj. So I'm collapsing the channels.
+    # this is because we're not assuming a channel - channel correspondence between domains.
+    if normalize:
+      average_psd = np.mean(Pxx, axis=0)
+      Pxx = average_psd / np.sum(average_psd)
+
     return f, Pxx
 
 def compute_normed_barycenter(data, psds=None, normalize=True):
@@ -37,7 +44,7 @@ def compute_normed_barycenter(data, psds=None, normalize=True):
   if psds is None:
     psds = []
   for i, subj in enumerate(data):
-      if psds is None:
+      if psds is None: # note: I'm always passing psds, so in practice we aren't calculating psds here.
           f, Pxx = psd(subj)
           psds.append(Pxx)
           if normalize:
@@ -65,8 +72,9 @@ def compute_filter_original(data, barycenter, psds=None):
   Compute the filter to transform the given data to the barycenter.
 
   Parameters:
-  - data: list of numpy arrays, each containing EEG data for a subject in the target data (cue / frolich here)
+  - data: list of numpy arrays, each containing EEG data for a subject in the target data (cue / frolich here) (note: only used when no psds are provided)
   - barycenter: numpy array containing the normed barycenter of the data
+  - psds: list of numpy arrays, each containing the PSD of the data for a subject in the target data. shape (n_channels, n_freqs)
 
   Returns:
   - freq_filter: numpy array containing the filter in the frequency domain
@@ -80,9 +88,21 @@ def compute_filter_original(data, barycenter, psds=None):
         psds.append(Pxx)
 
   # here we collapse channels down. our paradigm does not include channel - channel correspondence between domains
-  avg_psds_per_subj = [
-    np.mean(subj, axis=0) for subj in psds
-  ]
+  # only do if not already averaged
+  if psds[0].ndim > 1:
+    avg_psds_per_subj = [
+      np.mean(subj, axis=0) for subj in psds
+    ]
+  else:
+    avg_psds_per_subj = psds
+
+  # change of plans - normalize before passing here. 
+  # if normalize_psds:
+  #   avg_psds_per_subj_normed = [
+  #     avg_psd_per_subj / np.sum(avg_psd_per_subj) for avg_psd_per_subj in avg_psds_per_subj
+  #   ]
+
+  # avg_psds_per_subj = avg_psds_per_subj_normed if normalize_psds else avg_psds_per_subj
 
   # computing filters now. irfft
   freq_filter_per_subj = []
@@ -307,8 +327,24 @@ def main(make_psds=False):
         f, Pxx = psd(subj)
         np.savez(frolich_filepath / 'psds' / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds', Pxx)
 
+      # also make normed psds
+      (emotion_filepath / 'psds_normed').mkdir(parents=True, exist_ok=True)
+      (frolich_filepath / 'psds_normed').mkdir(parents=True, exist_ok=True)
+
+      for i, subj in enumerate(emotion_data):
+        f, Pxx = psd(subj, normalize=True)
+        np.savez(emotion_filepath / 'psds_normed' / f'subj-{emotion_subj_list[i]}_psds_normed', Pxx)
+
+      for i, subj in enumerate(frolich_data):
+        f, Pxx = psd(subj, normalize=True)
+        np.savez(frolich_filepath / 'psds_normed' / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds_normed', Pxx)
+        
+
     emotion_data_psds_raw = []
     frolich_data_psds_raw = []
+
+    emotion_data_psds_normed = []
+    frolich_data_psds_normed = []
 
     if (emotion_filepath / 'psds').exists():
         for subj in emotion_subj_list:
@@ -318,8 +354,17 @@ def main(make_psds=False):
         for subj in frolich_subj_list:
             frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
 
+    if (emotion_filepath / 'psds_normed').exists():
+        for subj in emotion_subj_list:
+            emotion_data_psds_normed.append(np.load(emotion_filepath / 'psds_normed' / f'subj-{subj}_psds_normed.npz')['arr_0'])
+
+    if (frolich_filepath / 'psds_normed').exists():
+        for subj in frolich_subj_list:
+            frolich_data_psds_normed.append(np.load(frolich_filepath / 'psds_normed' / f'frolich_extract_{subj}_256_hz_psds_normed.npz')['arr_0'])
+
 
     # compute normed barycenter
+    # changed to save both of these now for future viz
     normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=emotion_data_psds_raw, normalize=True)
     unnormed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=emotion_data_psds_raw, normalize=False)
 
@@ -332,6 +377,7 @@ def main(make_psds=False):
     np.savez(save_path / 'emotion_unnormed_barycenter.npz', unnormed_emotion_barycenter)
 
     # compute original filter
+    # unnormed psds, normed barycenter
     freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter)
 
     # save filters
@@ -343,6 +389,7 @@ def main(make_psds=False):
 
     
     # compute subj-subj filter
+    # unnormed psds, no barycenter
     subj_subj_matches = subj_subj_matching(emotion_data_psds_raw, frolich_data_psds_raw)
     freq_filter_subj_subj, time_filter_subj_subj = compute_filter_subj_subj(frolich_data_psds_raw, emotion_data_psds_raw, subj_subj_matches)
 
@@ -355,7 +402,7 @@ def main(make_psds=False):
 
 
     # below also computing the emotion filters to its own barycenter. for training a new clf. original CMMN paper formulation 
-    
+    # unnormed psds, normed barycenter
     freq_filter_emotion, time_filter_emotion = compute_filter_original(emotion_data, normed_emotion_barycenter)
 
     # save emotion filters
@@ -367,6 +414,7 @@ def main(make_psds=False):
 
 
     # compute unnormalized emotion filters
+    # unnormed psds, unnormed barycenter - this gave funky filters
     freq_filter_emotion_unnormed, time_filter_emotion_unnormed = compute_filter_original(emotion_data, unnormed_emotion_barycenter)
 
     # save unnormalized emotion filters
@@ -375,6 +423,19 @@ def main(make_psds=False):
     
     for i, filter in enumerate(time_filter_emotion_unnormed):
         np.savez(save_path / f'emotion_original_time_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
+
+
+
+    # now also compute filters for emotion -> emotion using both normed psds and normed barycenter
+    # normed psds, normed barycenter
+    freq_filter_emotion_normed_psds, time_filter_emotion_normed_psds = compute_filter_original(emotion_data, normed_emotion_barycenter, psds=emotion_data_psds_normed)
+
+    # save normed psds emotion filters
+    for i, filter in enumerate(freq_filter_emotion_normed_psds):
+        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_freq_filter_{emotion_subj_list[i]}.npz', filter)
+
+    for i, filter in enumerate(time_filter_emotion_normed_psds):
+        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_time_filter_{emotion_subj_list[i]}.npz', filter)
         
 
 
