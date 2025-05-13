@@ -327,6 +327,10 @@ def main(make_psds=False):
     save_path = Path('../data/frolich_filters')
     save_path.mkdir(parents=True, exist_ok=True)
 
+    # save both the normed and unnormed barycenters
+    np.savez(save_path / 'emotion_normed_barycenter.npz', normed_emotion_barycenter)
+    np.savez(save_path / 'emotion_unnormed_barycenter.npz', unnormed_emotion_barycenter)
+
     # compute original filter
     freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter)
 
