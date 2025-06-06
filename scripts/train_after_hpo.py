@@ -10,7 +10,11 @@ import sklearn
 from sklearn.base import clone
 
 from icwaves.factories import create_estimator
-from icwaves.file_utils import read_args_from_file
+from icwaves.file_utils import (
+    get_cmmn_suffix,
+    get_validation_segment_length_string,
+    read_args_from_file,
+)
 from icwaves.model_selection.hpo_utils import (
     process_candidate_results,
     get_base_parameters,
@@ -20,7 +24,7 @@ from icwaves.argparser import (
     create_argparser_aggregate_results,
     create_argparser_all_params,
 )
-from icwaves.data.loading import get_data_and_feature_extractor
+from icwaves.data.loading import get_feature_extractor, load_data_bundles
 
 
 def train_final_model(
@@ -104,7 +108,7 @@ if __name__ == "__main__":
     agg_args = parser.parse_args()
     args_list = read_args_from_file(agg_args.path_to_config_file)
     all_params_parser = create_argparser_all_params(agg_args.feature_extractor)
-    args = all_params_parser.parse_args(args_list)
+    args, _ = all_params_parser.parse_known_args(args_list)
     args.feature_extractor = agg_args.feature_extractor
 
     # Setup RNG
@@ -112,7 +116,8 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load or prepare data based on feature extractor type
-    data_bundles, feature_extractor = get_data_and_feature_extractor(args)
+    data_bundles = load_data_bundles(args)
+    feature_extractor = get_feature_extractor(args.feature_extractor, data_bundles)
 
     data_bundle = (
         data_bundles["bowav"]
@@ -154,14 +159,13 @@ if __name__ == "__main__":
     )
 
     # Save final model and results
-    valseglen = (
-        "None"
-        if args.validation_segment_length == -1
-        else int(args.validation_segment_length)
+    valseglen = get_validation_segment_length_string(
+        int(args.validation_segment_length)
     )
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
     results_file = Path(
         args.path_to_results,
-        f"train_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}.pkl",
+        f"train_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}.pkl",
     )
     with results_file.open("wb") as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)

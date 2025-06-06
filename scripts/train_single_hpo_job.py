@@ -12,12 +12,16 @@ from icwaves.factories import create_estimator
 from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
 from icwaves.model_selection.job_utils import get_job_parameters
-from icwaves.file_utils import read_args_from_file
+from icwaves.file_utils import (
+    get_cmmn_suffix,
+    get_validation_segment_length_string,
+    read_args_from_file,
+)
 from icwaves.argparser import (
     create_argparser_all_params,
     create_argparser_one_parameter_one_split,
 )
-from icwaves.data.loading import get_data_and_feature_extractor
+from icwaves.data.loading import get_feature_extractor, load_data_bundles
 from icwaves.model_selection.hpo_utils import get_base_parameters, build_grid_parameters
 
 
@@ -34,7 +38,7 @@ if __name__ == "__main__":
     job_id = one_run_args.job_id
 
     all_params_parser = create_argparser_all_params(one_run_args.feature_extractor)
-    args = all_params_parser.parse_args(args_list)
+    args, _ = all_params_parser.parse_known_args(args_list)
     args.feature_extractor = one_run_args.feature_extractor
 
     # Setup RNG
@@ -42,7 +46,8 @@ if __name__ == "__main__":
     old_rng = np.random.RandomState(13)
 
     # Load or prepare data based on feature extractor type
-    data_bundles, feature_extractor = get_data_and_feature_extractor(args)
+    data_bundles = load_data_bundles(args)
+    feature_extractor = get_feature_extractor(args.feature_extractor, data_bundles)
 
     # the DataBundle for bowav and psd_autocorr only differs in the `data` attribute
     # TODO: find a more efficient way of doing this
@@ -67,6 +72,25 @@ if __name__ == "__main__":
     logging.info(f"candidate_index: {job_params.candidate_index}")
     logging.info(f"split_index: {job_params.split_index}")
 
+    valseglen = get_validation_segment_length_string(
+        int(args.validation_segment_length)
+    )
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+
+    results_folder = Path(
+        args.path_to_results,
+        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}",
+    )
+    results_folder.mkdir(parents=True, exist_ok=True)
+
+    results_file = results_folder.joinpath(
+        f"candidate_{job_params.candidate_index}_split_{job_params.split_index}.pkl"
+    )
+
+    if results_file.exists():
+        logging.info(f"Results file {results_file} already exists. Skipping.")
+        exit(0)
+
     X = {k: v.data for k, v in data_bundles.items()}
     result = _fit_and_score(
         clf,
@@ -80,21 +104,6 @@ if __name__ == "__main__":
         feature_extractor=feature_extractor,
         split_progress=(job_params.split_index, job_params.n_splits),
         candidate_progress=(job_params.candidate_index, job_params.n_candidates),
-    )
-
-    valseglen = (
-        "None"
-        if args.validation_segment_length == -1
-        else int(args.validation_segment_length)
-    )
-    results_folder = Path(
-        args.path_to_results,
-        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}",
-    )
-    results_folder.mkdir(exist_ok=True, parents=True)
-
-    results_file = results_folder.joinpath(
-        f"candidate_{job_params.candidate_index}_split_{job_params.split_index}.pkl"
     )
 
     if job_id == 0:

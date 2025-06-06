@@ -5,7 +5,7 @@ to the sampling rate of the 'cue' dataset (500 Hz).
 """
 
 import numpy as np
-from scipy.signal import resample, resample_poly
+from scipy.signal import resample_poly
 from pathlib import Path
 import matplotlib.pyplot as plt
 

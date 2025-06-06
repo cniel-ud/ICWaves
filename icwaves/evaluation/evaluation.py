@@ -13,7 +13,7 @@ from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import get_validation_segment_length_string
+from icwaves.file_utils import get_validation_segment_length_string, get_cmmn_suffix
 
 
 def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
@@ -32,21 +32,37 @@ def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
     return clf, best_params
 
 
-def _should_skip_segment(val_segment_len, train_segment_length, aggregation_method):
-    if aggregation_method == "majority_vote":
-        return any(
-            val_segment_len[k] < train_segment_length[k] for k in val_segment_len.keys()
-        )
+def _should_skip_segment(val_segment_len, train_segment_len, agg_method):
+    """
+    The keys in val_segment_len and train_segment_len will always be individual feature
+    types (e.g., "bowav", "psd_autocorr"). The keys in agg_method can be either individual
+    feature types or concatenated (e.g., "bowav_psd_autocorr").
+    """
+    seg_len_keys = list(val_segment_len.keys())
+    agg_method_keys = list(agg_method.keys())
+    if len(seg_len_keys) == len(agg_method_keys):
+        for k in seg_len_keys:
+            if agg_method[k] == "majority_vote":
+                if val_segment_len[k] < train_segment_len[k]:
+                    return True
+
+    else:  # len(seg_len_keys) > len(agg_method_keys)
+        agg_key = agg_method_keys[0]
+        for k in seg_len_keys:
+            if agg_method[agg_key] == "majority_vote":
+                if val_segment_len[k] < train_segment_len[k]:
+                    return True
+
     return False
 
 
 def eval_classifier_per_subject_brain_F1(
     config: EvalConfig,
-    clf: BaseEstimator,
-    feature_extractor: Callable,
+    clf: dict[str, BaseEstimator],
+    feature_extractor: dict[str, Callable],
     validation_segment_lengths: np.ndarray,
     data_bundles: dict[str, DataBundle],
-    input_or_output_aggregation_method: str,
+    input_or_output_aggregation_method: dict[str, str],
     training_segment_length: dict[str, int],
 ) -> pd.DataFrame:
     """Evaluate classifier performance across different time windows.
@@ -68,9 +84,10 @@ def eval_classifier_per_subject_brain_F1(
     valseglen = get_validation_segment_length_string(
         int(config.validation_segment_length)
     )
+    cmmn_suffix = get_cmmn_suffix(config.cmmn_filter, config.is_cmmn_filter_resampled)
     results_file = (
         results_path
-        / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}.csv"
+        / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}{cmmn_suffix}.csv"
     )
 
     # Try to load cached results if they exist
@@ -140,12 +157,17 @@ def eval_classifier_per_subject_brain_F1(
                     pbar.update(1)
         results_df.to_csv(results_file, index=False)
 
+    # TODO: move this renaming of columns outside this function
     std_df = results_df.groupby("Prediction window [minutes]")["Brain F1 score"].std()
-    std_df = std_df.rename(f"StdDev - {config.feature_extractor}").reset_index()
+    std_df = std_df.rename(
+        f"StdDev - {config.feature_extractor} - cmmn-{config.cmmn_filter}"
+    ).reset_index()
     mean_df = (
         results_df.groupby("Prediction window [minutes]")["Brain F1 score"]
         .mean()
-        .rename(f"Brain F1 score - {config.feature_extractor}")
+        .rename(
+            f"Brain F1 score - {config.feature_extractor} - cmmn-{config.cmmn_filter}"
+        )
         .reset_index()
     )
     mean_and_std_df = pd.merge(std_df, mean_df, on="Prediction window [minutes]")
