@@ -67,10 +67,14 @@ if __name__ == "__main__":
     job_params = get_job_parameters(job_id, data_bundle, cv, candidate_params)
     # '0' is the 'brain' class. We want to compute the F1-score for this class only.
     job_params.parameters["scorer_kwargs"] = {"labels": [0], "average": None}
+    n_candidates = job_params.n_candidates
+    n_splits = job_params.n_splits
 
     # log candidate and split id
-    logging.info(f"candidate_index: {job_params.candidate_index}")
-    logging.info(f"split_index: {job_params.split_index}")
+    logging.info(
+        f"candidate_index: {job_params.candidate_index}, out of {n_candidates} candidates"
+    )
+    logging.info(f"split_index: {job_params.split_index}, out of {n_splits} splits")
 
     valseglen = get_validation_segment_length_string(
         int(args.validation_segment_length)
@@ -81,11 +85,10 @@ if __name__ == "__main__":
         args.path_to_results,
         f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}",
     )
+    results_folder = results_folder.joinpath(f"candidate_{job_params.candidate_index}")
     results_folder.mkdir(parents=True, exist_ok=True)
 
-    results_file = results_folder.joinpath(
-        f"candidate_{job_params.candidate_index}_split_{job_params.split_index}.pkl"
-    )
+    results_file = results_folder.joinpath(f"split_{job_params.split_index}.pkl")
 
     if results_file.exists():
         logging.info(f"Results file {results_file} already exists. Skipping.")

@@ -95,8 +95,9 @@ def load_candidate_results(results_path, n_candidates, n_splits):
     all_out = []
     for candidate_idx in range(n_candidates):
         for split_idx in range(n_splits):
+
             file = results_path.joinpath(
-                f"candidate_{candidate_idx}_split_{split_idx}.pkl"
+                f"candidate_{candidate_idx}", f"split_{split_idx}.pkl"
             )
             with open(file, "rb") as f:
                 all_out.append(pickle.load(f))
