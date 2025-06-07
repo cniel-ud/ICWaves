@@ -13,34 +13,34 @@ import numpy.typing as npt
 
 def create_estimator(
     classifier_name: str, feature_extractor: str, **kwargs
-) -> Union[Pipeline, RandomForestClassifier]:
+) -> Union[Pipeline, LogisticRegression, RandomForestClassifier]:
     """Create a classifier instance based on name."""
-    if classifier_name == "logistic":
-        if feature_extractor == "bowav":
-            clf = Pipeline(
-                [
-                    ("scaler", TfidfTransformer()),
-                    ("clf", LogisticRegression()),
-                ]
-            )
-            clf_params = dict(
-                clf__penalty=kwargs["penalty"],
-                clf__max_iter=kwargs["max_iter"],
-                clf__random_state=kwargs["random_state"],
-                clf__class_weight=kwargs["class_weight"],
-                clf__solver=kwargs["solver"],
-                clf__warm_start=kwargs["warm_start"],
-                clf__multi_class=kwargs["multi_class"],
-            )
-            clf.set_params(**clf_params)
-        elif feature_extractor == "psd_autocorr":
-            clf = LogisticRegression(**kwargs)
-        else:
-            raise ValueError(f"Unsupported feature extractor: {feature_extractor}")
-    elif classifier_name == "random_forest":
-        clf = RandomForestClassifier(**kwargs)
-    else:
+    if classifier_name not in ["logistic", "random_forest"]:
         raise ValueError(f"Unsupported classifier: {classifier_name}")
+
+    if feature_extractor == "bowav":
+        # Use TfidfTransformer for both logistic regression and random forest with bowav
+        classifier = (
+            LogisticRegression()
+            if classifier_name == "logistic"
+            else RandomForestClassifier()
+        )
+        clf = Pipeline(
+            [
+                ("scaler", TfidfTransformer()),
+                ("clf", classifier),
+            ]
+        )
+        params = {f"clf__{k}": v for k, v in kwargs.items()}
+        clf.set_params(**params)
+    elif feature_extractor == "psd_autocorr":
+        clf = (
+            LogisticRegression(**kwargs)
+            if classifier_name == "logistic"
+            else RandomForestClassifier(**kwargs)
+        )
+    else:
+        raise ValueError(f"Unsupported feature extractor: {feature_extractor}")
 
     return clf
 

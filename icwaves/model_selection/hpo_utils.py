@@ -36,11 +36,12 @@ def get_base_parameters(args, rng):
 
 
 def build_grid_parameters(args, srate):
-    candidate_params = {}
-    candidate_params["input_or_output_aggregation_method"] = [
-        "count_pooling",
-        "majority_vote",
-    ]
+    candidate_params = {
+        "input_or_output_aggregation_method": ["count_pooling", "majority_vote"],
+        "expert_weight": args.expert_weight,
+    }
+
+    # Handle segment lengths
     window_length = args.window_length if "bowav" in args.feature_extractor else None
     candidate_params["training_segment_length"] = convert_segment_length(
         args.training_segment_length, args.feature_extractor, srate, window_length
@@ -48,19 +49,22 @@ def build_grid_parameters(args, srate):
     candidate_params["validation_segment_length"] = convert_segment_length(
         args.validation_segment_length, args.feature_extractor, srate, window_length
     )
-    candidate_params["expert_weight"] = args.expert_weight
+
+    # Set classifier-specific parameters with appropriate prefixes
+    is_bowav = args.feature_extractor == "bowav"
+    prefix = "clf__" if is_bowav else ""
+
+    if is_bowav:
+        # Apply TF-IDF parameters for both classifiers with bowav
+        candidate_params["scaler__norm"] = [
+            TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+        ]
+
     if args.classifier_type == "logistic":
-        if args.feature_extractor == "bowav":
-            candidate_params["clf__C"] = args.regularization_factor
-            candidate_params["clf__l1_ratio"] = args.l1_ratio
-            candidate_params["scaler__norm"] = [
-                TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
-            ]
-        else:
-            candidate_params["C"] = args.regularization_factor
-            candidate_params["l1_ratio"] = args.l1_ratio
+        candidate_params[f"{prefix}C"] = args.regularization_factor
+        candidate_params[f"{prefix}l1_ratio"] = args.l1_ratio
     elif args.classifier_type == "random_forest":
-        candidate_params["min_samples_split"] = args.min_samples_split
+        candidate_params[f"{prefix}min_samples_split"] = args.min_samples_split
 
     candidate_params = list(ParameterGrid(candidate_params))
 
