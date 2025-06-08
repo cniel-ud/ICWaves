@@ -60,6 +60,10 @@ if __name__ == "__main__":
     # Create cross-validation splitter
     cv = LeaveOneSubjectOutExpertOnly(data_bundle.expert_label_mask)
     params = get_base_parameters(args, old_rng)
+    # n_codebooks and n_centroids are needed to build the estimator for
+    # the bowav_psd_autocorr feature
+    params["n_codebooks"] = 7  # number of ICLabel classes
+    params["n_centroids"] = data_bundle.n_centroids
     clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
     logging.info(f"clf: {clf}")
     candidate_params = build_grid_parameters(args, data_bundle.srate)
@@ -111,7 +115,7 @@ if __name__ == "__main__":
 
     if job_id == 0:
         # Save a copy of the config file in the results directory
-        shutil.copy(one_run_args.path_to_config_file, results_folder)
+        shutil.copy(one_run_args.path_to_config_file, results_folder.parent)
 
     # Add to results the version of scikit-learn, numpy, and
     # scipy to improve reproducibility

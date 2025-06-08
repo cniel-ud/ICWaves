@@ -50,16 +50,22 @@ def build_grid_parameters(args, srate):
         args.validation_segment_length, args.feature_extractor, srate, window_length
     )
 
-    # Set classifier-specific parameters with appropriate prefixes
-    is_bowav = args.feature_extractor == "bowav"
-    prefix = "clf__" if is_bowav else ""
+    # Determine if we need to use a pipeline prefix for classifier parameters
+    # Pipeline is used for bowav and bowav_psd_autocorr feature extractors
+    uses_pipeline = args.feature_extractor in ["bowav", "bowav_psd_autocorr"]
+    prefix = "clf__" if uses_pipeline else ""
 
-    if is_bowav:
-        # Apply TF-IDF parameters for both classifiers with bowav
+    # Apply TF-IDF parameters for feature extractors that use it
+    if args.feature_extractor == "bowav":
         candidate_params["scaler__norm"] = [
             TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
         ]
+    elif args.feature_extractor == "bowav_psd_autocorr":
+        candidate_params["scaler__bowav__norm"] = [
+            TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+        ]
 
+    # Add classifier-specific parameters with appropriate prefixes
     if args.classifier_type == "logistic":
         candidate_params[f"{prefix}C"] = args.regularization_factor
         candidate_params[f"{prefix}l1_ratio"] = args.l1_ratio

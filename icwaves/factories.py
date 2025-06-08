@@ -9,6 +9,34 @@ from .feature_extractors.bowav import build_bowav_from_centroid_assignments
 from .feature_extractors.iclabel_features import get_iclabel_features_per_segment
 import numpy as np
 import numpy.typing as npt
+from sklearn.compose import ColumnTransformer
+
+
+def _get_classifier(classifier_name: str):
+    """Create a classifier based on name."""
+    return (
+        LogisticRegression()
+        if classifier_name == "logistic"
+        else RandomForestClassifier()
+    )
+
+
+def _filter_classifier_kwargs(kwargs: dict) -> dict:
+    """Remove parameters not meant for the classifier."""
+    return {k: v for k, v in kwargs.items() if k not in ["n_codebooks", "n_centroids"]}
+
+
+def _create_pipeline(scaler, classifier, clf_kwargs: dict) -> Pipeline:
+    """Create and configure a pipeline with a scaler and classifier."""
+    pipeline = Pipeline(
+        [
+            ("scaler", scaler),
+            ("clf", classifier),
+        ]
+    )
+    params = {f"clf__{k}": v for k, v in clf_kwargs.items()}
+    pipeline.set_params(**params)
+    return pipeline
 
 
 def create_estimator(
@@ -18,27 +46,28 @@ def create_estimator(
     if classifier_name not in ["logistic", "random_forest"]:
         raise ValueError(f"Unsupported classifier: {classifier_name}")
 
+    classifier = _get_classifier(classifier_name)
+    clf_kwargs = _filter_classifier_kwargs(kwargs)
+
     if feature_extractor == "bowav":
         # Use TfidfTransformer for both logistic regression and random forest with bowav
-        classifier = (
-            LogisticRegression()
-            if classifier_name == "logistic"
-            else RandomForestClassifier()
-        )
-        clf = Pipeline(
-            [
-                ("scaler", TfidfTransformer()),
-                ("clf", classifier),
-            ]
-        )
-        params = {f"clf__{k}": v for k, v in kwargs.items()}
-        clf.set_params(**params)
+        clf = _create_pipeline(TfidfTransformer(), classifier, clf_kwargs)
     elif feature_extractor == "psd_autocorr":
-        clf = (
-            LogisticRegression(**kwargs)
-            if classifier_name == "logistic"
-            else RandomForestClassifier(**kwargs)
+        clf = classifier
+        clf.set_params(**clf_kwargs)
+    elif feature_extractor == "bowav_psd_autocorr":
+        # bowav_psd_autocorr is the concatenation of bowav and psd_autocorr
+        # we want to apply the TfidfTransformer only to bowav
+        # x = [x_{bowav} x_{psd_autocorr}], and len(x_{bowav}) = n_codebooks * n_centroids
+        bowav_feat_len = kwargs["n_codebooks"] * kwargs["n_centroids"]
+        scaler = ColumnTransformer(
+            [
+                ("bowav", TfidfTransformer(), slice(0, bowav_feat_len)),
+            ],
+            remainder="passthrough",
         )
+
+        clf = _create_pipeline(scaler, classifier, clf_kwargs)
     else:
         raise ValueError(f"Unsupported feature extractor: {feature_extractor}")
 
@@ -76,8 +105,6 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
             segment_len=segment_len["psd_autocorr"],
         )
 
-    # TODO: this concatenation is not performing any pre-scaling of bowav or psd_autocorr.
-    # For random forest, that is OK, but we will need to improve this if we want to use logistic regression.
     def bowav_psd_autocorr(time_series: dict[str, npt.ArrayLike], segment_len: int):
         bowav_features = bowav(time_series, segment_len)
         psd_autocorr_features = psd_autocorr(time_series, segment_len)
