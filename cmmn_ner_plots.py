@@ -635,7 +635,8 @@ if emotion_data_psds_normed:
 
 # %%
 # Use normed PSDs for barycenter computation
-psds_to_use = emotion_data_psds_normed if emotion_data_psds_normed else emotion_data_psds_raw
+#psds_to_use = emotion_data_psds_normed if emotion_data_psds_normed else emotion_data_psds_raw
+psds_to_use = emotion_data_psds_raw
 normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=psds_to_use)
 plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_barycenter.pdf')
 
