@@ -20,19 +20,9 @@ from scipy.signal import butter, sosfilt, welch, freqz, sosfreqz, filtfilt, lfil
 from scipy.fft import rfft, rfftfreq, irfft
 from typing import List, Tuple
 
-# %%
-# Full subject lists for HPC processing
-emotion_subj_list = [f'{i:02d}' for i in range(1, 36) if i != 22]  # 01-35 minus 22
-frolich_subj_list = [f'{i:02d}' for i in range(1, 13)]  # 01-12
 
-# Output directory for PDF figures
-output_dir = Path('./ner_figures')
-output_dir.mkdir(parents=True, exist_ok=True)
 
-# %%
-"""
-Below code grabs PSD for us and plots it. Note that this will give us PSD by channel. We'll want to be careful about that for broadcasting purposes.
-"""
+
 
 # %%
 def psd(data, fs=256, nperseg=256):
@@ -192,66 +182,7 @@ def plot_polysomnograph(data, channel_indices, fs=256, time_window=None, spacing
     
     plt.show()
 
-# %%
-"""
-Below will load in the data.
 
-Note that PSD computation is going to be the bulk of the notebook's runtime. We store the PSDs after the first run to help iterate faster.
-
-Additional note: The default runtime on Colab will crash when calculating PSDs for 4 subjects of both datasets at once. If you want to iterate on the PSDs, change the subject list or just use the ones I've preloaded.
-"""
-
-# %%
-make_psds = False # change to True if running the notebook for the first time.
-
-# HPC file paths
-data_dir = Path('data')
-emotion_filepath = data_dir / 'emotion_256' / 'raw_data_and_IC_labels'
-frolich_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz'
-
-# PSD file paths  
-emotion_normed_psd_filepath = emotion_filepath / 'psds_normed'
-frolich_normed_psd_filepath = frolich_filepath / 'psds_normed'
-
-emotion_raw_psd_filepath = emotion_filepath / 'psds'
-frolich_raw_psd_filepath = frolich_filepath / 'psds'
-
-# grab raw data
-emotion_data = []
-for subj in emotion_subj_list:
-  emotion_data.append(loadmat(emotion_filepath / f'subj-{subj}.mat')['data'])
-
-frolich_data = []
-for subj in frolich_subj_list:
-  frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
-
-if make_psds:
-  emotion_psd_filepath.mkdir(parents=True, exist_ok=True)
-  frolich_psd_filepath.mkdir(parents=True, exist_ok=True)
-
-  for i, subj in enumerate(emotion_data):
-    f, Pxx = psd(subj)
-    np.savez(emotion_filepath / 'psds' / f'subj-{emotion_subj_list[i]}_psds', Pxx)
-
-  for i, subj in enumerate(frolich_data):
-    f, Pxx = psd(subj)
-    np.savez(frolich_filepath / 'psds' / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds', Pxx)
-
-emotion_data_psds_raw = []
-frolich_data_psds_raw = []
-
-emotion_data_psds_normed = []
-frolich_data_psds_normed = []
-
-if (emotion_filepath / 'psds').exists():
-  for subj in emotion_subj_list:
-    emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
-
-if (frolich_filepath / 'psds').exists():
-  for subj in frolich_subj_list:
-    frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
-
-# %%
 
 # %%
 def compute_normed_barycenter(data, psds=None):
@@ -303,13 +234,6 @@ def plot_barycenter(barycenter, title='Normed Barycenter', save_path=None):
       print(f"Saved plot to {save_path}")
   
   plt.show()
-
-# %%
-"""
-Below are the filter computation portions. Remember to keep everything in the frequency domain, use irfft not ifft, etc.
-
-For the below, we also have a subj-subj filter computation function here.
-"""
 
 # %%
 def compute_filter_original(data, barycenter, psds=None):
@@ -526,14 +450,6 @@ def plot_time_filter(time_filter, fs=256, save_path=None):
   
   plt.show()
 
-# %%
-"""
-Below are the functions for transforming the data.
-
-The original paper transforms the target data to the barycenter of all source subjects. Their experiments relied on very small sleep stage EEG datasets, so this was not an issue for them. I have this as transform_original() below.
-
-We also do a subject-subject matching scheme, where we find the closest subject in the source dataset to the current subject in the target dataset, and then map to that subject specifically. This should retain more information. This is transform_subj_subj() below.
-"""
 
 # %%
 def transform_original(data, time_filter):
@@ -596,7 +512,85 @@ def transform_data_subj_subj(data, time_filter_subj_subj):
   return transformed_data
 
 
+
+
+
+
+
+# ----------------------------------------------------
+# above is util functions, below actually load and viz
 # %%
+# Full subject lists for HPC processing
+# right now I put this at 4 for quick testing. change soon
+emotion_subj_list = [f'{i:02d}' for i in range(1, 4) if i != 22]  # 01-35 minus 22
+frolich_subj_list = [f'{i:02d}' for i in range(1, 4)]  # 01-12
+
+# Output directory for PDF figures
+output_dir = Path('./ner_figures')
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# %%
+make_psds = False # change to True if running the notebook for the first time.
+
+# HPC file paths
+data_dir = Path('data')
+emotion_filepath = data_dir / 'emotion_256' / 'raw_data_and_IC_labels'
+frolich_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz'
+
+# PSD file paths  
+emotion_normed_psd_filepath = emotion_filepath / 'psds_normed'
+frolich_normed_psd_filepath = frolich_filepath / 'psds_normed'
+
+emotion_raw_psd_filepath = emotion_filepath / 'psds'
+frolich_raw_psd_filepath = frolich_filepath / 'psds'
+
+# grab raw data
+emotion_data = []
+for subj in emotion_subj_list:
+  emotion_data.append(loadmat(emotion_filepath / f'subj-{subj}.mat')['data'])
+
+frolich_data = []
+for subj in frolich_subj_list:
+  frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
+
+if make_psds:
+  emotion_psd_filepath.mkdir(parents=True, exist_ok=True)
+  frolich_psd_filepath.mkdir(parents=True, exist_ok=True)
+
+  for i, subj in enumerate(emotion_data):
+    f, Pxx = psd(subj)
+    np.savez(emotion_filepath / 'psds' / f'subj-{emotion_subj_list[i]}_psds', Pxx)
+
+  for i, subj in enumerate(frolich_data):
+    f, Pxx = psd(subj)
+    np.savez(frolich_filepath / 'psds' / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds', Pxx)
+
+emotion_data_psds_raw = []
+frolich_data_psds_raw = []
+
+emotion_data_psds_normed = []
+frolich_data_psds_normed = []
+
+if (emotion_filepath / 'psds').exists():
+  for subj in emotion_subj_list:
+    emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
+
+if (frolich_filepath / 'psds').exists():
+  for subj in frolich_subj_list:
+    frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
+
+# Load normed PSDs
+if emotion_normed_psd_filepath.exists():
+  for subj in emotion_subj_list:
+    emotion_data_psds_normed.append(np.load(emotion_normed_psd_filepath / f'subj-{subj}_psds_normed.npz')['arr_0'])
+
+if frolich_normed_psd_filepath.exists():
+  for subj in frolich_subj_list:
+    frolich_data_psds_normed.append(np.load(frolich_normed_psd_filepath / f'frolich_extract_{subj}_256_hz.npz')['arr_0'])
+
+
+
+
 """
 ## Frolich Filters Visualization
 
@@ -634,18 +628,27 @@ Below are plots of base data first, then the computation process.
 """
 
 # %%
-plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data', save_path=output_dir / 'emotion_psd.pdf')
+# Plot both raw and normed PSDs for comparison
+plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data - Raw PSDs', save_path=output_dir / 'emotion_psd_raw.pdf')
+if emotion_data_psds_normed:
+    plot_psd(emotion_data, psds=emotion_data_psds_normed, title='Emotion Data - Normed PSDs', save_path=output_dir / 'emotion_psd_normed.pdf')
 
 # %%
-normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=emotion_data_psds_raw)
+# Use normed PSDs for barycenter computation
+psds_to_use = emotion_data_psds_normed if emotion_data_psds_normed else emotion_data_psds_raw
+normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=psds_to_use)
 plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_barycenter.pdf')
 
 # %%
-plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Frolich Data', save_path=output_dir / 'frolich_psd.pdf')
+# Plot both raw and normed PSDs for Frolich data
+plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Frolich Data - Raw PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
+if frolich_data_psds_normed:
+    plot_psd(frolich_data, psds=frolich_data_psds_normed, title='Frolich Data - Normed PSDs', save_path=output_dir / 'frolich_psd_normed.pdf')
 
 # %%
-# Plotting filters for cue -> emotion
-freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter)
+# Plotting filters for cue -> emotion (using normed PSDs if available)
+frolich_psds_to_use = frolich_data_psds_normed if frolich_data_psds_normed else frolich_data_psds_raw
+freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter, psds=frolich_psds_to_use)
 
 # %%
 plot_freq_filter(freq_filter, save_path=output_dir / 'frolich_to_emotion_freq_filter.pdf')
@@ -680,9 +683,9 @@ plot_raw_signals([frolich_data[0]], title='Frolich Data', all_channels=True, sav
 plot_raw_signals([transformed_data[0]], title='Transformed Frolich Data', all_channels=True, save_path=output_dir / 'frolich_all_channels_transformed.pdf')
 
 # %%
-subj_subj_matches = subj_subj_matching(emotion_data_psds_raw, frolich_data_psds_raw)
+subj_subj_matches = subj_subj_matching(psds_to_use, frolich_psds_to_use)
 
-freq_filter_subj_subj, time_filter_subj_subj = compute_filter_subj_subj(frolich_data_psds_raw, emotion_data_psds_raw, subj_subj_matches)
+freq_filter_subj_subj, time_filter_subj_subj = compute_filter_subj_subj(frolich_psds_to_use, psds_to_use, subj_subj_matches)
 
 transformed_data_subj_subj = transform_data_subj_subj(frolich_data, time_filter_subj_subj)
 
@@ -709,6 +712,19 @@ print("VISUALIZATION COMPLETE!")
 print("="*60)
 print(f"All figures saved to: {output_dir}")
 print(f"Processed {len(emotion_subj_list)} emotion subjects and {len(frolich_subj_list)} Fröhlich subjects")
+
+# Print which PSDs were used
+print(f"\nPSD Usage:")
+if emotion_data_psds_normed:
+    print(f"  - Emotion: Using NORMED PSDs for processing")
+else:
+    print(f"  - Emotion: Using RAW PSDs (normed not found)")
+
+if frolich_data_psds_normed:
+    print(f"  - Fröhlich: Using NORMED PSDs for processing")
+else:
+    print(f"  - Fröhlich: Using RAW PSDs (normed not found)")
+
 print("\nFigures generated:")
 
 for fig_file in sorted(output_dir.glob("*.pdf")):
