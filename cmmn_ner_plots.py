@@ -537,6 +537,12 @@ data_dir = Path('data')
 emotion_filepath = data_dir / 'emotion_256' / 'raw_data_and_IC_labels'
 frolich_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz'
 
+emotion_transformed_filepath = data_dir / 'emotion_256' / 'emotion_data_cmmn'
+frolich_transformed_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn'
+emotion_transformed_psd_filepath = data_dir / 'emotion_256' / 'emotion_data_cmmn' / 'psds'
+frolich_transformed_subj_subj_psd_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn' / 'subj_subj_psds'
+frolich_transformed_original_psd_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn' / 'original_psds'
+
 # PSD file paths  
 emotion_normed_psd_filepath = emotion_filepath / 'psds_normed'
 frolich_normed_psd_filepath = frolich_filepath / 'psds_normed'
@@ -661,6 +667,63 @@ plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_norme
 
 
 
+
+
+# now I want to transform the data using the provided filters, store it in the transformed data file directories, and then calculate psds and whatnot
+
+# %%
+# transform the data using the provided filters
+for subj in frolich_subj_list:
+  time_filter = frolich_subj_subj_time_filters[subj]
+  transformed_data = transform_data_subj_subj(frolich_data[subj], time_filter)
+  np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn.npz', transformed_data)
+
+  # save psds
+  f, Pxx = psd(transformed_data)
+  np.savez(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz', Pxx)
+
+  # now filter with original filter
+  time_filter = frolich_original_time_filters[subj]
+  transformed_data = transform_original(frolich_data[subj], time_filter)
+  np.savez(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn.npz', transformed_data)
+
+  # save psds
+  f, Pxx = psd(transformed_data)
+  np.savez(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn_psds.npz', Pxx)
+
+
+
+# transform the emotion data using original filters
+for subj in emotion_subj_list:
+   time_filter = emotion_original_time_filters[subj]
+   transformed_data = transform_original(emotion_data[subj], time_filter)
+   np.savez(emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_cmmn.npz', transformed_data)
+
+   # save psds
+   f, Pxx = psd(transformed_data)
+   np.savez(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz', Pxx)
+
+
+# now visualize all of the above
+frolich_transformed_subj_subj_psd_filepath.mkdir(parents=True, exist_ok=True)
+frolich_transformed_original_psd_filepath.mkdir(parents=True, exist_ok=True)
+emotion_transformed_psd_filepath.mkdir(parents=True, exist_ok=True)
+
+frolich_transformed_subj_subj_psds = []
+frolich_transformed_original_psds = []
+emotion_transformed_psds = []
+
+for subj in frolich_subj_list:
+  frolich_transformed_subj_subj_psds.append(np.load(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz')['arr_0'])
+  frolich_transformed_original_psds.append(np.load(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn_psds.npz')['arr_0'])
+
+for subj in emotion_subj_list:
+  emotion_transformed_psds.append(np.load(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz')['arr_0'])
+
+# plot the psds
+plot_psd(frolich_transformed_subj_subj_psds, title='Frolich Transformed - Subj-Subj', save_path=output_dir / 'frolich_transformed_subj_subj_psds.pdf')
+plot_psd(frolich_transformed_original_psds, title='Frolich Transformed - Original', save_path=output_dir / 'frolich_transformed_original_psds.pdf')
+plot_psd(emotion_transformed_psds, title='Emotion Transformed - Original', save_path=output_dir / 'emotion_transformed_psds.pdf')
 
 
 
