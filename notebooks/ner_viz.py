@@ -427,40 +427,17 @@ def plot_time_filter(time_filter, fs=256, title="Time Domain Filters", save_path
     
     plt.show()
 
-def plot_barycenter(barycenter, f, title="Normed Barycenter", save_path=None):
+def plot_barycenter(barycenter, title='Normed Barycenter', save_path=None):
     """
-    Plot the normed barycenter with publication-quality formatting.
-    
-    Parameters:
-    -----------
-    barycenter : numpy.ndarray
-        Barycenter power spectral density
-    f : numpy.ndarray
-        Frequency array
-    title : str
-        Plot title
-    save_path : Path or str, optional
-        If provided, save the plot to this path
+    Plot the normed barycenter with the exact working code from the notebook.
     """
+    f = np.linspace(0, 128, 129)
     plt.figure(figsize=(12, 8))
-    
-    # Convert to dB scale for better visualization
-    barycenter_db = 10 * np.log10(barycenter)
-    
-    plt.plot(f, barycenter_db, linewidth=2.5, color='#2E86C1')
-    plt.xlabel('Frequency (Hz)', fontsize=14, fontweight='bold')
-    plt.ylabel('Power Spectral Density (dB/Hz)', fontsize=14, fontweight='bold')
-    plt.title(title, fontsize=16, fontweight='bold', pad=20)
-    plt.grid(True, alpha=0.3)
-    plt.xlim(0, f[-1])
-    
-    # Add subtle styling for publication quality
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
-    plt.gca().spines['left'].set_linewidth(1.5)
-    plt.gca().spines['bottom'].set_linewidth(1.5)
-    
-    plt.tight_layout()
+    plt.plot(f, 10 * np.log10(barycenter))
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Power Spectral Density (dB/Hz)')
+    plt.title(title)
+    plt.grid(True)
     
     if save_path:
         plt.savefig(save_path, format='pdf', bbox_inches='tight', 
@@ -674,11 +651,11 @@ def main():
             valid_emotion_data = [emotion_data[i] for i, psd in enumerate(emotion_psds) if psd is not None]
             emotion_barycenter = compute_normed_barycenter(valid_emotion_data, psds=valid_emotion_psds)
             
-            # Get frequency array from the PSDs
-            f = np.linspace(0, args.fs/2, valid_emotion_psds[0].shape[-1])
+            # Get frequency array (using exact working code from notebook)
+            f = np.linspace(0, 128, 129)
             
             print("Plotting emotion barycenter...")
-            plot_barycenter(emotion_barycenter, f, 
+            plot_barycenter(emotion_barycenter, 
                            title="Emotion Dataset - Normed Barycenter",
                            save_path=output_dir / "emotion_barycenter.pdf")
     
