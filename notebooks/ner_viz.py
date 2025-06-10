@@ -86,14 +86,29 @@ def compute_psd(data, fs=256, nperseg=256):
 
 def compute_normed_barycenter(data, psds=None):
   """
-
+  Compute the normed barycenter from EEG data.
+  
+  Parameters:
+  -----------
+  data : list of numpy.ndarray
+      List of EEG data arrays for each subject
+  psds : list of numpy.ndarray, optional
+      Pre-computed PSDs. If None, PSDs will be computed from data.
+      
+  Returns:
+  --------
+  barycenter : numpy.ndarray
+      Normalized barycenter
   """
 
   normalized_psds = []
-  if psds is None:
+  compute_psds_flag = psds is None
+  
+  if compute_psds_flag:
     psds = []
+    
   for i, subj in enumerate(data):
-      if psds is None:
+      if compute_psds_flag:
           f, Pxx = compute_psd(subj)
           psds.append(Pxx)
           normalized_psds.append(Pxx / np.sum(Pxx))
@@ -355,8 +370,8 @@ def load_psds(psd_filepath, subject_list, dataset_type='emotion'):
             # emotion_psds: subj-{XX}_psds_normed.npz where XX is 01 to 35, minus 22
             filename = f'subj-{subj}_psds_normed.npz'
         elif dataset_type == 'frolich':
-            # frolich_psds: frolich_extract_{XX}_256_hz_psds_normed.npz where XX is 01 to 12
-            filename = f'frolich_extract_{subj}_256_hz_psds_normed.npz'
+            # frolich_psds: frolich_extract_{XX}_256_hz.npz where XX is 01 to 12
+            filename = f'frolich_extract_{subj}_256_hz.npz'
         
         psd_path = psd_filepath / filename
         
@@ -637,42 +652,39 @@ def main():
     
     print(f"Successfully loaded {len(frolich_data)} Fröhlich subjects")
     
-    # Compute barycenters (this will calculate PSDs internally as needed)
+    # Load pre-computed PSDs and compute barycenters
     print("\n" + "="*60)
-    print("COMPUTING BARYCENTERS")
+    print("LOADING PRE-COMPUTED PSDS AND COMPUTING BARYCENTERS")
     print("="*60)
     
+    emotion_barycenter = None
+    f = None
+    
     if emotion_data:
-        print("Computing emotion dataset barycenter...")
-        emotion_barycenter = compute_normed_barycenter(emotion_data, psds=None)
+        print("Loading pre-computed emotion PSDs...")
+        emotion_psds = load_psds(emotion_psd_filepath, emotion_subj_list, 'emotion')
         
-        # For plotting, we need to compute PSDs to get frequency array
-        print("Computing PSDs for plotting...")
-        f, temp_psd = compute_psd(emotion_data[0], fs=args.fs, nperseg=args.nperseg)
+        # Filter out None values and get valid PSDs
+        valid_emotion_psds = [psd for psd in emotion_psds if psd is not None]
+        print(f"Successfully loaded {len(valid_emotion_psds)}/{len(emotion_psds)} emotion PSDs")
         
-        print("Plotting emotion barycenter...")
-        plot_barycenter(emotion_barycenter, f, 
-                       title="Emotion Dataset - Normed Barycenter",
-                       save_path=output_dir / "emotion_barycenter.pdf")
+        if valid_emotion_psds:
+            print("Computing emotion dataset barycenter from pre-computed PSDs...")
+            # Pass only the valid data and PSDs (same indices)
+            valid_emotion_data = [emotion_data[i] for i, psd in enumerate(emotion_psds) if psd is not None]
+            emotion_barycenter = compute_normed_barycenter(valid_emotion_data, psds=valid_emotion_psds)
+            
+            # Get frequency array from the PSDs
+            f = np.linspace(0, args.fs/2, valid_emotion_psds[0].shape[-1])
+            
+            print("Plotting emotion barycenter...")
+            plot_barycenter(emotion_barycenter, f, 
+                           title="Emotion Dataset - Normed Barycenter",
+                           save_path=output_dir / "emotion_barycenter.pdf")
     
-    if frolich_data:
-        print("Computing Fröhlich dataset barycenter...")
-        frolich_barycenter = compute_normed_barycenter(frolich_data, psds=None)
-        
-        # For plotting, we need to compute PSDs to get frequency array  
-        print("Computing PSDs for plotting...")
-        f, temp_psd = compute_psd(frolich_data[0], fs=args.fs, nperseg=args.nperseg)
-        
-        print("Plotting Fröhlich barycenter...")
-        plot_barycenter(frolich_barycenter, f, 
-                       title="Fröhlich Dataset - Normed Barycenter",
-                       save_path=output_dir / "frolich_barycenter.pdf")
+
     
-    # Create comparison plot if both datasets are available
-    if emotion_data and frolich_data:
-        print("Creating comparison plot...")
-        plot_comparison_barycenters(emotion_barycenter, frolich_barycenter, f,
-                                  save_path=output_dir / "barycenter_comparison.pdf")
+
 
     # Transform data using pre-computed filters
     print("\n" + "="*60)
@@ -752,15 +764,12 @@ def main():
     print("SAVING NUMERICAL RESULTS")
     print("="*60)
     
-    if emotion_data:
+    if emotion_barycenter is not None:
         np.savez(output_dir / "emotion_barycenter.npz", 
                 barycenter=emotion_barycenter, frequencies=f)
         print(f"Saved emotion barycenter to {output_dir / 'emotion_barycenter.npz'}")
     
-    if frolich_data:
-        np.savez(output_dir / "frolich_barycenter.npz", 
-                barycenter=frolich_barycenter, frequencies=f)
-        print(f"Saved Fröhlich barycenter to {output_dir / 'frolich_barycenter.npz'}")
+
     
     print("\n" + "="*60)
     print("VISUALIZATION COMPLETE!")
