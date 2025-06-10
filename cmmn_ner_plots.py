@@ -554,16 +554,16 @@ for subj in frolich_subj_list:
   frolich_data.append(loadmat(frolich_filepath / f'frolich_extract_{subj}_256_hz.mat')['X'])
 
 if make_psds:
-  emotion_psd_filepath.mkdir(parents=True, exist_ok=True)
-  frolich_psd_filepath.mkdir(parents=True, exist_ok=True)
+  emotion_raw_psd_filepath.mkdir(parents=True, exist_ok=True)
+  frolich_raw_psd_filepath.mkdir(parents=True, exist_ok=True)
 
   for i, subj in enumerate(emotion_data):
     f, Pxx = psd(subj)
-    np.savez(emotion_filepath / 'psds' / f'subj-{emotion_subj_list[i]}_psds', Pxx)
+    np.savez(emotion_raw_psd_filepath / f'subj-{emotion_subj_list[i]}_psds', Pxx)
 
   for i, subj in enumerate(frolich_data):
     f, Pxx = psd(subj)
-    np.savez(frolich_filepath / 'psds' / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds', Pxx)
+    np.savez(frolich_raw_psd_filepath / f'frolich_extract_{frolich_subj_list[i]}_256_hz_psds', Pxx)
 
 emotion_data_psds_raw = []
 frolich_data_psds_raw = []
@@ -571,13 +571,13 @@ frolich_data_psds_raw = []
 emotion_data_psds_normed = []
 frolich_data_psds_normed = []
 
-if (emotion_filepath / 'psds').exists():
+if (emotion_raw_psd_filepath).exists():
   for subj in emotion_subj_list:
-    emotion_data_psds_raw.append(np.load(emotion_filepath / 'psds' / f'subj-{subj}_psds.npz')['arr_0'])
+    emotion_data_psds_raw.append(np.load(emotion_raw_psd_filepath / f'subj-{subj}_psds.npz')['arr_0'])
 
-if (frolich_filepath / 'psds').exists():
+if (frolich_raw_psd_filepath).exists():
   for subj in frolich_subj_list:
-    frolich_data_psds_raw.append(np.load(frolich_filepath / 'psds' / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
+    frolich_data_psds_raw.append(np.load(frolich_raw_psd_filepath / f'frolich_extract_{subj}_256_hz_psds.npz')['arr_0'])
 
 # Load normed PSDs
 if emotion_normed_psd_filepath.exists():
@@ -586,7 +586,7 @@ if emotion_normed_psd_filepath.exists():
 
 if frolich_normed_psd_filepath.exists():
   for subj in frolich_subj_list:
-    frolich_data_psds_normed.append(np.load(frolich_normed_psd_filepath / f'frolich_extract_{subj}_256_hz.npz')['arr_0'])
+    frolich_data_psds_normed.append(np.load(frolich_normed_psd_filepath / f'frolich_extract_{subj}_256_hz_psds_normed.npz')['arr_0'])
 
 
 
