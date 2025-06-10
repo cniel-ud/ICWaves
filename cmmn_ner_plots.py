@@ -673,15 +673,17 @@ plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_norme
 
 # %%
 # transform the data using the provided filters
-for subj in frolich_subj_list:
+for i, subj in enumerate(frolich_subj_list):
 
   # if the transformed data and psds already exist, skip
   if (frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn.npz').exists() and (frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz').exists() and (frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn.npz').exists() and (frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn_psds.npz').exists():
     continue
 
-  
-  time_filter = frolich_subj_subj_time_filters[subj]
-  transformed_data = transform_data_subj_subj(frolich_data[subj], time_filter)
+  # print progress
+  print(f'Transforming frolich data for subject {subj} ({i+1}/{len(frolich_subj_list)})')
+
+  time_filter = frolich_subj_subj_time_filters[i]
+  transformed_data = transform_data_subj_subj(frolich_data[i], time_filter)
   np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn.npz', transformed_data)
 
   # save psds
@@ -689,8 +691,8 @@ for subj in frolich_subj_list:
   np.savez(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz', Pxx)
 
   # now filter with original filter
-  time_filter = frolich_original_time_filters[subj]
-  transformed_data = transform_original(frolich_data[subj], time_filter)
+  time_filter = frolich_original_time_filters[i]
+  transformed_data = transform_original(frolich_data[i], time_filter)
   np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn.npz', transformed_data)
 
   # save psds
@@ -702,14 +704,17 @@ for subj in frolich_subj_list:
 
 
 # transform the emotion data using original filters
-for subj in emotion_subj_list:
+for i, subj in enumerate(emotion_subj_list):
    
   # skip is already done
   if (emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_cmmn.npz').exists() and (emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz').exists():
     continue
 
-  time_filter = emotion_original_time_filters[subj]
-  transformed_data = transform_original(emotion_data[subj], time_filter)
+  # print progress
+  print(f'Transforming emotion data for subject {subj} ({i+1}/{len(emotion_subj_list)})')
+
+  time_filter = emotion_original_time_filters[i]
+  transformed_data = transform_original(emotion_data[i], time_filter)
   np.savez(emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_cmmn.npz', transformed_data)
 
   # save psds
