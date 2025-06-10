@@ -675,13 +675,13 @@ plot_polysomnograph(frolich_data[0], channel_indices=channel_list, time_window=(
 
 plot_polysomnograph(transformed_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Transformed', save_path=output_dir / 'frolich_polysomnograph_transformed.pdf')  # show first 60 seconds, for first subject of frolich
 
-# %%
-# plot with all channels
+# # %%
+# # plot with all channels
 
-# there are very many channels, so just do with 1 subject to start
+# # there are very many channels, so just do with 1 subject to start
 
-plot_raw_signals([frolich_data[0]], title='Frolich Data', all_channels=True, save_path=output_dir / 'frolich_all_channels_original.pdf')
-plot_raw_signals([transformed_data[0]], title='Transformed Frolich Data', all_channels=True, save_path=output_dir / 'frolich_all_channels_transformed.pdf')
+# plot_raw_signals([frolich_data[0]], title='Frolich Data', all_channels=True, save_path=output_dir / 'frolich_all_channels_original.pdf')
+# plot_raw_signals([transformed_data[0]], title='Transformed Frolich Data', all_channels=True, save_path=output_dir / 'frolich_all_channels_transformed.pdf')
 
 # %%
 subj_subj_matches = subj_subj_matching(psds_to_use, frolich_psds_to_use)
