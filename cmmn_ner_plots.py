@@ -619,6 +619,52 @@ if emotion_original_freq_filters:
   plot_freq_filter(emotion_original_freq_filters, save_path=output_dir / 'emotion_original_freq_filters.pdf')
 
 
+frolich_original_time_filters = []
+frolich_original_freq_filters = []
+frolich_subj_subj_freq_filters = []
+frolich_subj_subj_time_filters = []
+
+for subj in frolich_subj_list:
+  frolich_original_time_filters.append(np.load(filters_filepath / f'frolich_original_time_filter_{subj}.npz')['arr_0'])
+  frolich_original_freq_filters.append(np.load(filters_filepath / f'frolich_original_freq_filter_{subj}.npz')['arr_0'])
+  frolich_subj_subj_freq_filters.append(np.load(filters_filepath / f'frolich_subj_subj_freq_filter_{subj}.npz')['arr_0'])
+  frolich_subj_subj_time_filters.append(np.load(filters_filepath / f'frolich_subj_subj_time_filter_{subj}.npz')['arr_0'])
+
+if frolich_original_time_filters:
+  plot_time_filter(frolich_original_time_filters, save_path=output_dir / 'frolich_original_time_filters.pdf')
+if frolich_original_freq_filters:
+  plot_freq_filter(frolich_original_freq_filters, save_path=output_dir / 'frolich_original_freq_filters.pdf')
+
+"""
+List of things to plot in this omnibus plotting file:
+
+- Raw PSDs for emotion and frolich
+- Normed Barycenter for emotion
+- Filters for frolich to emotion - loaded in, not recomputed
+- Transformed data for frolich
+"""
+
+# raw psds for emoiton and frolich
+plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data - Raw PSDs', save_path=output_dir / 'emotion_psd_raw.pdf')
+plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Frolich Data - Raw PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
+
+# normed barycenter for emotion
+normed_emotion_barycenter = np.load(data_dir / 'frolich_filters' / 'emotion_normed_barycenter.npz')['arr_0']
+plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_normed_barycenter.pdf')
+
+# NOTE: believe my currently computer frolich subj subj filters are good
+
+# let me try the above and then I'll come back and plot the transformed data
+
+# will also want to print out the subj to subj correspondence, polysomnograph of sample channels for a few different subjects
+
+
+
+
+
+
+
+
 
 # %%
 """
@@ -629,51 +675,51 @@ Below are plots of base data first, then the computation process.
 
 # %%
 # Plot both raw and normed PSDs for comparison
-plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data - Raw PSDs', save_path=output_dir / 'emotion_psd_raw.pdf')
-if emotion_data_psds_normed:
-    plot_psd(emotion_data, psds=emotion_data_psds_normed, title='Emotion Data - Normed PSDs', save_path=output_dir / 'emotion_psd_normed.pdf')
+# plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data - Raw PSDs', save_path=output_dir / 'emotion_psd_raw.pdf')
+# if emotion_data_psds_normed:
+#     plot_psd(emotion_data, psds=emotion_data_psds_normed, title='Emotion Data - Normed PSDs', save_path=output_dir / 'emotion_psd_normed.pdf')
 
 # %%
 # Use normed PSDs for barycenter computation
 #psds_to_use = emotion_data_psds_normed if emotion_data_psds_normed else emotion_data_psds_raw
-psds_to_use = emotion_data_psds_raw
-normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=psds_to_use)
-plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_barycenter.pdf')
+# psds_to_use = emotion_data_psds_raw
+# normed_emotion_barycenter = compute_normed_barycenter(emotion_data, psds=psds_to_use)
+# plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_barycenter.pdf')
 
 # %%
 # Plot both raw and normed PSDs for Frolich data
-plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Frolich Data - Raw PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
-if frolich_data_psds_normed:
-    plot_psd(frolich_data, psds=frolich_data_psds_normed, title='Frolich Data - Normed PSDs', save_path=output_dir / 'frolich_psd_normed.pdf')
+# plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Frolich Data - Raw PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
+# if frolich_data_psds_normed:
+#     plot_psd(frolich_data, psds=frolich_data_psds_normed, title='Frolich Data - Normed PSDs', save_path=output_dir / 'frolich_psd_normed.pdf')
 
 # %%
-# Plotting filters for cue -> emotion (using normed PSDs if available)
-frolich_psds_to_use = frolich_data_psds_normed if frolich_data_psds_normed else frolich_data_psds_raw
-freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter, psds=frolich_psds_to_use)
+# # Plotting filters for cue -> emotion (using normed PSDs if available)
+# frolich_psds_to_use = frolich_data_psds_normed if frolich_data_psds_normed else frolich_data_psds_raw
+# freq_filter, time_filter = compute_filter_original(frolich_data, normed_emotion_barycenter, psds=frolich_psds_to_use)
+
+# # %%
+# plot_freq_filter(freq_filter, save_path=output_dir / 'frolich_to_emotion_freq_filter.pdf')
+# plot_time_filter(time_filter, save_path=output_dir / 'frolich_to_emotion_time_filter.pdf') # note: still looks wonky but the transformed data seems to be fine
 
 # %%
-plot_freq_filter(freq_filter, save_path=output_dir / 'frolich_to_emotion_freq_filter.pdf')
-plot_time_filter(time_filter, save_path=output_dir / 'frolich_to_emotion_time_filter.pdf') # note: still looks wonky but the transformed data seems to be fine
+# transformed_data = transform_original(frolich_data, time_filter)
 
 # %%
-transformed_data = transform_original(frolich_data, time_filter)
+# # plot transformed data
+# plot_psd(frolich_data, title='Frolich Data Original', save_path=output_dir / 'frolich_original_psd.pdf')
+# plot_psd(transformed_data, title='Transformed Frolich Data Original CMMN Method', save_path=output_dir / 'frolich_transformed_original_psd.pdf')
 
 # %%
-# plot transformed data
-plot_psd(frolich_data, title='Frolich Data Original', save_path=output_dir / 'frolich_original_psd.pdf')
-plot_psd(transformed_data, title='Transformed Frolich Data Original CMMN Method', save_path=output_dir / 'frolich_transformed_original_psd.pdf')
+# # plot raw frolich and transformed frolich
+# plot_raw_signals(frolich_data, title='Frolich Data', save_path=output_dir / 'frolich_raw_signals.pdf')
+# plot_raw_signals(transformed_data, title='Transformed Frolich Data', save_path=output_dir / 'frolich_transformed_signals.pdf')
 
 # %%
-# plot raw frolich and transformed frolich
-plot_raw_signals(frolich_data, title='Frolich Data', save_path=output_dir / 'frolich_raw_signals.pdf')
-plot_raw_signals(transformed_data, title='Transformed Frolich Data', save_path=output_dir / 'frolich_transformed_signals.pdf')
+# # Example usage for a single subject:
+# channel_list = [1, 16, 64]  # specify which channels you want to see
+# plot_polysomnograph(frolich_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Original', save_path=output_dir / 'frolich_polysomnograph_original.pdf')  # show first 60 seconds, for first subject of frolich
 
-# %%
-# Example usage for a single subject:
-channel_list = [1, 16, 64]  # specify which channels you want to see
-plot_polysomnograph(frolich_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Original', save_path=output_dir / 'frolich_polysomnograph_original.pdf')  # show first 60 seconds, for first subject of frolich
-
-plot_polysomnograph(transformed_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Transformed', save_path=output_dir / 'frolich_polysomnograph_transformed.pdf')  # show first 60 seconds, for first subject of frolich
+# plot_polysomnograph(transformed_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Transformed', save_path=output_dir / 'frolich_polysomnograph_transformed.pdf')  # show first 60 seconds, for first subject of frolich
 
 # # %%
 # # plot with all channels
@@ -684,27 +730,27 @@ plot_polysomnograph(transformed_data[0], channel_indices=channel_list, time_wind
 # plot_raw_signals([transformed_data[0]], title='Transformed Frolich Data', all_channels=True, save_path=output_dir / 'frolich_all_channels_transformed.pdf')
 
 # %%
-subj_subj_matches = subj_subj_matching(psds_to_use, frolich_psds_to_use)
+# subj_subj_matches = subj_subj_matching(psds_to_use, frolich_psds_to_use)
 
-freq_filter_subj_subj, time_filter_subj_subj = compute_filter_subj_subj(frolich_psds_to_use, psds_to_use, subj_subj_matches)
+# freq_filter_subj_subj, time_filter_subj_subj = compute_filter_subj_subj(frolich_psds_to_use, psds_to_use, subj_subj_matches)
 
-transformed_data_subj_subj = transform_data_subj_subj(frolich_data, time_filter_subj_subj)
+# transformed_data_subj_subj = transform_data_subj_subj(frolich_data, time_filter_subj_subj)
 
-# %%
-plot_freq_filter(freq_filter_subj_subj, save_path=output_dir / 'frolich_to_emotion_subj_subj_freq_filter.pdf')
-plot_time_filter(time_filter_subj_subj, save_path=output_dir / 'frolich_to_emotion_subj_subj_time_filter.pdf')
+# # %%
+# plot_freq_filter(freq_filter_subj_subj, save_path=output_dir / 'frolich_to_emotion_subj_subj_freq_filter.pdf')
+# plot_time_filter(time_filter_subj_subj, save_path=output_dir / 'frolich_to_emotion_subj_subj_time_filter.pdf')
 
-# %%
-# plot original frolich data as well
-plot_psd(frolich_data, title='Frolich Data', save_path=output_dir / 'frolich_data_for_subj_subj.pdf')
-plot_psd(transformed_data_subj_subj, title='Transformed Frolich Data. Subj-Subj Matching', save_path=output_dir / 'frolich_transformed_subj_subj_psd.pdf')
+# # %%
+# # plot original frolich data as well
+# plot_psd(frolich_data, title='Frolich Data', save_path=output_dir / 'frolich_data_for_subj_subj.pdf')
+# plot_psd(transformed_data_subj_subj, title='Transformed Frolich Data. Subj-Subj Matching', save_path=output_dir / 'frolich_transformed_subj_subj_psd.pdf')
 
-# %%
-# Example usage for a single subject:
-channel_list = [1, 16, 32, 48, 64]  # specify which channels you want to see
-plot_polysomnograph(frolich_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Original', save_path=output_dir / 'frolich_polysomnograph_original_subj_subj.pdf')  # show first 60 seconds, for first subject of frolich
+# # %%
+# # Example usage for a single subject:
+# channel_list = [1, 16, 32, 48, 64]  # specify which channels you want to see
+# plot_polysomnograph(frolich_data[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Original', save_path=output_dir / 'frolich_polysomnograph_original_subj_subj.pdf')  # show first 60 seconds, for first subject of frolich
 
-plot_polysomnograph(transformed_data_subj_subj[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Transformed Subj-Subj', save_path=output_dir / 'frolich_polysomnograph_transformed_subj_subj.pdf')  # show first 60 seconds, for first subject of frolich
+# plot_polysomnograph(transformed_data_subj_subj[0], channel_indices=channel_list, time_window=(0, 5), title='First Frolich Subject, 5 seconds, Transformed Subj-Subj', save_path=output_dir / 'frolich_polysomnograph_transformed_subj_subj.pdf')  # show first 60 seconds, for first subject of frolich
 
 # %%
 
