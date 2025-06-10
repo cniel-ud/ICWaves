@@ -85,6 +85,8 @@ def eval_classifier_per_subject_brain_F1(
         int(config.validation_segment_length)
     )
     cmmn_suffix = get_cmmn_suffix(config.cmmn_filter, config.is_cmmn_filter_resampled)
+    if config.is_classifier_trained_on_normalized_data:
+        cmmn_suffix = cmmn_suffix + "_clf-trained-on-filtered-data"
     results_file = (
         results_path
         / f"eval_brain_f1_{config.classifier_type}_{config.feature_extractor}_{valseglen}{cmmn_suffix}.csv"
