@@ -664,7 +664,7 @@ filters_filepath = data_dir / 'frolich_filters'
 emotion_original_time_filters = []
 emotion_original_freq_filters = []
 
-for subj in emotion_subj_list[:4]:  # Just first 4 for initial visualization
+for subj in emotion_subj_list:  # Load filters for all subjects
   time_filter_path = filters_filepath / f'emotion_normed_psds_normed_barycenter_time_filter_{subj}.npz'
   freq_filter_path = filters_filepath / f'emotion_normed_psds_normed_barycenter_freq_filter_{subj}.npz'
   
