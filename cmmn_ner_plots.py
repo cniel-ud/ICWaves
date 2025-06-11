@@ -576,6 +576,13 @@ frolich_normed_psd_filepath = frolich_filepath / 'psds_normed'
 emotion_raw_psd_filepath = emotion_filepath / 'psds'
 frolich_raw_psd_filepath = frolich_filepath / 'psds'
 
+# Create all necessary directories
+emotion_transformed_filepath.mkdir(parents=True, exist_ok=True)
+frolich_transformed_filepath.mkdir(parents=True, exist_ok=True)
+emotion_transformed_psd_filepath.mkdir(parents=True, exist_ok=True)
+frolich_transformed_subj_subj_psd_filepath.mkdir(parents=True, exist_ok=True)
+frolich_transformed_original_psd_filepath.mkdir(parents=True, exist_ok=True)
+
 # grab raw data
 emotion_data = []
 for subj in emotion_subj_list:
