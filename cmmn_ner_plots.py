@@ -674,9 +674,9 @@ for subj in emotion_subj_list:  # Load filters for all subjects
     emotion_original_freq_filters.append(np.load(freq_filter_path)['arr_0'])
 
 if emotion_original_time_filters:
-  plot_time_filter(emotion_original_time_filters, save_path=output_dir / 'emotion_original_time_filters.pdf')
+  plot_time_filter(emotion_original_time_filters, title='Emotion Barycenter Mapping Time Filters', save_path=output_dir / 'emotion_original_time_filters.pdf')
 if emotion_original_freq_filters:
-  plot_freq_filter(emotion_original_freq_filters, save_path=output_dir / 'emotion_original_freq_filters.pdf')
+  plot_freq_filter(emotion_original_freq_filters, title='Emotion Barycenter Mapping Frequency Filters', save_path=output_dir / 'emotion_original_freq_filters.pdf')
 
 
 frolich_original_time_filters = []
@@ -691,9 +691,18 @@ for subj in frolich_subj_list:
   frolich_subj_subj_time_filters.append(np.load(filters_filepath / f'frolich_subj_subj_time_filter_{subj}.npz')['arr_0'])
 
 if frolich_original_time_filters:
-  plot_time_filter(frolich_original_time_filters, save_path=output_dir / 'frolich_original_time_filters.pdf')
+  plot_time_filter(frolich_original_time_filters, title='Cue Barycenter Mapping Time Filters', save_path=output_dir / 'frolich_original_time_filters.pdf')
 if frolich_original_freq_filters:
-  plot_freq_filter(frolich_original_freq_filters, save_path=output_dir / 'frolich_original_freq_filters.pdf')
+  plot_freq_filter(frolich_original_freq_filters, title='Cue Barycenter Mapping Frequency Filters', save_path=output_dir / 'frolich_original_freq_filters.pdf')
+
+# also plot frolich subj subj filters
+if frolich_subj_subj_time_filters:
+  plot_time_filter(frolich_subj_subj_time_filters, title='Cue Subj-to-subj Mapping Time Filters', save_path=output_dir / 'frolich_subj_subj_time_filters.pdf')
+if frolich_subj_subj_freq_filters:
+  plot_freq_filter(frolich_subj_subj_freq_filters, title='Cue Subj-to-subj Mapping Frequency Filters', save_path=output_dir / 'frolich_subj_subj_freq_filters.pdf')
+
+
+
 
 """
 List of things to plot in this omnibus plotting file:
@@ -705,12 +714,12 @@ List of things to plot in this omnibus plotting file:
 """
 
 # raw psds for emoiton and frolich
-plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data - Raw PSDs', save_path=output_dir / 'emotion_psd_raw.pdf')
-plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Frolich Data - Raw PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
+plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data, Unnormalized PSDs', save_path=output_dir / 'emotion_psd_raw.pdf')
+plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Cue Data, Unnormalized PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
 
 # normed barycenter for emotion
 normed_emotion_barycenter = np.load(data_dir / 'frolich_filters' / 'emotion_normed_barycenter.npz')['arr_0']
-plot_barycenter(normed_emotion_barycenter, save_path=output_dir / 'emotion_normed_barycenter.pdf')
+plot_barycenter(normed_emotion_barycenter, title='Normalized Emotion Barycenter', save_path=output_dir / 'emotion_normed_barycenter.pdf')
 
 # NOTE: believe my currently computer frolich subj subj filters are good
 
@@ -795,9 +804,9 @@ for subj in emotion_subj_list:
   emotion_transformed_psds.append(np.load(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz')['arr_0'])
 
 # plot the psds
-plot_psd(frolich_transformed_subj_subj_psds, title='Frolich Transformed - Subj-Subj', save_path=output_dir / 'frolich_transformed_subj_subj_psds.pdf')
-plot_psd(frolich_transformed_original_psds, title='Frolich Transformed - Original', save_path=output_dir / 'frolich_transformed_original_psds.pdf')
-plot_psd(emotion_transformed_psds, title='Emotion Transformed - Original', save_path=output_dir / 'emotion_transformed_psds.pdf')
+plot_psd(frolich_transformed_subj_subj_psds, title='Cue Transformed - Subj-to-subj Mapping', save_path=output_dir / 'frolich_transformed_subj_subj_psds.pdf')
+plot_psd(frolich_transformed_original_psds, title='Cue Transformed - Barycenter Mapping', save_path=output_dir / 'frolich_transformed_original_psds.pdf')
+plot_psd(emotion_transformed_psds, title='Emotion Transformed - Barycenter Mapping', save_path=output_dir / 'emotion_transformed_psds.pdf')
 
 
 
