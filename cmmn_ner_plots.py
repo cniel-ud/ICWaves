@@ -674,7 +674,7 @@ for subj in emotion_subj_list:  # Load filters for all subjects
     emotion_original_freq_filters.append(np.load(freq_filter_path)['arr_0'])
 
 if emotion_original_time_filters:
-  plot_time_filter(emotion_original_time_filters, title='Emotion Barycenter Mapping Time Filters', save_path=output_dir / 'emotion_original_time_filters.pdf')
+  plot_time_filter(emotion_original_time_filters,  save_path=output_dir / 'emotion_original_time_filters.pdf')
 if emotion_original_freq_filters:
   plot_freq_filter(emotion_original_freq_filters, title='Emotion Barycenter Mapping Frequency Filters', save_path=output_dir / 'emotion_original_freq_filters.pdf')
 
@@ -691,13 +691,13 @@ for subj in frolich_subj_list:
   frolich_subj_subj_time_filters.append(np.load(filters_filepath / f'frolich_subj_subj_time_filter_{subj}.npz')['arr_0'])
 
 if frolich_original_time_filters:
-  plot_time_filter(frolich_original_time_filters, title='Cue Barycenter Mapping Time Filters', save_path=output_dir / 'frolich_original_time_filters.pdf')
+  plot_time_filter(frolich_original_time_filters,  save_path=output_dir / 'frolich_original_time_filters.pdf')
 if frolich_original_freq_filters:
   plot_freq_filter(frolich_original_freq_filters, title='Cue Barycenter Mapping Frequency Filters', save_path=output_dir / 'frolich_original_freq_filters.pdf')
 
 # also plot frolich subj subj filters
 if frolich_subj_subj_time_filters:
-  plot_time_filter(frolich_subj_subj_time_filters, title='Cue Subj-to-subj Mapping Time Filters', save_path=output_dir / 'frolich_subj_subj_time_filters.pdf')
+  plot_time_filter(frolich_subj_subj_time_filters, save_path=output_dir / 'frolich_subj_subj_time_filters.pdf')
 if frolich_subj_subj_freq_filters:
   plot_freq_filter(frolich_subj_subj_freq_filters, title='Cue Subj-to-subj Mapping Frequency Filters', save_path=output_dir / 'frolich_subj_subj_freq_filters.pdf')
 
