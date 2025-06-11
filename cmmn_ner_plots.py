@@ -569,8 +569,8 @@ def transform_original_single(subj_data, time_filter):
 # %%
 # Full subject lists for HPC processing
 # right now I put this at 4 for quick testing. change soon
-emotion_subj_list = [f'{i:02d}' for i in range(1, 4) if i != 22]  # 01-35 minus 22
-frolich_subj_list = [f'{i:02d}' for i in range(1, 4)]  # 01-12
+emotion_subj_list = [f'{i:02d}' for i in range(1, 36) if i != 22]  # 01-35 minus 22
+frolich_subj_list = [f'{i:02d}' for i in range(1, 13)]  # 01-12
 
 # Output directory for PDF figures
 output_dir = Path('./ner_figures')
