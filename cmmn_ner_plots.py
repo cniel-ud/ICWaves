@@ -538,6 +538,27 @@ def transform_data_subj_subj_single(subj_data, time_filter):
   return subj_norm
 
 
+def transform_original_single(subj_data, time_filter):
+  """
+  Transform the given single subject data using the given filter.
+
+  Parameters:
+  - subj_data: numpy array containing EEG data for a single subject, shape (n_channels, n_samples)
+  - time_filter: numpy array containing the filter in the time domain for this subject
+
+  Returns:
+  - subj_norm: numpy array containing the transformed EEG data for the subject
+  """
+
+  num_channels = subj_data.shape[0]
+  subj_norm = np.zeros_like(subj_data)
+
+  for chan in range(num_channels):
+    subj_norm[chan] = np.convolve(subj_data[chan], time_filter, mode='full')[:len(subj_data[chan])]
+
+  return subj_norm
+
+
 
 
 
@@ -725,7 +746,7 @@ for i, subj in enumerate(frolich_subj_list):
 
   # now filter with original filter
   time_filter = frolich_original_time_filters[i]
-  transformed_data = transform_original(frolich_data[i], time_filter)
+  transformed_data = transform_original_single(frolich_data[i], time_filter)
   np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn.npz', transformed_data)
 
   # save psds
@@ -747,7 +768,7 @@ for i, subj in enumerate(emotion_subj_list):
   print(f'Transforming emotion data for subject {subj} ({i+1}/{len(emotion_subj_list)})')
 
   time_filter = emotion_original_time_filters[i]
-  transformed_data = transform_original(emotion_data[i], time_filter)
+  transformed_data = transform_original_single(emotion_data[i], time_filter)
   np.savez(emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_cmmn.npz', transformed_data)
 
   # save psds
