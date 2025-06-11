@@ -512,6 +512,32 @@ def transform_data_subj_subj(data, time_filter_subj_subj):
   return transformed_data
 
 
+def transform_data_subj_subj_single(subj_data, time_filter):
+  """
+  Transform data for a single subject using subject-specific time filter
+
+  Parameters
+  ----------
+  subj_data : numpy array
+    EEG data for a single subject, shape (n_channels, n_samples)
+  time_filter : numpy array
+    Time filter specific to this subject, shape (n_channels, filter_length)
+
+  Returns
+  -------
+  subj_norm : numpy array
+    Transformed EEG data for the subject, same shape as input
+  """
+  
+  subj_norm = np.zeros(subj_data.shape)
+  num_channels = subj_data.shape[0]
+
+  for chan in range(num_channels):
+    subj_norm[chan] = np.convolve(subj_data[chan], time_filter[chan], mode='full')[:len(subj_data[chan])]
+
+  return subj_norm
+
+
 
 
 
@@ -683,7 +709,7 @@ for i, subj in enumerate(frolich_subj_list):
   print(f'Transforming frolich data for subject {subj} ({i+1}/{len(frolich_subj_list)})')
 
   time_filter = frolich_subj_subj_time_filters[i]
-  transformed_data = transform_data_subj_subj(frolich_data[i], time_filter)
+  transformed_data = transform_data_subj_subj_single(frolich_data[i], time_filter)
   np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn.npz', transformed_data)
 
   # save psds
