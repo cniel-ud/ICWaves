@@ -46,7 +46,8 @@ def get_feature_extractor(
     """Load data based on feature extractor type.
 
     Args:
-        args: Arguments containing feature_extractor type and other parameters.
+        feature_type: Feature extractor type.
+        data_bundles: Dictionary of data bundles.
 
     Returns:
         Tuple of (data bundles dict, feature extractor callable)

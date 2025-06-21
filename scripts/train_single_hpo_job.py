@@ -47,6 +47,7 @@ if __name__ == "__main__":
 
     # Load or prepare data based on feature extractor type
     data_bundles = load_data_bundles(args)
+
     feature_extractor = get_feature_extractor(args.feature_extractor, data_bundles)
 
     # the DataBundle for bowav and psd_autocorr only differs in the `data` attribute
@@ -64,6 +65,8 @@ if __name__ == "__main__":
     # the bowav_psd_autocorr feature
     params["n_codebooks"] = 7  # number of ICLabel classes
     params["n_centroids"] = data_bundle.n_centroids
+
+    # Create estimator
     clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
     logging.info(f"clf: {clf}")
     candidate_params = build_grid_parameters(args, data_bundle.srate)
