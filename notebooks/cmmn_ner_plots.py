@@ -5,6 +5,9 @@ Dr. B has recommended to do the notebook here in colab so that we all have the s
 Later, once this is complete, will refresh on the newly refactored codebase to do BoW on this and then Carlos can test it with his shiny new clfs.
 
 Right now this is finished, currently setting up a Caviness job to run through everything.
+
+
+Post NER note - moved to notebooks, make sure that the filepaths work correclty when re-visualized. 
 """
 
 # %%
@@ -814,6 +817,7 @@ plot_psd(emotion_transformed_psds, title='Emotion Transformed - Barycenter Mappi
 
 
 
+# TODO remove after update figures for NER arXiv submission, may need some of below comments
 # %%
 """
 # **Computation & Plotting**

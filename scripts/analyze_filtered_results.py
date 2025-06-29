@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Script to analyze specific CSV evaluation results from a manual list.
+
+Post NER note - moved to scripts. Check filepaths.
+
 """
 
 import pandas as pd

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Script to analyze all CSV evaluation results and compute averages across subjects.
+
+Post NER note - moved to scripts. Check filepaths.
+
 """
 
 import pandas as pd

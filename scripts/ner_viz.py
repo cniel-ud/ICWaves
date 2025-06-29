@@ -9,8 +9,7 @@ and creating publication-ready visualizations.
 Usage:
     python ner_viz.py [--data_dir DATA_DIR] [--output_dir OUTPUT_DIR] [--all_subjects]
 
-Author: ICWaves Research Team
-Date: 2025
+Post NER note - moved to scripts. Check filepaths.
 """
 
 import argparse
