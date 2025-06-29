@@ -56,6 +56,9 @@ def _fit_and_score(
     sample_weight_train = sample_weight[train]
 
     # Build train feature vector for a given segment length
+    # Note: When using count rates with bowav features, normalization by the number 
+    # of segments is handled in the feature extractor, and the custom TfidfRateScaler
+    # handles the binarization for IDF computation while using rates for transformation.
     X_train = feature_extractor(X_train, train_segment_length)
 
     # X_train.shape = (n_time_series, n_segments, n_features)

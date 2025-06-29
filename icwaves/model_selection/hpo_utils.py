@@ -36,11 +36,12 @@ def get_base_parameters(args, rng):
 
 
 def build_grid_parameters(args, srate):
-    candidate_params = {}
-    candidate_params["input_or_output_aggregation_method"] = [
-        "count_pooling",
-        "majority_vote",
-    ]
+    candidate_params = {
+        "input_or_output_aggregation_method": ["count_pooling", "majority_vote"],
+        "expert_weight": args.expert_weight,
+    }
+
+    # Handle segment lengths
     window_length = args.window_length if "bowav" in args.feature_extractor else None
     candidate_params["training_segment_length"] = convert_segment_length(
         args.training_segment_length, args.feature_extractor, srate, window_length
@@ -48,19 +49,28 @@ def build_grid_parameters(args, srate):
     candidate_params["validation_segment_length"] = convert_segment_length(
         args.validation_segment_length, args.feature_extractor, srate, window_length
     )
-    candidate_params["expert_weight"] = args.expert_weight
+
+    # Determine if we need to use a pipeline prefix for classifier parameters
+    # Pipeline is used for bowav and bowav_psd_autocorr feature extractors
+    uses_pipeline = args.feature_extractor in ["bowav", "bowav_psd_autocorr"]
+    prefix = "clf__" if uses_pipeline else ""
+
+    # Apply TF-IDF parameters for feature extractors that use it
+    if args.feature_extractor == "bowav":
+        candidate_params["scaler__norm"] = [
+            TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+        ]
+    elif args.feature_extractor == "bowav_psd_autocorr":
+        candidate_params["scaler__bowav__norm"] = [
+            TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+        ]
+
+    # Add classifier-specific parameters with appropriate prefixes
     if args.classifier_type == "logistic":
-        if args.feature_extractor == "bowav":
-            candidate_params["clf__C"] = args.regularization_factor
-            candidate_params["clf__l1_ratio"] = args.l1_ratio
-            candidate_params["scaler__norm"] = [
-                TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
-            ]
-        else:
-            candidate_params["C"] = args.regularization_factor
-            candidate_params["l1_ratio"] = args.l1_ratio
+        candidate_params[f"{prefix}C"] = args.regularization_factor
+        candidate_params[f"{prefix}l1_ratio"] = args.l1_ratio
     elif args.classifier_type == "random_forest":
-        candidate_params["min_samples_split"] = args.min_samples_split
+        candidate_params[f"{prefix}min_samples_split"] = args.min_samples_split
 
     candidate_params = list(ParameterGrid(candidate_params))
 
@@ -91,8 +101,9 @@ def load_candidate_results(results_path, n_candidates, n_splits):
     all_out = []
     for candidate_idx in range(n_candidates):
         for split_idx in range(n_splits):
+
             file = results_path.joinpath(
-                f"candidate_{candidate_idx}_split_{split_idx}.pkl"
+                f"candidate_{candidate_idx}", f"split_{split_idx}.pkl"
             )
             with open(file, "rb") as f:
                 all_out.append(pickle.load(f))

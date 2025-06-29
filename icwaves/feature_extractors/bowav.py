@@ -86,7 +86,7 @@ def build_or_load_centroid_assignments_and_labels(args: Namespace) -> DataBundle
 
 
 def build_bowav_from_centroid_assignments(
-    centroid_assignments, n_centroids, n_windows_per_segment
+    centroid_assignments, n_centroids, n_windows_per_segment, normalize_by_segments=True
 ):
     """Build flattened bag of waves from centroid assignments. Use all windows on each time series.
 
@@ -104,6 +104,10 @@ def build_bowav_from_centroid_assignments(
     n_windows_per_segment:
         The number of windows per segment. This is the number of
         windows/assignments counted to compute the BoWav vector.
+    normalize_by_segments:
+        If True, normalize counts by the number of segments to get rates.
+        This addresses the document count disparity between training and
+        validation/test when using different segment lengths.
     """
     n_time_series, n_codebooks, n_windows_per_time_series = centroid_assignments.shape
     n_features = n_codebooks * n_centroids
@@ -114,9 +118,12 @@ def build_bowav_from_centroid_assignments(
         n_segments_per_time_series = 1
         n_windows_per_segment = n_windows_per_time_series
 
+    # Use float32 if normalizing, int32 otherwise
+    dtype = np.float32 if normalize_by_segments else np.int32
     bowav = np.zeros(
-        (n_time_series, n_segments_per_time_series, n_features), dtype=np.int32
+        (n_time_series, n_segments_per_time_series, n_features), dtype=dtype
     )
+    
     for i_ts in range(n_time_series):
         for i_seg in range(n_segments_per_time_series):
             start_ind = i_seg * n_windows_per_segment
@@ -127,7 +134,11 @@ def build_bowav_from_centroid_assignments(
                 )
                 # centroid index->feature index
                 i_feature = nu + r * n_centroids
-                bowav[i_ts, i_seg, i_feature] = counts
+                if normalize_by_segments:
+                    # Normalize by number of segments to get rates
+                    bowav[i_ts, i_seg, i_feature] = counts / n_segments_per_time_series
+                else:
+                    bowav[i_ts, i_seg, i_feature] = counts
 
     return bowav
 

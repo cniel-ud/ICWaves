@@ -49,6 +49,13 @@ class EvalConfig:
         if self.cmmn_filter is not None and self.eval_dataset != "cue":
             raise ValueError(f"cmmn filter only supported for cue dataset")
 
+        # TODO: if the classifier is not trained on filtered 'emotion' data,
+        # should we still use the filtered codebooks when computing bowav for 'cue'?
+        if self.is_classifier_trained_on_normalized_data:
+            self.cmmn_subfolder = "normed_filtered"
+        else:
+            self.cmmn_subfolder = "unfiltered"
+
     @property
     def subj_ids(self) -> List[int]:
         if self.eval_dataset == "emotion_study":
@@ -88,16 +95,20 @@ class EvalConfig:
 
     @property
     def path_to_centroid_assignments(self) -> Path:
-        path = self.path_to_eval_data / "centroid_assignments"
+        path = self.path_to_eval_data / "centroid_assignments" / self.cmmn_subfolder
         return path
 
     @property
     def path_to_codebooks(self) -> Path:
         if "bowav" in self.feature_extractor:
             if self.eval_dataset == "emotion_study":
-                return self.path_to_train_output / "dictionaries"
+                return self.path_to_train_output / "dictionaries" / self.cmmn_subfolder
             else:  # cue
-                return self.path_to_train_output / "dictionaries_resampled"
+                return (
+                    self.path_to_train_output
+                    / "dictionaries_resampled"
+                    / self.cmmn_subfolder
+                )
         else:
             raise ValueError(f"Codebooks not available for {self.feature_extractor}")
 

@@ -128,6 +128,10 @@ if __name__ == "__main__":
     # Create cross-validation splitter and estimator
     cv = LeaveOneSubjectOutExpertOnly(data_bundle.expert_label_mask)
     params = get_base_parameters(args, old_rng)
+    # n_codebooks and n_centroids are needed to build the estimator for
+    # the bowav_psd_autocorr feature
+    params["n_codebooks"] = 7  # number of ICLabel classes
+    params["n_centroids"] = data_bundle.n_centroids
     clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
     logging.info(f"clf: {clf}")
 
