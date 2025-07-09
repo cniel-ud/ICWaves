@@ -193,24 +193,46 @@ def compute_normed_barycenter(data, psds=None):
 
   """
 
-  normalized_psds = []
+  # Original approach - commented out
+  # normalized_psds = []
+  # if psds is None:
+  #   psds = []
+  # for i, subj in enumerate(data):
+  #     if psds is None:
+  #         f, Pxx = psd(subj)
+  #         psds.append(Pxx)
+  #         normalized_psds.append(Pxx / np.sum(Pxx))
+  #     else:
+  #         normalized_psds.append(psds[i] / np.sum(psds[i]))
+
+  # # now average all together
+  # per_subj_avgs = []
+  # for subj in normalized_psds:
+  #     avg = np.mean(subj, axis=0)
+  #     per_subj_avgs.append(np.mean(subj, axis=0)) # necessary due to inhomogenous dimensions
+
+  # barycenter = np.mean(per_subj_avgs, axis=0)
+
+  # New approach - L1 normalization after channel averaging
   if psds is None:
     psds = []
-  for i, subj in enumerate(data):
-      if psds is None:
-          f, Pxx = psd(subj)
-          psds.append(Pxx)
-          normalized_psds.append(Pxx / np.sum(Pxx))
-      else:
-          normalized_psds.append(psds[i] / np.sum(psds[i]))
+    for subj in data:
+        f, Pxx = psd(subj)
+        psds.append(Pxx)
 
-  # now average all together
+  # First average across channels for each subject
   per_subj_avgs = []
-  for subj in normalized_psds:
+  for subj in psds:
       avg = np.mean(subj, axis=0)
-      per_subj_avgs.append(np.mean(subj, axis=0)) # necessary due to inhomogenous dimensions
+      per_subj_avgs.append(avg)
 
-  barycenter = np.mean(per_subj_avgs, axis=0)
+  # Then do L1 normalization on each subject's averaged PSD
+  normalized_psds = []
+  for subj_avg in per_subj_avgs:
+      normalized_psds.append(subj_avg / np.sum(subj_avg))
+
+  # Finally average across subjects
+  barycenter = np.mean(normalized_psds, axis=0)
 
   return barycenter
 
