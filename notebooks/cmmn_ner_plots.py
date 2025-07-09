@@ -607,7 +607,7 @@ output_dir.mkdir(parents=True, exist_ok=True)
 make_psds = False # change to True if running the notebook for the first time.
 
 # HPC file paths
-data_dir = Path('data')
+data_dir = Path('../data')
 emotion_filepath = data_dir / 'emotion_256' / 'raw_data_and_IC_labels'
 frolich_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz'
 
