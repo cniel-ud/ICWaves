@@ -611,11 +611,11 @@ data_dir = Path('../data')
 emotion_filepath = data_dir / 'emotion_256' / 'raw_data_and_IC_labels'
 frolich_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz'
 
-emotion_transformed_filepath = data_dir / 'emotion_256' / 'emotion_data_cmmn'
-frolich_transformed_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn'
-emotion_transformed_psd_filepath = data_dir / 'emotion_256' / 'emotion_data_cmmn' / 'psds'
-frolich_transformed_subj_subj_psd_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn' / 'subj_subj_psds'
-frolich_transformed_original_psd_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn' / 'original_psds'
+emotion_transformed_filepath = data_dir / 'emotion_256' / 'emotion_data_cmmn_ch_avg_barycenter'
+frolich_transformed_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn_ch_avg_barycenter'
+emotion_transformed_psd_filepath = data_dir / 'emotion_256' / 'emotion_data_cmmn_ch_avg_barycenter' / 'psds'
+frolich_transformed_subj_subj_psd_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn_ch_avg_barycenter' / 'subj_subj_psds'
+frolich_transformed_original_psd_filepath = data_dir / 'frolich_256' / 'frolich_extract_256_hz_cmmn_ch_avg_barycenter' / 'original_psds'
 
 # PSD file paths  
 emotion_normed_psd_filepath = emotion_filepath / 'psds_normed'
@@ -692,8 +692,8 @@ emotion_original_time_filters = []
 emotion_original_freq_filters = []
 
 for subj in emotion_subj_list:  # Load filters for all subjects
-  time_filter_path = filters_filepath / f'emotion_normed_psds_normed_barycenter_time_filter_{subj}.npz'
-  freq_filter_path = filters_filepath / f'emotion_normed_psds_normed_barycenter_freq_filter_{subj}.npz'
+  time_filter_path = filters_filepath / f'emotion_normed_psds_normed_barycenter_ch_avg_barycenter_time_filter_{subj}.npz'
+  freq_filter_path = filters_filepath / f'emotion_normed_psds_normed_barycenter_ch_avg_barycenter_freq_filter_{subj}.npz'
   
   if time_filter_path.exists():
     emotion_original_time_filters.append(np.load(time_filter_path)['arr_0'])
@@ -712,10 +712,10 @@ frolich_subj_subj_freq_filters = []
 frolich_subj_subj_time_filters = []
 
 for subj in frolich_subj_list:
-  frolich_original_time_filters.append(np.load(filters_filepath / f'frolich_original_time_filter_{subj}.npz')['arr_0'])
-  frolich_original_freq_filters.append(np.load(filters_filepath / f'frolich_original_freq_filter_{subj}.npz')['arr_0'])
-  frolich_subj_subj_freq_filters.append(np.load(filters_filepath / f'frolich_subj_subj_freq_filter_{subj}.npz')['arr_0'])
-  frolich_subj_subj_time_filters.append(np.load(filters_filepath / f'frolich_subj_subj_time_filter_{subj}.npz')['arr_0'])
+  frolich_original_time_filters.append(np.load(filters_filepath / f'frolich_original_ch_avg_barycenter_time_filter_{subj}.npz')['arr_0'])
+  frolich_original_freq_filters.append(np.load(filters_filepath / f'frolich_original_ch_avg_barycenter_freq_filter_{subj}.npz')['arr_0'])
+  frolich_subj_subj_freq_filters.append(np.load(filters_filepath / f'frolich_subj_subj_ch_avg_barycenter_freq_filter_{subj}.npz')['arr_0'])
+  frolich_subj_subj_time_filters.append(np.load(filters_filepath / f'frolich_subj_subj_ch_avg_barycenter_time_filter_{subj}.npz')['arr_0'])
 
 if frolich_original_time_filters:
   plot_time_filter(frolich_original_time_filters, title='Cue Barycenter Mapping Time Filters', save_path=output_dir / 'frolich_original_time_filters.pdf')
@@ -745,7 +745,7 @@ plot_psd(emotion_data, psds=emotion_data_psds_raw, title='Emotion Data, Unnormal
 plot_psd(frolich_data, psds=frolich_data_psds_raw, title='Cue Data, Unnormalized PSDs', save_path=output_dir / 'frolich_psd_raw.pdf')
 
 # normed barycenter for emotion
-normed_emotion_barycenter = np.load(data_dir / 'frolich_filters' / 'emotion_normed_barycenter.npz')['arr_0']
+normed_emotion_barycenter = np.load(data_dir / 'frolich_filters' / 'emotion_normed_ch_avg_barycenter.npz')['arr_0']
 plot_barycenter(normed_emotion_barycenter, title='Normalized Emotion Barycenter', save_path=output_dir / 'emotion_normed_barycenter.pdf')
 
 # NOTE: believe my currently computer frolich subj subj filters are good
@@ -766,7 +766,7 @@ plot_barycenter(normed_emotion_barycenter, title='Normalized Emotion Barycenter'
 for i, subj in enumerate(frolich_subj_list):
 
   # if the transformed data and psds already exist, skip
-  if (frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn.npz').exists() and (frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz').exists() and (frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn.npz').exists() and (frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn_psds.npz').exists():
+  if (frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_ch_avg_barycenter_cmmn.npz').exists() and (frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_ch_avg_barycenter_cmmn_psds.npz').exists() and (frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_ch_avg_barycenter_cmmn.npz').exists() and (frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_ch_avg_barycenter_cmmn_psds.npz').exists():
     continue
 
   # print progress
@@ -774,20 +774,20 @@ for i, subj in enumerate(frolich_subj_list):
 
   time_filter = frolich_subj_subj_time_filters[i]
   transformed_data = transform_data_subj_subj_single(frolich_data[i], time_filter)
-  np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn.npz', transformed_data)
+  np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_ch_avg_barycenter_cmmn.npz', transformed_data)
 
   # save psds
   f, Pxx = psd(transformed_data)
-  np.savez(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz', Pxx)
+  np.savez(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_ch_avg_barycenter_cmmn_psds.npz', Pxx)
 
   # now filter with original filter
   time_filter = frolich_original_time_filters[i]
   transformed_data = transform_original_single(frolich_data[i], time_filter)
-  np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn.npz', transformed_data)
+  np.savez(frolich_transformed_filepath / f'frolich_extract_{subj}_256_hz_original_ch_avg_barycenter_cmmn.npz', transformed_data)
 
   # save psds
   f, Pxx = psd(transformed_data)
-  np.savez(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn_psds.npz', Pxx)
+  np.savez(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_ch_avg_barycenter_cmmn_psds.npz', Pxx)
 
   print(f'Transformed frolich data for subject {subj} and calculated and saved psds')
 
@@ -797,7 +797,7 @@ for i, subj in enumerate(frolich_subj_list):
 for i, subj in enumerate(emotion_subj_list):
    
   # skip is already done
-  if (emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_cmmn.npz').exists() and (emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz').exists():
+  if (emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_ch_avg_barycenter_cmmn.npz').exists() and (emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_ch_avg_barycenter_cmmn_psds.npz').exists():
     continue
 
   # print progress
@@ -805,11 +805,11 @@ for i, subj in enumerate(emotion_subj_list):
 
   time_filter = emotion_original_time_filters[i]
   transformed_data = transform_original_single(emotion_data[i], time_filter)
-  np.savez(emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_cmmn.npz', transformed_data)
+  np.savez(emotion_transformed_filepath / f'emotion_data_{subj}_256_hz_original_ch_avg_barycenter_cmmn.npz', transformed_data)
 
   # save psds
   f, Pxx = psd(transformed_data)
-  np.savez(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz', Pxx)
+  np.savez(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_ch_avg_barycenter_cmmn_psds.npz', Pxx)
 
   print(f'Transformed emotion data for subject {subj} and calculated and saved psds')
 
@@ -824,11 +824,11 @@ frolich_transformed_original_psds = []
 emotion_transformed_psds = []
 
 for subj in frolich_subj_list:
-  frolich_transformed_subj_subj_psds.append(np.load(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_cmmn_psds.npz')['arr_0'])
-  frolich_transformed_original_psds.append(np.load(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_cmmn_psds.npz')['arr_0'])
+  frolich_transformed_subj_subj_psds.append(np.load(frolich_transformed_subj_subj_psd_filepath / f'frolich_extract_{subj}_256_hz_subj_subj_ch_avg_barycenter_cmmn_psds.npz')['arr_0'])
+  frolich_transformed_original_psds.append(np.load(frolich_transformed_original_psd_filepath / f'frolich_extract_{subj}_256_hz_original_ch_avg_barycenter_cmmn_psds.npz')['arr_0'])
 
 for subj in emotion_subj_list:
-  emotion_transformed_psds.append(np.load(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_cmmn_psds.npz')['arr_0'])
+  emotion_transformed_psds.append(np.load(emotion_transformed_psd_filepath / f'emotion_data_{subj}_256_hz_original_ch_avg_barycenter_cmmn_psds.npz')['arr_0'])
 
 # plot the psds
 plot_psd(frolich_transformed_subj_subj_psds, title='Cue Transformed - Subj-to-subj Mapping', save_path=output_dir / 'frolich_transformed_subj_subj_psds.pdf')
