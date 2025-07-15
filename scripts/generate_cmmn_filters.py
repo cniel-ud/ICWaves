@@ -40,30 +40,55 @@ def compute_normed_barycenter(data, psds=None, normalize=True):
 
   """
 
-  normalized_psds = []
+  # Original approach - commented out for reproducibility
+  # normalized_psds = []
+  # if psds is None:
+  #   psds = []
+  # for i, subj in enumerate(data):
+  #     if psds is None: # note: I'm always passing psds, so in practice we aren't calculating psds here.
+  #         f, Pxx = psd(subj)
+  #         psds.append(Pxx)
+  #         if normalize:
+  #           normalized_psds.append(Pxx / np.sum(Pxx))
+  #         else:
+  #           normalized_psds.append(Pxx)
+  #     else:
+  #         if normalize:
+  #           normalized_psds.append(psds[i] / np.sum(psds[i]))
+  #         else:
+  #           normalized_psds.append(psds[i])
+
+  # # now average all together
+  # per_subj_avgs = []
+  # for subj in normalized_psds:
+  #     avg = np.mean(subj, axis=0)
+  #     per_subj_avgs.append(np.mean(subj, axis=0)) # necessary due to inhomogenous dimensions
+
+  # barycenter = np.mean(per_subj_avgs, axis=0)
+
+  # New approach - L1 normalization after channel averaging
   if psds is None:
     psds = []
-  for i, subj in enumerate(data):
-      if psds is None: # note: I'm always passing psds, so in practice we aren't calculating psds here.
-          f, Pxx = psd(subj)
-          psds.append(Pxx)
-          if normalize:
-            normalized_psds.append(Pxx / np.sum(Pxx))
-          else:
-            normalized_psds.append(Pxx)
-      else:
-          if normalize:
-            normalized_psds.append(psds[i] / np.sum(psds[i]))
-          else:
-            normalized_psds.append(psds[i])
+    for subj in data:
+        f, Pxx = psd(subj)
+        psds.append(Pxx)
 
-  # now average all together
+  # First average across channels for each subject
   per_subj_avgs = []
-  for subj in normalized_psds:
+  for subj in psds:
       avg = np.mean(subj, axis=0)
-      per_subj_avgs.append(np.mean(subj, axis=0)) # necessary due to inhomogenous dimensions
+      per_subj_avgs.append(avg)
 
-  barycenter = np.mean(per_subj_avgs, axis=0)
+  # Then do L1 normalization on each subject's averaged PSD (if normalize=True)
+  if normalize:
+    normalized_psds = []
+    for subj_avg in per_subj_avgs:
+        normalized_psds.append(subj_avg / np.sum(subj_avg))
+    # Finally average across subjects
+    barycenter = np.mean(normalized_psds, axis=0)
+  else:
+    # If not normalizing, just average the channel-averaged PSDs directly
+    barycenter = np.mean(per_subj_avgs, axis=0)
 
   return barycenter
 
@@ -374,8 +399,8 @@ def main(make_psds=False):
     save_path.mkdir(parents=True, exist_ok=True)
 
     # save both the normed and unnormed barycenters
-    np.savez(save_path / 'emotion_normed_barycenter.npz', normed_emotion_barycenter)
-    np.savez(save_path / 'emotion_unnormed_barycenter.npz', unnormed_emotion_barycenter)
+    np.savez(save_path / 'emotion_normed_ch_avg_barycenter.npz', normed_emotion_barycenter)
+    np.savez(save_path / 'emotion_unnormed_ch_avg_barycenter.npz', unnormed_emotion_barycenter)
 
     # compute original filter
     # unnormed psds, normed barycenter
@@ -384,10 +409,10 @@ def main(make_psds=False):
     # save filters
     print('Saving filters for frolich original method...')
     for i, filter in enumerate(freq_filter):
-        np.savez(save_path / f'frolich_original_freq_filter_{frolich_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'frolich_original_ch_avg_barycenter_freq_filter_{frolich_subj_list[i]}.npz', filter)
 
     for i, filter in enumerate(time_filter):
-        np.savez(save_path / f'frolich_original_time_filter_{frolich_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'frolich_original_ch_avg_barycenter_time_filter_{frolich_subj_list[i]}.npz', filter)
 
     
     # compute subj-subj filter
@@ -398,10 +423,10 @@ def main(make_psds=False):
     # save subj-subj filters
     print('Saving filters for frolich subj-subj method...')
     for i, filter in enumerate(freq_filter_subj_subj):
-        np.savez(save_path / f'frolich_subj_subj_freq_filter_{frolich_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'frolich_subj_subj_ch_avg_barycenter_freq_filter_{frolich_subj_list[i]}.npz', filter)
 
     for i, filter in enumerate(time_filter_subj_subj):
-        np.savez(save_path / f'frolich_subj_subj_time_filter_{frolich_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'frolich_subj_subj_ch_avg_barycenter_time_filter_{frolich_subj_list[i]}.npz', filter)
 
 
     # below also computing the emotion filters to its own barycenter. for training a new clf. original CMMN paper formulation 
@@ -411,10 +436,10 @@ def main(make_psds=False):
     # save emotion filters
     print('Saving filters for emotion original method...')
     for i, filter in enumerate(freq_filter_emotion):
-        np.savez(save_path / f'emotion_original_freq_filter_{emotion_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_ch_avg_barycenter_freq_filter_{emotion_subj_list[i]}.npz', filter)
 
     for i, filter in enumerate(time_filter_emotion):
-        np.savez(save_path / f'emotion_original_time_filter_{emotion_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_ch_avg_barycenter_time_filter_{emotion_subj_list[i]}.npz', filter)
 
 
     # compute unnormalized emotion filters
@@ -424,10 +449,10 @@ def main(make_psds=False):
     # save unnormalized emotion filters
     print('Saving filters for emotion original method (unnormalized)...')
     for i, filter in enumerate(freq_filter_emotion_unnormed):
-        np.savez(save_path / f'emotion_original_freq_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'emotion_original_ch_avg_barycenter_freq_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
     
     for i, filter in enumerate(time_filter_emotion_unnormed):
-        np.savez(save_path / f'emotion_original_time_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'emotion_original_ch_avg_barycenter_time_filter_unnormed_{emotion_subj_list[i]}.npz', filter)
 
 
 
@@ -437,10 +462,10 @@ def main(make_psds=False):
 
     # save normed psds emotion filters
     for i, filter in enumerate(freq_filter_emotion_normed_psds):
-        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_freq_filter_{emotion_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_ch_avg_barycenter_freq_filter_{emotion_subj_list[i]}.npz', filter)
 
     for i, filter in enumerate(time_filter_emotion_normed_psds):
-        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_time_filter_{emotion_subj_list[i]}.npz', filter)
+        np.savez(save_path / f'emotion_normed_psds_normed_barycenter_ch_avg_barycenter_time_filter_{emotion_subj_list[i]}.npz', filter)
         
 
 
