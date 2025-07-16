@@ -15,18 +15,19 @@ FLOAT_DTYPES = (np.float64, np.float32)
 
 class TfidfRateScaler(BaseEstimator, TransformerMixin):
     """
-    TF-IDF scaler for count rates.
+    TF-IDF scaler for count rates that ensures consistent feature scaling across different segment lengths.
     
-    This scaler addresses the issue where TfidfTransformer expects integer counts
-    but we have count rates (floats) due to normalization by the number of documents.
+    This scaler addresses the issue where bowav features from different segment lengths
+    produce inconsistent TF-IDF scaling due to varying raw count magnitudes and patterns.
     
-    The scaler:
-    1. For fitting: Binarizes the count rates and converts to integers to compute IDF
-    2. For transformation: Uses the actual rates with TfidfTransformer.transform()
+    The scaler works with sklearn's raw-count-based TF-IDF by ensuring consistent input semantics:
+    1. For fitting: Binarizes count rates to learn IDF from feature presence patterns
+    2. For transformation: Applies learned IDF to actual count rates for consistent scaling
     
-    This ensures that the classifier receives IDF-scaled rates for both training
-    and inference, maintaining consistency while handling the document count disparity
-    between training and validation/test segments.
+    This approach ensures that:
+    - IDF learning is based on consistent feature presence patterns across segment lengths
+    - Raw count magnitudes are proportional and comparable 
+    - Normalization denominators reflect true relative feature importance
     
     Parameters
     ----------
@@ -87,10 +88,14 @@ class TfidfRateScaler(BaseEstimator, TransformerMixin):
         """
         Learn the IDF vector from binarized count rates.
         
+        Binarizes the count rates to focus IDF learning on feature presence patterns
+        rather than raw count magnitudes, ensuring consistent IDF values across
+        different segment lengths.
+        
         Parameters
         ----------
         X : array-like or sparse matrix of shape (n_samples, n_features)
-            Count rates matrix (floats).
+            Count rates matrix (floats representing proportions of windows containing each feature).
         y : Ignored
             Not used, present here for API consistency by convention.
             
@@ -124,15 +129,16 @@ class TfidfRateScaler(BaseEstimator, TransformerMixin):
     
     def transform(self, X, copy=True):
         """
-        Transform count rates to TF-IDF representation using actual rates.
+        Transform count rates to TF-IDF representation using learned IDF values.
         
-        This method directly uses TfidfTransformer.transform() on the count rates,
-        which handles all validation, TF-IDF logic, sublinear scaling, and normalization.
+        Applies the IDF values learned during fitting to the actual count rates,
+        ensuring consistent TF-IDF scaling regardless of the original segment lengths
+        used to generate the rates.
         
         Parameters
         ----------
         X : array-like or sparse matrix of shape (n_samples, n_features)
-            Count rates matrix (floats).
+            Count rates matrix (floats representing proportions of windows containing each feature).
         copy : bool, default=True
             Whether to copy X and operate on the copy or perform in-place operations.
             

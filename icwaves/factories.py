@@ -85,8 +85,8 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
     For bowav, time_series are the centroid assignments and have shape
     (n_ics, 7, n_win_per_ic), and the output of the extractor has shape
     (n_ics, n_segments, n_centroids*7). 7 is the number of ICLabel classes.
-    Bowav features are normalized by the number of segments to get count rates,
-    which addresses document count disparity between training and validation/test.
+    Bowav features are normalized by the number of windows per segment to get count rates,
+    which ensures consistent feature semantics across different segment lengths for TF-IDF scaling.
 
     For psd_autocorr, time_series are ICs, and have shape (n_ics, n_samples),
     and the output of the extractor has shape (n_ics, n_segments, 200). 200
@@ -109,7 +109,7 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
             time_series["bowav"], 
             kwargs["n_centroids"], 
             segment_len["bowav"],
-            normalize_by_segments=True  # Always use count rates for bowav
+            normalize_by_windows=True  # Always use count rates for bowav
         )
 
     def psd_autocorr(
