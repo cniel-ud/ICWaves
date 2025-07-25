@@ -11,6 +11,7 @@ from typing import Tuple
 
 import numpy as np
 from numpy.typing import NDArray
+from tensorflow.python.ops.ragged.ragged_array_ops import dynamic_partition
 
 
 def eeg_psd(
@@ -18,6 +19,7 @@ def eeg_psd(
     sfreq: float,
     logscale: bool = True,
     normalize: bool = True,
+    dynamic_range: float = 1000.,
 ) -> NDArray[np.float32]:
     """PSD feature.
 
@@ -29,7 +31,7 @@ def eeg_psd(
     n_chan, n_points = signal.shape
     constants = _psd_constants(n_points, sfreq, n_chan)
     psd = _psd_compute_psdmed(signal, sfreq, *constants, logscale=logscale)
-    psd = _psd_format(psd, logscale=logscale, normalize=normalize)
+    psd = _psd_format(psd, logscale=logscale, normalize=normalize, dynamic_range=dynamic_range)
     return psd
 
 
@@ -116,6 +118,7 @@ def _psd_format(
     psd: NDArray[np.float64],
     logscale: bool = True,
     normalize: bool = True,
+    dynamic_range: float = 1000.,
 ) -> NDArray[np.float32]:
     """Apply the formatting steps after 'eeg_rpsd.m'."""
     # extrapolate or prune as needed
@@ -149,8 +152,13 @@ def _psd_format(
             )
 
     if normalize:
-        # normalize
-        psd = np.divide(psd.T, np.max(np.abs(psd), axis=-1)).T
+        # log scale normalization
+        if logscale:
+            orig_max = np.max(psd,axis=-1,keepdims=True)
+            psd = np.maximum(-np.log10(dynamic_range), (psd - orig_max)/20) # range is -log10(dynamic_range) to 0
+            psd = 2*psd/np.log10(dynamic_range)+1 # range is  -1 to 1
+        else:
+            psd = np.divide(psd.T, np.max(np.abs(psd), axis=-1)).T
 
         # cast
         return 0.99 * psd.astype(np.float32)
