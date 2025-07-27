@@ -95,24 +95,29 @@ def _eeg_autocorr_welch(
         ac[it, :] = np.mean(np.power(np.abs(x), 2), axis=1)
     ac = np.fft.ifft(ac)
 
+    # resample to 1 second at 100 samples/sec
+    # NOTE: in contrast to the original ICLabel code, we resample first and
+    # and then normalize. Resampling might change the amplitude of the autocorrelation,
+    # and thus undo the normalization.
+
+    ac = _resample(ac, sfreq)
+
     # normalize
     # In MATLAB, 2 scenarios are defined:
     # - EEG.pnts < EEG.srate, which never occurs since then raw provided to
     # this autocorrelation function last at least 5 second.
     # - EEG.pnts > EEG.srate, implemented below.
-    ac = ac[:, : int(sfreq) + 1]
+    ac = ac[:, :101]
     # build the (3-line!) denominator
-    arr1 = np.arange(n_points, n_points - int(sfreq), -1)
-    arr1 = np.hstack([arr1, [np.max([1, n_points - int(sfreq)])]])
+    arr1 = np.arange(n_points, n_points - 100, -1)
+    arr1 = np.hstack([arr1, [np.max([1, n_points - 100])]])
     den = np.tile(ac[:, 0], (arr1.size, 1))
     den = den.T * arr1 / n_points
     # finally..
     ac = np.divide(ac, den)
 
-    # resample to 1 second at 100 samples/sec
-    resamp = _resample(ac, sfreq)
-    resamp = resamp[:, 1:]
-    return 0.99 * np.real(resamp).astype(np.float32)
+    ac = ac[:, 1:]
+    return 0.99 * np.real(ac).astype(np.float32)
 
 
 def _resample(ac: NDArray[np.float64], sfreq: Union[int, float]) -> NDArray[np.float64]:
