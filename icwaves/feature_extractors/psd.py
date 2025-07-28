@@ -149,8 +149,10 @@ def _psd_format(
             )
 
     if normalize:
-        # normalize
-        psd = np.divide(psd.T, np.max(np.abs(psd), axis=-1)).T
+        # min-max scaling normalization
+        psd_min = np.min(psd, axis=-1, keepdims=True)
+        psd_max = np.max(psd, axis=-1, keepdims=True)
+        psd = 2 * (psd - psd_min) / (psd_max - psd_min) - 1  # range is -1 to 1
 
         # cast
         return 0.99 * psd.astype(np.float32)
