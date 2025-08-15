@@ -1,5 +1,4 @@
 _private/
-/results/
 /data/
 __pycache__/
 *.asv
@@ -7,3 +6,4 @@ __pycache__/
 *.egg-info/
 .venv/
 /SLURM/
+/results/emotion_study/classifier/
