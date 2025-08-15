@@ -46,7 +46,7 @@ class EvalConfig:
             and self.cmmn_filter not in SUPPORTED_CMNN_FILTERS
         ):
             raise ValueError(f"Unknown cmmn filter {self.cmmn_filter}")
-        if self.cmmn_filter is not None and self.eval_dataset != "cue":
+        if self.cmmn_filter == "subj_to_subj" and self.eval_dataset != "cue":
             raise ValueError(f"cmmn filter only supported for cue dataset")
 
         # Wheter we use codebooks that were trained using CMMN-filtered data
