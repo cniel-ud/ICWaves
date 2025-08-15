@@ -1,6 +1,8 @@
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
 from itertools import product
+from pathlib import Path
 
 
 def plot_confusion_matrix(
@@ -66,20 +68,236 @@ def plot_confusion_matrix(
     return fig, ax
 
 
-def plot_line_with_error_area(ax, df, x, y, error, color="blue", add_std_label=False):
+def plot_line_with_error_area(
+    ax, df, x, y, error, color="blue", add_std_label=False, label=None
+):
+    """
+    Plot a line with error area.
+
+    Args:
+        ax: Matplotlib axis to plot on
+        df: DataFrame containing data
+        x: Column name for x-axis data
+        y: Column name for y-axis data
+        error: Column name for error data
+        color: Color name or hex code
+        add_std_label: Whether to add a separate label for the error area
+        label: Custom label for the line (if None, uses the y column name)
+
+    Returns:
+        Updated matplotlib axis
+    """
+    # Use custom label if provided, otherwise use column name
+    plot_label = label if label is not None else y
+
+    # If color starts with 'tab:', use it directly, otherwise add the prefix
+    if color.startswith("tab:"):
+        color_str = color
+    else:
+        color_str = f"tab:{color}"
+
     ax.plot(
         df[x],
         df[y],
-        label=y,
-        color=f"tab:{color}",
+        label=plot_label,
+        color=color_str,
     )
+
     std_label = error if add_std_label else None
     ax.fill_between(
         df[x],
         df[y] - df[error],
         df[y] + df[error],
-        color=f"tab:{color}",
+        color=color_str,
         alpha=0.2,
         label=std_label,
     )
     return ax
+
+
+def create_comparison_plot(
+    results_df,
+    fixed_params,
+    vary_by,
+    include_iclabel=True,
+    figsize=(10, 6),
+    save_path=None,
+    iclabel_func=None,
+    root_path=None,
+    add_title=True,
+):
+    """
+    Create a comparison plot showing mean F1 score vs prediction window.
+
+    This simplified function focuses specifically on plotting prediction window on the x-axis
+    and mean F1 score on the y-axis, with one line for each value of the vary_by parameter.
+
+    Args:
+        results_df: DataFrame containing all results
+        fixed_params: Dict of parameters to fix for filtering (e.g., {'eval_dataset': 'cue', 'validation_segment_len': 300})
+        vary_by: Parameter to vary in the plot (e.g., 'feature_extractor', 'classifier_type')
+        include_iclabel: Whether to include ICLabel results
+        figsize: Size of the figure
+        save_path: Path to save the figure (if None, don't save)
+        iclabel_func: Function to calculate ICLabel F1 scores (required if include_iclabel=True)
+        root_path: Path to the root directory (required if include_iclabel=True)
+        add_title: If True, add title. This is for debugging purposes.
+
+    Returns:
+        Figure and axis objects
+    """
+    # Define standard x ticks for log scale
+    global_x_ticks = np.array([0.15, 0.5, 1, 2, 3, 5, 10, 30, 50])
+    val_seg_len_map = {-1: "All", 300: "5-minutes"}
+
+    # Filter the data based on fixed parameters
+    filtered_df = results_df.copy()
+    for param, value in fixed_params.items():
+        if param != "cmmn_filter":  # Don't filter on cmmn_filter
+            filtered_df = filtered_df[filtered_df[param] == value]
+
+    # Validate that we have data after filtering
+    if len(filtered_df) == 0:
+        raise ValueError("No data matching the specified filters")
+
+    # Get unique values for the parameter we're varying
+    vary_values = filtered_df[vary_by].unique()
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Add ICLabel reference if requested
+    if include_iclabel and iclabel_func and root_path:
+        # Get ICLabel data
+        eval_dataset = fixed_params.get("eval_dataset")
+        if eval_dataset:
+            # Calculate validation_times_ for ICLabel
+            validation_times = filtered_df["prediction_window"].unique()
+            validation_times_ = validation_times * 60
+
+            iclabel_data_dir = root_path.joinpath(f"data/{eval_dataset}/ICLabels")
+            subj_ids = (
+                list(range(1, 8))
+                if eval_dataset == "emotion_study"
+                else list(range(1, 13))
+            )
+            iclabel_df = iclabel_func(iclabel_data_dir, subj_ids, validation_times_)
+            iclabel_df = iclabel_df.rename(
+                columns={
+                    "Brain F1 score - iclabel": "iclabel",
+                }
+            )
+
+            # Plot ICLabel results
+            ax = plot_line_with_error_area(
+                ax,
+                iclabel_df,
+                "Prediction window [minutes]",
+                "iclabel",
+                "StdDev - iclabel",
+                color="red",
+                label="ICLabel",
+            )
+
+    # Create color mapping for the varying parameter
+    vary_colors = plt.cm.tab10(np.linspace(0, 1, len(vary_values)))
+    vary_color_map = {value: vary_colors[i] for i, value in enumerate(vary_values)}
+
+    # Get unique filter values in the filtered dataframe
+    filter_values = filtered_df["cmmn_filter"].unique()
+
+    # Create a colormap specifically for filters with pastel colors
+    filter_colors = plt.cm.Pastel1(np.linspace(0, 1, len(filter_values)))
+    filter_color_map = {
+        value: filter_colors[i] for i, value in enumerate(filter_values)
+    }
+
+    # Line styles for different filters
+    filter_line_styles = {
+        "None": "-",  # Solid line
+        "normed-barycenter": "--",  # Dashed line
+        "unnormed-barycenter": "-.",  # Dash-dot line
+        "subj_to_subj": ":",  # Dotted line
+    }
+
+    # Plot for each combination of vary_by parameter and cmmn_filter
+    for vary_value in vary_values:
+        # Get data for this value of the varying parameter
+        vary_data = filtered_df[filtered_df[vary_by] == vary_value]
+
+        # Skip if no data
+        if len(vary_data) == 0:
+            continue
+
+        # Process each filter for this vary_value
+        for filter_value in filter_values:
+            # Get data for this filter value
+            value_data = vary_data[vary_data["cmmn_filter"] == filter_value]
+
+            # Skip if no data for this combination
+            if len(value_data) == 0:
+                continue
+
+            # Sort by prediction window
+            value_data = value_data.sort_values("prediction_window")
+
+            # Create label combining vary_by parameter and filter
+            if vary_by == "feature_extractor":
+                base_label = vary_value
+            elif vary_by == "classifier_type":
+                base_label = vary_value
+            else:
+                base_label = f"{vary_by}: {vary_value}"
+
+            # Add filter to the label
+            label = f"{base_label} (filter: {filter_value})"
+
+            # Choose color based on the varying parameter
+            color = vary_color_map[vary_value]
+
+            # Choose line style based on filter
+            line_style = filter_line_styles.get(filter_value, "-")
+
+            # Plot the line with appropriate style
+            ax.plot(
+                value_data["prediction_window"],
+                value_data["mean_f1"],
+                label=label,
+                color=color,
+                linestyle=line_style,
+            )
+
+            # Add error area
+            ax.fill_between(
+                value_data["prediction_window"],
+                value_data["mean_f1"] - value_data["std_f1"],
+                value_data["mean_f1"] + value_data["std_f1"],
+                color=color,
+                alpha=0.1,  # Lower alpha for better visibility with multiple filters
+            )
+
+    # Format the plot
+    ax.set_xscale("log")
+    ax.set_xticks(global_x_ticks, labels=global_x_ticks)
+    ax.set_xlim(global_x_ticks[0], 50)
+    ax.set_xlabel("Prediction window [minutes]")
+    ax.set_ylabel("Mean Brain F1 score")
+
+    if add_title:
+        # Create descriptive title
+        title_parts = []
+        for param, value in fixed_params.items():
+            if param == "validation_segment_len":
+                value = val_seg_len_map.get(value, value)
+            if param != "cmmn_filter":  # Don't include cmmn_filter in title
+                title_parts.append(f"{param}: {value}")
+
+        ax.set_title(f"Mean Brain F1 score | {' | '.join(title_parts)}")
+    ax.legend()
+    ax.grid(True)
+
+    # Save the figure if a path is provided
+    if save_path:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    return fig, ax
