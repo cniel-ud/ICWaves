@@ -7,7 +7,7 @@ from typing import Optional
 SUPPORTED_CLASSIFIERS = ["random_forest", "logistic", "ensembled_logistic"]
 SUPPORTED_DATASETS = ["emotion_study", "cue"]
 SUPPORTED_FEATURES = ["bowav", "psd_autocorr", "bowav_psd_autocorr"]
-SUPPORTED_CMNN_FILTERS = ["original", "subj_to_subj"]
+SUPPORTED_CMNN_FILTERS = ["normed-barycenter", "unnormed-barycenter", "subj_to_subj"]
 
 
 @dataclass
