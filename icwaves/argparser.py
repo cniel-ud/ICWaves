@@ -62,7 +62,7 @@ def create_argparser_all_params(feature_extractor: str):
     parser.add_argument(
         "--cmmn-filter",
         type=str,
-        choices=["original", "subj_to_subj"],
+        choices=["unnormed-barycenter", "normed-barycenter", "subj_to_subj"],
         default=None,
         help="Type of CMMN filter to use",
     )
