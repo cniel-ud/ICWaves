@@ -178,7 +178,8 @@ def _add_bowav_args(parser):
         "--tf-idf-norm",
         help="Norm in TfidfTransformer",
         nargs="+",
-        default=["none", "l1", "l2"],
+        default=["none"],
+        choices=["none", "l1", "l2"],
     )
 
     return parser
