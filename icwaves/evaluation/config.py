@@ -118,9 +118,7 @@ class EvalConfig:
             int(self.validation_segment_length)
         )
         if self.is_classifier_trained_on_normalized_data:
-            cmmn_suffix = get_cmmn_suffix(
-                self.cmmn_filter, self.is_cmmn_filter_resampled
-            )
+            cmmn_suffix = get_cmmn_suffix("normed-barycenter")
         else:
             cmmn_suffix = get_cmmn_suffix(None)
         # Base path for all classifiers
