@@ -49,8 +49,7 @@ class EvalConfig:
         if self.cmmn_filter is not None and self.eval_dataset != "cue":
             raise ValueError(f"cmmn filter only supported for cue dataset")
 
-        # TODO: if the classifier is not trained on filtered 'emotion' data,
-        # should we still use the filtered codebooks when computing bowav for 'cue'?
+        # Wheter we use codebooks that were trained using CMMN-filtered data
         if self.is_classifier_trained_on_normalized_data:
             self.cmmn_subfolder = "normed_filtered"
         else:
