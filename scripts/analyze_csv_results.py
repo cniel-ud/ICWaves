@@ -2,7 +2,7 @@
 """
 Script to analyze all CSV evaluation results and compute averages across subjects.
 
-Post NER note - moved to scripts. Check filepaths.
+note - moved to scripts. Check filepaths.
 
 """
 
