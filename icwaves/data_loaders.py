@@ -6,6 +6,11 @@ import numpy as np
 from scipy.io import loadmat
 from tqdm import tqdm
 
+from icwaves.preprocessing import _get_metadata_for_windowed_ics
+
+# Configure module logger
+logger = logging.getLogger(__name__)
+
 EXPERT_ANNOTATED_CLASSES = [1, 2, 3]  # brain, muscle, eye (Matlab indexing)
 
 CLASS_LABELS = [
@@ -19,89 +24,96 @@ CLASS_LABELS = [
 ]
 
 
-# TODO: refactor to recieve subject ids and use new-format files subj-<id>.mat
 # The train set here were subjects 8 to 35 (subject 22 is missing) from the
 # 'emotion_study' dataset.
 def load_raw_train_set_per_class(args, rng):
-    data_dir = args.path_to_centroid_assignments
-    file_list = list(data_dir.glob(f"train_subj-*.mat"))
+    """Load raw training data for a specific IC class."""
+    logger.info(
+        f"Loading raw training set for class {args.class_label} ({CLASS_LABELS[args.class_label-1]})"
+    )
+    file_list, _, n_win_per_ic, srate = _get_metadata_for_windowed_ics(args)
+    logger.debug(f"Found {len(file_list)} files")
 
-    ic_ind_per_subj = []
-    subj_with_no_ic = []
-    for i_subj, file in enumerate(file_list):
+    ic_ind_per_subj_dict = {}
+    file_dict = {}
+    n_ics_per_subj_dict = {}
+
+    logger.info("Identifying subjects with target IC class")
+    for i_subj, file in zip(args.subj_ids, file_list):
         with file.open("rb") as f:
-            matdict = loadmat(f, variable_names=["expert_labels", "noisy_labels"])
-            expert_labels = matdict["expert_labels"]
-            noisy_labels = matdict["noisy_labels"]
+            matdict = loadmat(f, variable_names=["labels"])
+            labels = matdict["labels"]
 
-        if args.class_label in EXPERT_ANNOTATED_CLASSES:
-            ic_ind = (expert_labels == args.class_label).nonzero()[0]
-        else:
-            winner_class = np.argmax(noisy_labels, axis=1)
-            winner_class = winner_class + 1  # python to matlab indexing base
-            ic_ind = (winner_class == args.class_label).nonzero()[0]
+        ic_ind = (labels == args.class_label).nonzero()[0]
 
         if ic_ind.size > 0:  # subject has IC class
-            ic_ind_per_subj.append(ic_ind)
-        else:
-            subj_with_no_ic.append(i_subj)
+            ic_ind_per_subj_dict[i_subj] = ic_ind
+            file_dict[i_subj] = file
+            n_ics_per_subj_dict[i_subj] = ic_ind.size
+            logger.debug(
+                f"Subject {i_subj}: Found {ic_ind.size} ICs of class {args.class_label}"
+            )
 
-    file_list = [file for i, file in enumerate(file_list) if i not in subj_with_no_ic]
+            if ic_ind.size > args.ics_per_subject:
+                n_ics_per_subj_dict[i_subj] = args.ics_per_subject
+                ic_ind_per_subj_dict[i_subj] = rng.choice(
+                    ic_ind_per_subj_dict[i_subj],
+                    size=args.ics_per_subject,
+                    replace=False,
+                )
+                logger.debug(
+                    f"Subject {i_subj}: Sampled {args.ics_per_subject} ICs from {ic_ind.size} available"
+                )
 
-    n_subj = len(ic_ind_per_subj)
-    n_ics_per_subj = np.array(list(map(lambda x: x.size, ic_ind_per_subj)))
-    subj_with_ic_excess = (n_ics_per_subj > args.ics_per_subject).nonzero()[0]
-    n_ics_per_subj[subj_with_ic_excess] = args.ics_per_subject
-    n_ics = np.sum(n_ics_per_subj)
-
-    for i_subj in subj_with_ic_excess:
-        ic_ind_per_subj[i_subj] = rng.choice(
-            ic_ind_per_subj[i_subj], size=args.ics_per_subject, replace=False
-        )
-
-    icaact_list = [None] * n_subj
-    for i_subj, file in tqdm(enumerate(file_list)):
-        with file.open("rb") as f:
-            matdict = loadmat(f, variable_names="icaact")
-            icaact = matdict["icaact"]
-
-        icaact_list[i_subj] = icaact[ic_ind_per_subj[i_subj]]
-
-    # ICs from different subjects have different lenths, so we don't
-    # concatenate into a single array
-    ic_lenght_per_subj = np.array(list(map(lambda x: x.shape[1], icaact_list)))
-    max_n_win_per_subj = ic_lenght_per_subj // args.window_len
-    max_minutes_per_ic_per_subj = (
-        (max_n_win_per_subj * args.window_len) / args.srate / 60
+    n_ics = sum(n_ics_per_subj_dict.values())
+    tot_win = n_ics * n_win_per_ic
+    tot_hrs = tot_win * args.window_length / 3600
+    logger.info(
+        f"Found {len(file_dict)}/{len(args.subj_ids)} subjects with class '{CLASS_LABELS[args.class_label-1]}'"
     )
-    min_max_minutes_per_ic = np.min(max_minutes_per_ic_per_subj)
+    logger.info(f"Training ICs for '{CLASS_LABELS[args.class_label-1]}': {n_ics}")
+    logger.info(f"Number of training windows: {tot_win} ({tot_hrs:.2f} hours)")
 
-    take_all = True
-    if args.minutes_per_ic is not None and args.minutes_per_ic < min_max_minutes_per_ic:
-        minutes_per_window = args.window_len / args.srate / 60
-        n_win_per_ic = np.ceil(args.minutes_per_ic / minutes_per_window).astype(int)
-        take_all = False
-    else:
-        n_win_per_ic = ic_lenght_per_subj // args.window_len
+    window_length = int(args.window_length * srate)
+    logger.debug(f"Window length: {window_length} samples ({args.window_length}s)")
 
-    tot_win = (n_win_per_ic * n_ics_per_subj).sum()
-    tot_hrs = tot_win * args.window_len / args.srate / 3600
-
-    print(f"Training ICs for '{CLASS_LABELS[args.class_label-1]}': {n_ics}")
-    print(f"Number of training hours: {tot_hrs:.2f}")
-
-    X = np.zeros((tot_win, args.window_len), dtype=icaact_list[0].dtype)
+    ic_windows = np.zeros((tot_win, window_length), dtype=np.float32)
     win_start = 0
-    for i_subj, ics in tqdm(enumerate(icaact_list)):
-        n_win = n_win_per_ic[i_subj] if take_all else n_win_per_ic
-        for ic in ics:
-            time_idx = np.arange(0, ic.size - args.window_len + 1, args.window_len)
-            time_idx = rng.choice(time_idx, size=n_win, replace=False)
-            time_idx = time_idx[:, None] + np.arange(args.window_len)[None, :]
-            X[win_start : win_start + n_win] = ic[time_idx]
-            win_start += n_win
 
-    return X
+    logger.info(f"Processing {len(file_dict)} subjects")
+    for i_subj, file in tqdm(file_dict.items()):
+        logger.debug(f"Processing subject {i_subj} from {file}")
+        with file.open("rb") as f:
+            matdict = loadmat(f)
+            data = matdict["data"]
+            icaweights = matdict["icaweights"]
+            icasphere = matdict["icasphere"]
+
+        icaact = icaweights @ icasphere @ data
+        icaact = icaact[ic_ind_per_subj_dict[i_subj]]
+        logger.debug(f"Subject {i_subj}: ICA activations shape {icaact.shape}")
+
+        if args.path_to_cmmn_filters is not None:
+            cmmn_path = Path(args.path_to_cmmn_filters)
+            fname = f"subj-{i_subj:02}.npz"
+            fpath = cmmn_path.joinpath(fname)
+            if not fpath.exists():
+                raise FileNotFoundError(f"File {fpath} does not exist.")
+            with np.load(fpath) as cmmn_map:
+                cmmn_filter = cmmn_map["arr_0"]
+            logger.debug(f"Loaded CMMN filter for subject {i_subj}")
+
+        for ic in icaact:
+            time_idx = np.arange(0, ic.size - window_length + 1, window_length)
+            time_idx = time_idx[:n_win_per_ic]
+            time_idx = time_idx[:, None] + np.arange(window_length)[None, :]
+            if args.path_to_cmmn_filters is not None:
+                ic = np.convolve(ic, cmmn_filter, mode="full")[: len(ic)]
+            ic_windows[win_start : win_start + n_win_per_ic] = ic[time_idx]
+            win_start += n_win_per_ic
+
+    logger.info(f"Successfully loaded {win_start} windows")
+    return ic_windows, srate
 
 
 def load_codebooks(args):

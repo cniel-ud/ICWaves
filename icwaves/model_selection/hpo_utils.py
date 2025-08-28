@@ -4,7 +4,8 @@ import pickle
 from pathlib import Path
 from sklearn.model_selection import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
-from icwaves.feature_extractors.utils import calculate_segment_length
+from icwaves.feature_extractors.utils import convert_segment_length
+from icwaves.file_utils import get_cmmn_suffix, get_validation_segment_length_string
 from icwaves.model_selection.utils import _store
 
 TF_IDF_NORM_MAP = {
@@ -35,42 +36,53 @@ def get_base_parameters(args, rng):
 
 
 def build_grid_parameters(args, srate):
-    candidate_params = {}
-    candidate_params["input_or_output_aggregation_method"] = [
-        "count_pooling",
-        "majority_vote",
-    ]
-    candidate_params["training_segment_length"] = calculate_segment_length(
-        args, srate, train=True
+    candidate_params = {
+        "input_or_output_aggregation_method": ["count_pooling", "majority_vote"],
+        "expert_weight": args.expert_weight,
+    }
+
+    # Handle segment lengths
+    window_length = args.window_length if "bowav" in args.feature_extractor else None
+    candidate_params["training_segment_length"] = convert_segment_length(
+        args.training_segment_length, args.feature_extractor, srate, window_length
     )
-    candidate_params["validation_segment_length"] = calculate_segment_length(
-        args, srate, train=False
+    candidate_params["validation_segment_length"] = convert_segment_length(
+        args.validation_segment_length, args.feature_extractor, srate, window_length
     )
-    candidate_params["expert_weight"] = args.expert_weight
+
+    # Determine if we need to use a pipeline prefix for classifier parameters
+    # Pipeline is used for bowav and bowav_psd_autocorr feature extractors
+    uses_pipeline = args.feature_extractor in ["bowav", "bowav_psd_autocorr"]
+    prefix = "clf__" if uses_pipeline else ""
+
+    # Apply TF-IDF parameters for feature extractors that use it
+    if args.feature_extractor == "bowav":
+        candidate_params["scaler__norm"] = [
+            TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+        ]
+    elif args.feature_extractor == "bowav_psd_autocorr":
+        candidate_params["scaler__bowav__norm"] = [
+            TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
+        ]
+
+    # Add classifier-specific parameters with appropriate prefixes
     if args.classifier_type == "logistic":
-        if args.feature_extractor == "bowav":
-            candidate_params["clf__C"] = args.regularization_factor
-            candidate_params["clf__l1_ratio"] = args.l1_ratio
-            candidate_params["scaler__norm"] = [
-                TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
-            ]
-        else:
-            candidate_params["C"] = args.regularization_factor
-            candidate_params["l1_ratio"] = args.l1_ratio
+        candidate_params[f"{prefix}C"] = args.regularization_factor
+        candidate_params[f"{prefix}l1_ratio"] = args.l1_ratio
     elif args.classifier_type == "random_forest":
-        candidate_params["min_samples_split"] = args.min_samples_split
+        candidate_params[f"{prefix}min_samples_split"] = args.min_samples_split
 
     candidate_params = list(ParameterGrid(candidate_params))
 
     return candidate_params
 
 
-def get_grid_size(candidate_params, cv, data_bundle):
+def get_grid_size(candidate_params, cv, subj_ind):
     n_candidates = len(candidate_params)
     n_splits = cv.get_n_splits(
-        data_bundle.data,
-        data_bundle.labels,
-        groups=data_bundle.subj_ind,
+        X=None,
+        y=None,
+        groups=subj_ind,
     )
     return n_candidates, n_splits
 
@@ -89,8 +101,9 @@ def load_candidate_results(results_path, n_candidates, n_splits):
     all_out = []
     for candidate_idx in range(n_candidates):
         for split_idx in range(n_splits):
+
             file = results_path.joinpath(
-                f"candidate_{candidate_idx}_split_{split_idx}.pkl"
+                f"candidate_{candidate_idx}", f"split_{split_idx}.pkl"
             )
             with open(file, "rb") as f:
                 all_out.append(pickle.load(f))
@@ -116,33 +129,32 @@ def get_best_parameters(results):
     return best_params
 
 
-def process_candidate_results(args, cv, data_bundle):
+def process_candidate_results(args, cv, srate, subj_ind):
     """Process all candidate results and return the best estimator configuration.
 
     Args:
         args: Arguments containing path information
-        estimator: Base estimator to clone
-        n_candidates (int): Number of hyperparameter candidates
-        n_splits (int): Number of cross-validation splits
-        candidate_params (list): List of parameter dictionaries
+        cv: Cross validator
+        srate: sampling rate
+        subj_ind: indices of subjects
 
     Returns:
         tuple: (best_params, results)
     """
 
-    candidate_params = build_grid_parameters(args, data_bundle.srate)
-    n_candidates, n_splits = get_grid_size(candidate_params, cv, data_bundle)
+    candidate_params = build_grid_parameters(args, srate)
+    n_candidates, n_splits = get_grid_size(candidate_params, cv, subj_ind)
 
-    valseglen = (
-        "None"
-        if args.validation_segment_length == -1
-        else int(args.validation_segment_length)
+    valseglen = get_validation_segment_length_string(
+        int(args.validation_segment_length)
     )
-    results_path = Path(
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+
+    results_folder = Path(
         args.path_to_results,
-        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}",
+        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}",
     )
-    all_out = load_candidate_results(results_path, n_candidates, n_splits)
+    all_out = load_candidate_results(results_folder, n_candidates, n_splits)
 
     timing_results = {
         **_store("fit_time", all_out["fit_time"], n_splits, n_candidates),

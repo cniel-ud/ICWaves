@@ -16,6 +16,8 @@ def _get_base_metadata(args):
         raise FileNotFoundError(f"Directory {data_dir} does not exist.")
 
     fnames = [f"subj-{i:02}.mat" for i in args.subj_ids]
+
+    # TODO: build a dict instead, to keep a map of subj_id and file
     file_list = [data_dir.joinpath(f) for f in fnames]
 
     logging.info("Getting number of time series and sampling rate...")
@@ -79,11 +81,23 @@ def _get_windowed_ics_and_labels(args):
 
         expert_label_mask_per_subject = expert_label_mask_per_subject.astype(bool)
         ica_activations = icaweights @ icasphere @ data
+        cmmn_filter = None
+        if args.path_to_cmmn_filters is not None:
+            cmmn_path = Path(args.path_to_cmmn_filters)
+            fname = f"subj-{subjID:02}.npz"
+            fpath = cmmn_path.joinpath(fname)
+            if not fpath.exists():
+                raise FileNotFoundError(f"File {fpath} does not exist.")
+            with np.load(fpath) as cmmn_map:
+                cmmn_filter = cmmn_map["arr_0"]
 
         for ic_ind, ic in enumerate(ica_activations):
             time_idx = np.arange(0, ic.size - window_length + 1, window_length)
             time_idx = time_idx[:n_win_per_ic]
             time_idx = time_idx[:, None] + np.arange(window_length)[None, :]
+            # Apply CMM filter here if vectorization is not possible, o.w., do it outside
+            if cmmn_filter is not None:
+                ic = np.convolve(ic, cmmn_filter, mode="full")[: len(ic)]
             windowed_ics[cum_ic_ind] = ic[time_idx]
             labels[cum_ic_ind] = labels_per_subject[ic_ind]
             noisy_labels[cum_ic_ind] = noisy_labels_per_subject[ic_ind]
@@ -111,7 +125,7 @@ def _get_ics_and_labels(args):
     ics = np.zeros((n_ics, n_points), dtype=np.float32)
     labels = -1 * np.ones(n_ics, dtype=int)
 
-    ic_start = 0
+    cum_ic_ind = 0
     expert_label_mask = np.full(n_ics, False)
     subj_ind = np.zeros(n_ics, dtype=int)
     # 7 ICLabel classes
@@ -131,13 +145,25 @@ def _get_ics_and_labels(args):
         expert_label_mask_per_subject = expert_label_mask_per_subject.astype(bool)
         ica_activations = icaweights @ icasphere @ data
 
-        ic_end = ic_start + ica_activations.shape[0]
-        ics[ic_start:ic_end] = ica_activations[:, :n_points]
-        labels[ic_start:ic_end] = labels_per_subject.squeeze()
-        noisy_labels[ic_start:ic_end] = noisy_labels_per_subject
-        expert_label_mask[ic_start:ic_end] = expert_label_mask_per_subject.squeeze()
-        subj_ind[ic_start:ic_end] = subjID
-        ic_start = ic_end
+        cmmn_filter = None
+        if args.path_to_cmmn_filters is not None:
+            cmmn_path = Path(args.path_to_cmmn_filters)
+            fname = f"subj-{subjID:02}.npz"
+            fpath = cmmn_path.joinpath(fname)
+            if not fpath.exists():
+                raise FileNotFoundError(f"File {fpath} does not exist.")
+            with np.load(fpath) as cmmn_map:
+                cmmn_filter = cmmn_map["arr_0"]
+
+        for ic_ind, ic in enumerate(ica_activations):
+            if cmmn_filter is not None:
+                ic = np.convolve(ic, cmmn_filter, mode="full")[: len(ic)]
+            ics[cum_ic_ind] = ic[:n_points]
+            labels[cum_ic_ind] = labels_per_subject[ic_ind]
+            noisy_labels[cum_ic_ind] = noisy_labels_per_subject[ic_ind]
+            expert_label_mask[cum_ic_ind] = expert_label_mask_per_subject[ic_ind]
+            subj_ind[cum_ic_ind] = subjID
+            cum_ic_ind += 1
 
     logging.info("Done building data matrix, labels, and other metadata")
 
@@ -164,28 +190,30 @@ def load_or_build_ics_and_labels(args: Namespace) -> DataBundle:
             expert_label_mask = data["expert_label_mask"]
             subj_ind = data["subj_ind"]
             noisy_labels = data["noisy_labels"]
-    else:
-        ics, labels, srate, expert_label_mask, subj_ind, noisy_labels = (
-            _get_ics_and_labels(args)
+
+        return DataBundle(
+            data=ics,
+            labels=labels,
+            expert_label_mask=expert_label_mask,
+            subj_ind=subj_ind,
+            srate=srate,
+            noisy_labels=noisy_labels,
         )
+
+    else:
+        db = _get_ics_and_labels(args)
         with preprocessed_data_file.open("wb") as f:
             np.savez(
                 f,
-                ics=ics,
-                labels=labels,
-                srate=srate,
-                expert_label_mask=expert_label_mask,
-                subj_ind=subj_ind,
-                noisy_labels=noisy_labels,
+                ics=db.data,
+                labels=db.labels,
+                srate=db.srate,
+                expert_label_mask=db.expert_label_mask,
+                subj_ind=db.subj_ind,
+                noisy_labels=db.noisy_labels,
             )
-    return DataBundle(
-        data=ics,
-        labels=labels,
-        expert_label_mask=expert_label_mask,
-        subj_ind=subj_ind,
-        srate=srate,
-        noisy_labels=noisy_labels,
-    )
+
+        return db
 
 
 def load_or_build_preprocessed_data(args):

@@ -6,7 +6,7 @@ def create_argparser_one_parameter_one_split():
     parser.add_argument(
         "--feature_extractor",
         type=str,
-        choices=["bowav", "psd_autocorr"],
+        choices=["bowav", "psd_autocorr", "bowav_psd_autocorr"],
         required=True,
         help="Type of feature extractor to use",
     )
@@ -21,7 +21,7 @@ def create_argparser_one_parameter_one_split():
         help=(
             "ID of SLURM array job. It takes values in [0, n_params*n_subjects-1]"
             "where n_params is the number of parameters in the config file and "
-            "n_subjects is the number of subjects."
+            "n_subjects is the number of subjects used for training."
         ),
     )
 
@@ -38,7 +38,7 @@ def create_argparser_aggregate_results():
     parser.add_argument(
         "--feature_extractor",
         type=str,
-        choices=["bowav", "psd_autocorr"],
+        choices=["bowav", "psd_autocorr", "bowav_psd_autocorr"],
         required=True,
         help="Type of feature extractor to use",
     )
@@ -58,6 +58,24 @@ def create_argparser_all_params(feature_extractor: str):
     parser.add_argument("--path-to-raw-data", help="Path to raw data", required=True)
     parser.add_argument(
         "--path-to-preprocessed-data", help="Path to preprocessed data", required=True
+    )
+    parser.add_argument(
+        "--cmmn-filter",
+        type=str,
+        choices=["unnormed-barycenter", "normed-barycenter", "subj_to_subj"],
+        default=None,
+        help="Type of CMMN filter to use",
+    )
+    parser.add_argument(
+        "--is-cmmn-filter-resampled",
+        action="store_true",
+        help="Whether to use resampled CMMN filters",
+    )
+    parser.add_argument(
+        "--path-to-cmmn-filters",
+        type=str,
+        help="Path to CMMN filters.",
+        default=None,
     )
     parser.add_argument(
         "--minutes-per-ic",
@@ -82,7 +100,7 @@ def create_argparser_all_params(feature_extractor: str):
     )
     parser.add_argument(
         "--validation-segment-length",
-        type=int,
+        type=float,
         default=300,
         help="Length in seconds of segment used during validation. Use -1 if you want to use all the time series.",
     )
@@ -120,7 +138,7 @@ def create_argparser_all_params(feature_extractor: str):
         help="Minimum samples per split",
     )
 
-    if feature_extractor == "bowav":
+    if "bowav" in feature_extractor:
         parser = _add_bowav_args(parser)
     return parser
 
@@ -160,7 +178,88 @@ def _add_bowav_args(parser):
         "--tf-idf-norm",
         help="Norm in TfidfTransformer",
         nargs="+",
-        default=["none", "l1", "l2"],
+        default=["none"],
+        choices=["none", "l1", "l2"],
+    )
+
+    return parser
+
+
+def create_argparser_train_dict():
+    parser = ArgumentParser()
+    parser.add_argument("--path-to-raw-data", help="Path to raw data", required=True)
+    parser.add_argument("--path-to-results", help="Path to results", required=True)
+    parser.add_argument(
+        "--subj-ids",
+        type=int,
+        help="A list with the subject ids to be used during training.",
+        nargs="+",
+        required=True,
+    )
+    parser.add_argument(
+        "--window-length",
+        type=float,
+        default=1.5,
+        help="Length of window assigned to centroid, in seconds",
+    )
+    parser.add_argument(
+        "--minutes-per-ic",
+        type=float,
+        default=50,
+        help="Number of minutes per IC to extract BagOfWaves features",
+    )
+    parser.add_argument(
+        "--num-clusters",
+        type=int,
+        default=128,
+        help="Number of clusters",
+    )
+    parser.add_argument(
+        "--centroid-length",
+        type=float,
+        default=1.0,
+        help="Centroid length in seconds",
+    )
+    parser.add_argument(
+        "--ics-per-subject",
+        type=int,
+        default=2,
+        help="Maximum number of ICs per subject to train the class-specific codebook",
+    )
+    parser.add_argument(
+        "--n-runs",
+        type=int,
+        default=10,
+        help="Number of runs for sikmeans",
+    )
+    parser.add_argument(
+        "--path-to-cmmn-filters",
+        type=str,
+        help="Path to CMMN filters.",
+        default=None,
+    )
+
+    return parser
+
+
+def create_argparser_train_dict_config():
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--path-to-config-file",
+        help="Path to config file with all the parameters",
+        required=True,
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=1,
+        help="Value for n_jobs (sklearn)",
+    )
+    parser.add_argument(
+        "--class-label",
+        type=int,
+        help="Class label to be used for training",
+        required=True,
     )
 
     return parser

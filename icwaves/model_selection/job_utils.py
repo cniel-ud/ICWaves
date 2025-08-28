@@ -34,6 +34,7 @@ def get_job_parameters(
         Tuple of (parameters, train_indices, test_indices, candidate_index, split_index, n_splits, n_candidates)
     """
     # Get all combinations of parameters and CV splits
+    # data_bundle.data is used only to get the number of samples (first dimension)
     all_combinations = list(
         product(
             enumerate(param_grid),
@@ -46,9 +47,7 @@ def get_job_parameters(
     # Get specific combination for this job
     (cand_idx, parameters), (split_idx, (train, test)) = all_combinations[job_id]
 
-    n_splits = cv.get_n_splits(
-        data_bundle.data, data_bundle.labels, groups=data_bundle.subj_ind
-    )
+    n_splits = cv.get_n_splits(X=None, y=None, groups=data_bundle.subj_ind)
     n_candidates = len(param_grid)
 
     return JobParameters(

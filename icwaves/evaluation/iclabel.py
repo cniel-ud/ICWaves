@@ -3,28 +3,31 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 from sklearn.metrics import f1_score
-from icwaves.evaluation.config import EvalConfig
 from numpy.typing import NDArray
-from icwaves.feature_extractors.utils import _get_conversion_factor
+import numpy.typing as npt
 
 
 def calculate_iclabel_f1_scores(
-    config: EvalConfig, validation_segment_lengths: NDArray[int]
+    dataset_dir: Path,
+    subj_ids: list[int],
+    validation_segment_lengths: npt.NDArray[np.int_],
 ):
     """
     Calculate ICLabel F1 scores for different segment lengths and subjects.
 
     Parameters
     ----------
-    config : EvalConfig
-        Evaluation configuration.
-    validation_segment_lengths : NDArray[np.int]
+    dataset_dir : Path
+        Directory containing the dataset.
+    subj_ids : list[int]
+        List of subject IDs to process.
+    validation_segment_lengths : npt.NDArray[np.int_]
         Array of validation segment lengths in seconds.
 
     Returns
     -------
-    f1_scores_ICLabel_df : pd.DataFrame
-        Data frame with ICLabel F1 scores.
+    mean_and_std_df : pd.DataFrame
+        Data frame with ICLabel F1 scores, including means and standard deviations.
     """
     columns = [
         "Prediction window [minutes]",
@@ -33,11 +36,10 @@ def calculate_iclabel_f1_scores(
         "Number of ICs",
     ]
     df = pd.DataFrame(columns=columns)
-    dataset_dir = config.path_to_eval_data
 
     for test_segment_len in validation_segment_lengths:
         subdir = dataset_dir.joinpath(f"IC_labels_at_{test_segment_len:.1f}_seconds")
-        for subj_id in config.subj_ids:
+        for subj_id in subj_ids:
             file = subdir.joinpath(f"subj-{subj_id:02}.mat")
             with file.open("rb") as f:
                 data = loadmat(f)

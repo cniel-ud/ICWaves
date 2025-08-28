@@ -4,6 +4,7 @@ import numpy as np
 import scipy
 from joblib import logger
 import logging
+from icwaves.model_selection.utils import _gather
 
 
 def _fit_and_score(
@@ -28,7 +29,8 @@ def _fit_and_score(
 
     # Build sample_weights
     expert_weight = parameters.pop("expert_weight", 1)
-    sample_weight = np.ones(X.shape[0])
+    feature_extractors = list(X.keys())
+    sample_weight = np.ones(X[feature_extractors[0]].shape[0])
     sample_weight[expert_label_mask] = expert_weight
 
     # Get input/output aggregation method
@@ -50,11 +52,13 @@ def _fit_and_score(
 
     result = {}
     start_time = time.time()
-    X_train, y_train = X[train], y[train]
+    X_train, y_train = _gather(X, y, train)
     sample_weight_train = sample_weight[train]
 
     # Build train feature vector for a given segment length
-    # TODO: rename `training_segment_length` to `train_segment_len`
+    # Note: When using count rates with bowav features, normalization by the number 
+    # of segments is handled in the feature extractor, and the custom TfidfRateScaler
+    # handles the binarization for IDF computation while using rates for transformation.
     X_train = feature_extractor(X_train, train_segment_length)
 
     # X_train.shape = (n_time_series, n_segments, n_features)
@@ -76,7 +80,7 @@ def _fit_and_score(
 
     fit_time = time.time() - start_time
 
-    X_test, y_test = X[test], y[test]
+    X_test, y_test = _gather(X, y, test)
     sample_weight_test = sample_weight[test]
 
     # Aggregate input at either training segment length or validation segment length
@@ -92,6 +96,18 @@ def _fit_and_score(
 
     y_pred = estimator.predict(X_test)
     del X_test
+
+    # TODO: improve this:
+    validation_segment_length = (
+        validation_segment_length["bowav"]
+        if "bowav" in validation_segment_length
+        else validation_segment_length["psd_autocorr"]
+    )
+    train_segment_length = (
+        train_segment_length["bowav"]
+        if "bowav" in train_segment_length
+        else train_segment_length["psd_autocorr"]
+    )
 
     # Predictions were made on segments of length training_segment_length.
     if input_or_output_aggregation_method == "majority_vote":

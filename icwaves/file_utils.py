@@ -1,14 +1,15 @@
 from pathlib import Path
 import shlex
-
-import numpy as np
-import scipy
-from sklearn.metrics import f1_score
+from typing import Optional
 
 
-def get_validation_segment_length_string(valseglen: int):
-    valseglen = "none" if valseglen == -1 else valseglen
+def get_validation_segment_length_string(valseglen: int) -> str:
+    valseglen = "None" if valseglen == -1 else str(valseglen)
     return valseglen
+
+
+def get_cmmn_suffix(cmmn_filter: Optional[str]) -> str:
+    return f"_cmmn-{cmmn_filter}"
 
 
 def read_args_from_file(file_path):
@@ -25,12 +26,13 @@ def read_args_from_file(file_path):
 
 def _build_centroid_assignments_file(args):
     subj_str = list_to_base36(args.subj_ids)
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
     base_name = (
         f"k-{args.num_clusters}_P-{args.centroid_length}"
         f"_winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}"
         f"_cbookMinPerIc-{args.codebook_minutes_per_ic}"
         f"_cbookICsPerSubj-{args.codebook_ics_per_subject}"
-        f"_subj-{subj_str}"
+        f"_subj-{subj_str}{cmmn_suffix}"
     )
     file_name = f"{base_name}.npy"
 
@@ -39,7 +41,9 @@ def _build_centroid_assignments_file(args):
 
 def _build_ics_and_labels_file(args):
     subj_str = list_to_base36(args.subj_ids)
-    base_name = f"minPerIC-{args.minutes_per_ic}_subj-{subj_str}"
+    # add suffix to signal that CMMN filter was applied
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    base_name = f"minPerIC-{args.minutes_per_ic}_subj-{subj_str}{cmmn_suffix}"
     file_name = f"{base_name}.npz"
 
     return file_name
@@ -47,9 +51,8 @@ def _build_ics_and_labels_file(args):
 
 def _build_preprocessed_data_file(args):
     subj_str = list_to_base36(args.subj_ids)
-    base_name = (
-        f"winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}_subj-{subj_str}"
-    )
+    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    base_name = f"winLen-{args.window_length}_minPerIC-{args.minutes_per_ic}_subj-{subj_str}{cmmn_suffix}"
     file_name = f"{base_name}.npz"
 
     return file_name
