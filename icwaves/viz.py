@@ -279,7 +279,7 @@ def create_comparison_plot(
     # Format the plot
     ax.set_xscale("log")
     ax.set_xticks(global_x_ticks, labels=global_x_ticks)
-    ax.set_xlim(global_x_ticks[0], 50)
+    ax.set_xlim(filtered_df["prediction_window"].min(), 50)
     ax.set_xlabel("Prediction window [minutes]")
     ax.set_ylabel("Mean Brain F1 score")
 
