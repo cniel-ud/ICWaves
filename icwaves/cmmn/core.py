@@ -71,7 +71,7 @@ def compute_filter_original(data, barycenter, psds=None):
     Compute the filter to transform the given data to the barycenter.
 
     Parameters:
-    - data: list of numpy arrays, each containing EEG data for a subject in the target data (cue / frolich here)
+    - data: list of numpy arrays, each containing EEG data for a subject in the target data (cue data here)
     - barycenter: numpy array containing the normed barycenter of the data
     - psds: pre-computed PSDs (optional)
 
@@ -130,7 +130,7 @@ def subj_subj_matching(source_psds, target_psds) -> List[int]:
         correct_source_psds[i] = source_psd / np.sum(source_psd)
 
     subj_subj_matches = []
-    for i, target_psd in enumerate(correct_target_psds):  # frolich
+    for i, target_psd in enumerate(correct_target_psds):  # cue
         min_dist = float('inf')
         min_idx = -1
         for j, source_psd in enumerate(correct_source_psds):  # emotion
@@ -142,7 +142,7 @@ def subj_subj_matching(source_psds, target_psds) -> List[int]:
                 min_idx = j
         subj_subj_matches.append(min_idx)
 
-        print(f"Frolich subject {i} has been matched to Emotion subject {min_idx}")
+        print(f"Cue subject {i} has been matched to Emotion subject {min_idx}")
 
     return subj_subj_matches
 
@@ -175,7 +175,7 @@ def compute_filter_subj_subj(target_psds, source_psds, subj_subj_matches):
     for i, subj in enumerate(averaged_target_psds):
         source_psd = averaged_source_psds[subj_subj_matches[i]]
 
-        freq_filter = np.sqrt(source_psd) / np.sqrt(subj)  # sqrt of emotion psd / sqrt of frolich psd
+        freq_filter = np.sqrt(source_psd) / np.sqrt(subj)  # sqrt of emotion psd / sqrt of cue psd
         time_filter = np.fft.irfft(freq_filter)  # note: changed from ifft to irfft
 
         freq_filter_per_subj.append(freq_filter)
@@ -311,13 +311,14 @@ def plot_psd(data, fs=256, nperseg=256, psds=None, title='PSD', save_path=None):
 
             plt.plot(f, 10 * np.log10(Pxx), label=f'Subject {i+1}')
         else:
-            viz_psds = [np.zeros_like(psd_val) for psd_val in psds]
-            if psds[i].ndim > 1:
-                viz_psds[i] = np.mean(psds[i], axis=0)
+            # Handle PSDs directly - matching the original implementation
+            if data[i].ndim > 1:
+                viz_psd = np.mean(data[i], axis=0)
+            else:
+                viz_psd = data[i]
 
             f = np.linspace(0, 128, 129)
-
-            plt.plot(f, 10 * np.log10(viz_psds[i]), label=f'Subject {i+1}')
+            plt.plot(f, 10 * np.log10(viz_psd), label=f'Subject {i+1}')
 
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Power Spectral Density (dB/Hz)')
