@@ -1,0 +1,22 @@
+--path-to-raw-data <root>/data/emotion_study/raw_data_and_IC_labels
+--path-to-preprocessed-data <root>/results/emotion_study/preprocessed_data
+--path-to-centroid-assignments <root>/results/emotion_study/centroid_assignments
+--path-to-codebooks <root>/results/emotion_study/dictionaries
+--path-to-results <root>/results/emotion_study/classifier
+--path-to-cmmn-filters <root>/data/emotion_study/cmmn_filters/original
+--subj-ids 8 9 10 11 12 13 14 15 16 17 18 19 20 21 23 24 25 26 27 28 29 30 31 32 33 34 35
+--classifier_type random_forest
+--centroid-length 1.0
+--window-length 1.5
+--training-segment-length 9 30 60 120 300
+--validation-segment-length -1
+--num-clusters 128
+--minutes-per-ic 50
+--regularization-factor 0.01 0.1 1
+--l1-ratio 0.1 0.5 1
+--expert-weight 1 16 32 64
+--codebook-minutes-per-ic 50
+--codebook-ics-per-subject 2
+--tf-idf-norm none l1 l2
+--min-samples-split 10 20 40 80 160
+--cmmn-filter normed-barycenter
