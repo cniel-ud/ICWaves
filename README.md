@@ -22,8 +22,12 @@ EEG independent component analysis (ICA) separates brain signals from artifacts,
 
 This repository implements methods described in:
 
-1. **"Convolutional Monge Mapping between EEG Datasets to Support Independent Component Labeling"** - Work in progress
-2. **"Cross-Dataset EEG Independent Component Classification using Bag-of-Waves Features and Convolutional Monge Mapping Normalization"** - Work in progress
+1. **"Labeling EEG Components with a Bag of Waveforms from Learned Dictionaries"** (ICLR 2023 Workshop) - Original BoWav method for IC classification
+2. **"Convolutional Monge Mapping between EEG Datasets to Support Independent Component Labeling"** - Work in progress
+3. **"Cross-Dataset EEG Independent Component Classification using Bag-of-Waves Features and Convolutional Monge Mapping Normalization"** - Work in progress
+
+### Related Work
+- **"Interpretable EEG biomarkers for neurological disease models in mice using bag-of-waves classifiers"** - Application of BoWav to genotype prediction from EEG
 
 ## Installation
 
@@ -190,11 +194,13 @@ See `requirements.txt` for specific versions.
 If you use this code in your research, please cite:
 
 ```bibtex
-@article{meek2024convolutional,
-  title={Convolutional Monge Mapping between EEG Datasets to Support Independent Component Labeling},
-  author={Meek, Austin and Mendoza-Cardenas, Carlos H. and Brockmeier, Austin J.},
-  journal={to-be-submitted},
-  year={2024}
+@inproceedings{
+mendoza-cardenas2023labeling,
+title={Labeling {EEG} Components with a Bag of Waveforms from Learned Dictionaries},
+author={Carlos H Mendoza-Cardenas and Austin Meek and Austin J. Brockmeier},
+booktitle={ICLR 2023 Workshop on Time Series Representation Learning for Health},
+year={2023},
+url={https://openreview.net/forum?id=i8zQLneFvn}
 }
 ```
 
