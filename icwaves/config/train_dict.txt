@@ -1,0 +1,10 @@
+--path-to-raw-data <root>/data/emotion_study/raw_data_and_IC_labels
+--path-to-results <root>/results/emotion_study/dictionaries/filtered
+--path-to-cmmn-filters <root>/data/emotion_study/cmmn_filters/original/normed
+--subj-ids 8 9 10 11 12 13 14 15 16 17 18 19 20 21 23 24 25 26 27 28 29 30 31 32 33 34 35
+--window-length 1.5
+--num-clusters 128
+--n-runs 3
+--max-iter 500
+--minutes-per-ic 50
+--ics-per-subject 2

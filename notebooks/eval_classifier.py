@@ -19,12 +19,13 @@ from icwaves.data.loading import get_feature_extractor, load_data_bundles
 from icwaves.viz import (
     create_comparison_plot,
 )
-from icwaves.evaluation.iclabel import calculate_iclabel_f1_scores
+from icwaves.evaluation.iclabel import compute_iclabel_scores_for_dataset
 
 
 # %%
 def get_cmmn_filter_options(eval_dataset, is_classifier_trained_on_normalized_data):
     if eval_dataset == "emotion_study":
+        # TODO: remove "normed-barycenter"
         if is_classifier_trained_on_normalized_data:
             cmmn_filter_options = ["normed-barycenter"]
         else:
@@ -36,7 +37,6 @@ def get_cmmn_filter_options(eval_dataset, is_classifier_trained_on_normalized_da
             cmmn_filter_options = [
                 None,
                 "unnormed-barycenter",
-                "normed-barycenter",
                 "subj_to_subj",
             ]
     return cmmn_filter_options
@@ -174,7 +174,7 @@ validation_times = np.r_[
 root = Path().absolute().parent
 
 # Define the configuration options
-is_classifier_trained_on_normalized_data = True
+is_classifier_trained_on_normalized_data = False
 eval_datasets = ["cue", "emotion_study"]
 feature_extractors = ["bowav", "psd_autocorr"]
 classifier_types = ["random_forest"]  # , "logistic"]  # Both classifier types included
@@ -219,13 +219,23 @@ for eval_dataset in eval_datasets:
                     # Append directly to the master results DataFrame
                     all_results = pd.concat([all_results, results], ignore_index=True)
 
+# Compute and add ICLabel scores for each dataset
+print("\nComputing ICLabel scores...")
+for eval_dataset in eval_datasets:
+    print(f"Computing ICLabel scores for {eval_dataset}...")
+    mean_std_f1_iclabel, per_subject_f1_iclabel = compute_iclabel_scores_for_dataset(
+        eval_dataset, validation_times, root
+    )
+    all_results = pd.concat([all_results, mean_std_f1_iclabel], ignore_index=True)
+    per_subject_f1_iclabel.to_csv(
+        root / "results" / f"{eval_dataset}" / "evaluation" / "ICLabel.csv", index=False
+    )
+
 # Save the results to a CSV file
 results_dir = root / "results"
 results_dir.mkdir(exist_ok=True)
 train_data_str = "normalized" if is_classifier_trained_on_normalized_data else "raw"
-all_results.to_csv(
-    results_dir / f"all_evaluation_results_{train_data_str}.csv", index=False
-)
+all_results.to_csv(results_dir / f"mean_std_brain_f1_{train_data_str}.csv", index=False)
 
 # %%
 # Example usage of the new plotting function
@@ -236,7 +246,7 @@ plot_dir.mkdir(exist_ok=True)
 
 # Plot 1: Compare feature extractors (bowav vs psd_autocorr) with all filter options
 dataset = "cue"
-validation_segment_len = 300
+validation_segment_len = -1
 classifier_type = "random_forest"
 validation_segment_len_str = "5min" if validation_segment_len == 300 else "50min"
 save_path = (
@@ -251,8 +261,6 @@ fig1, ax1 = create_comparison_plot(
         "classifier_type": classifier_type,
     },
     vary_by="feature_extractor",
-    iclabel_func=calculate_iclabel_f1_scores,
-    root_path=root,
     save_path=save_path,
     add_title=False,
 )

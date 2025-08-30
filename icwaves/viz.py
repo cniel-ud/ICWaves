@@ -122,8 +122,6 @@ def create_comparison_plot(
     include_iclabel=True,
     figsize=(10, 6),
     save_path=None,
-    iclabel_func=None,
-    root_path=None,
     add_title=True,
 ):
     """
@@ -133,14 +131,12 @@ def create_comparison_plot(
     and mean F1 score on the y-axis, with one line for each value of the vary_by parameter.
 
     Args:
-        results_df: DataFrame containing all results
+        results_df: DataFrame containing all results (including pre-computed ICLabel data)
         fixed_params: Dict of parameters to fix for filtering (e.g., {'eval_dataset': 'cue', 'validation_segment_len': 300})
         vary_by: Parameter to vary in the plot (e.g., 'feature_extractor', 'classifier_type')
-        include_iclabel: Whether to include ICLabel results
+        include_iclabel: Whether to include ICLabel results (must be pre-computed in results_df)
         figsize: Size of the figure
         save_path: Path to save the figure (if None, don't save)
-        iclabel_func: Function to calculate ICLabel F1 scores (required if include_iclabel=True)
-        root_path: Path to the root directory (required if include_iclabel=True)
         add_title: If True, add title. This is for debugging purposes.
 
     Returns:
@@ -166,38 +162,31 @@ def create_comparison_plot(
     # Create the plot
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Add ICLabel reference if requested
-    if include_iclabel and iclabel_func and root_path:
-        # Get ICLabel data
+    # Add ICLabel reference if requested and available in the data
+    if include_iclabel:
+        # Get ICLabel data from the results DataFrame
         eval_dataset = fixed_params.get("eval_dataset")
         if eval_dataset:
-            # Calculate validation_times_ for ICLabel
-            validation_times = filtered_df["prediction_window"].unique()
-            validation_times_ = validation_times * 60
+            # Filter for ICLabel results for this dataset
+            iclabel_data = results_df[
+                (results_df["eval_dataset"] == eval_dataset)
+                & (results_df["feature_extractor"] == "iclabel")
+            ]
 
-            iclabel_data_dir = root_path.joinpath(f"data/{eval_dataset}/ICLabels")
-            subj_ids = (
-                list(range(1, 8))
-                if eval_dataset == "emotion_study"
-                else list(range(1, 13))
-            )
-            iclabel_df = iclabel_func(iclabel_data_dir, subj_ids, validation_times_)
-            iclabel_df = iclabel_df.rename(
-                columns={
-                    "Brain F1 score - iclabel": "iclabel",
-                }
-            )
+            if len(iclabel_data) > 0:
+                # Sort by prediction window
+                iclabel_data = iclabel_data.sort_values("prediction_window")
 
-            # Plot ICLabel results
-            ax = plot_line_with_error_area(
-                ax,
-                iclabel_df,
-                "Prediction window [minutes]",
-                "iclabel",
-                "StdDev - iclabel",
-                color="red",
-                label="ICLabel",
-            )
+                # Plot ICLabel results
+                ax = plot_line_with_error_area(
+                    ax,
+                    iclabel_data,
+                    "prediction_window",
+                    "mean_f1",
+                    "std_f1",
+                    color="red",
+                    label="ICLabel",
+                )
 
     # Create color mapping for the varying parameter
     vary_colors = plt.cm.tab10(np.linspace(0, 1, len(vary_values)))
@@ -279,7 +268,7 @@ def create_comparison_plot(
     # Format the plot
     ax.set_xscale("log")
     ax.set_xticks(global_x_ticks, labels=global_x_ticks)
-    ax.set_xlim(global_x_ticks[0], 50)
+    ax.set_xlim(filtered_df["prediction_window"].min(), 50)
     ax.set_xlabel("Prediction window [minutes]")
     ax.set_ylabel("Mean Brain F1 score")
 
