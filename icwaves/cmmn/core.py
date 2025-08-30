@@ -297,7 +297,7 @@ def plot_psd(data, fs=256, nperseg=256, psds=None, title='PSD', save_path=None):
     - fs: sampling frequency (default: 256 Hz)
     - nperseg: length of each segment for Welch's method (default: 256)
     - psds: pre-computed PSDs (optional)
-    - title: plot title
+    - title: plot title (ignored, kept for compatibility)
     - save_path: if provided, save the plot to this path as PDF
     """
     plt.figure(figsize=(12, 8))
@@ -309,7 +309,7 @@ def plot_psd(data, fs=256, nperseg=256, psds=None, title='PSD', save_path=None):
                 subj_data = np.mean(subj_data, axis=0)
             f, Pxx = psd(subj_data, fs=fs, nperseg=nperseg)
 
-            plt.plot(f, 10 * np.log10(Pxx), label=f'Subject {i+1}')
+            plt.plot(f, 10 * np.log10(Pxx))
         else:
             # Handle PSDs directly - matching the original implementation
             if data[i].ndim > 1:
@@ -318,12 +318,11 @@ def plot_psd(data, fs=256, nperseg=256, psds=None, title='PSD', save_path=None):
                 viz_psd = data[i]
 
             f = np.linspace(0, 128, 129)
-            plt.plot(f, 10 * np.log10(viz_psd), label=f'Subject {i+1}')
+            plt.plot(f, 10 * np.log10(viz_psd))
 
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Power Spectral Density (dB/Hz)')
-    plt.title(title)
-    plt.legend()
+    plt.xlabel('Frequency (Hz)', fontsize=15)
+    plt.ylabel('Power Spectral Density (dB/Hz)', fontsize=15)
+    plt.tick_params(axis='both', which='major', labelsize=12)
     
     if save_path:
         plt.savefig(save_path, format='pdf', bbox_inches='tight', 
@@ -340,7 +339,7 @@ def plot_raw_signals(data, fs=256, title='Raw Signals', all_channels=False, save
     Parameters:
     - data: list of numpy arrays, each containing EEG data for a subject
     - fs: sampling frequency (default: 256 Hz)
-    - title: plot title
+    - title: plot title (ignored, kept for compatibility)
     - all_channels: if True, plot all channels separately
     - save_path: if provided, save the plot to this path as PDF
     """
@@ -354,18 +353,16 @@ def plot_raw_signals(data, fs=256, title='Raw Signals', all_channels=False, save
                     plt.plot(np.arange(subj_data.shape[0]) / fs, subj_data[:, channel])
             else:
                 # If subj_data is 1-dimensional, plot it directly
-                plt.plot(np.arange(subj_data.shape[0]) / fs, subj_data, label=f'Subject {i+1}, Channel 1')
+                plt.plot(np.arange(subj_data.shape[0]) / fs, subj_data)
         else:
             # average all channels together
             subj_data = np.mean(subj_data, axis=0)  # changed from 1 to 0
 
             # now plot
-            plt.plot(np.arange(subj_data.shape[0]) / fs, subj_data, label=f'Subject {i+1}')
-
-    plt.title(title)
-    plt.legend()
-    plt.ylabel('Voltage (uV)')
-    plt.xlabel('Time (s)')
+            plt.plot(np.arange(subj_data.shape[0]) / fs, subj_data)
+    plt.ylabel('Voltage (uV)', fontsize=15)
+    plt.xlabel('Time (s)', fontsize=15)
+    plt.tick_params(axis='both', which='major', labelsize=12)
     
     if save_path:
         plt.savefig(save_path, format='pdf', bbox_inches='tight', 
@@ -411,7 +408,7 @@ def plot_polysomnograph(data, channel_indices, fs=256, time_window=None, spacing
         offset = -i * spacing_factor
         plt.plot(time, normalized_channel + offset, label=f'Channel {chan_idx}')
 
-    plt.xlabel('Time (s)')
+    plt.xlabel('Time (s)', fontsize=15)
     plt.yticks([])  # Remove y-axis ticks since they're arbitrary
     if title:
         plt.title(title)
@@ -436,16 +433,16 @@ def plot_barycenter(barycenter, title='Normed Barycenter', save_path=None):
 
     Parameters:
     - barycenter: numpy array containing the normed barycenter of the data
-    - title: plot title
+    - title: plot title (ignored, kept for compatibility)
     - save_path: if provided, save the plot to this path as PDF
     """
     plt.figure(figsize=(12, 8))
     f = np.linspace(0, 128, 129)
     plt.plot(f, 10 * np.log10(barycenter))
 
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Power Spectral Density (dB/Hz)')
-    plt.title(title)
+    plt.xlabel('Frequency (Hz)', fontsize=15)
+    plt.ylabel('Power Spectral Density (dB/Hz)', fontsize=15)
+    plt.tick_params(axis='both', which='major', labelsize=12)
     
     if save_path:
         plt.savefig(save_path, format='pdf', bbox_inches='tight', 
@@ -462,7 +459,7 @@ def plot_freq_filter(freq_filter, fs=256, title='Frequency Filters', save_path=N
     Parameters:
     - freq_filter: numpy array containing the filter in the frequency domain
     - fs: sampling frequency (default: 256 Hz)
-    - title: plot title (default: 'Frequency Filters')
+    - title: plot title (ignored, kept for compatibility)
     - save_path: if provided, save the plot to this path as PDF
     """
     # for subj subj matching, the freq and time filters have channel components still.
@@ -473,12 +470,11 @@ def plot_freq_filter(freq_filter, fs=256, title='Frequency Filters', save_path=N
     plt.figure(figsize=(12, 8))
     f = np.linspace(0, fs/2, freq_filter[0].shape[-1])
     for i, subj in enumerate(freq_filter):
-        plt.plot(f, 10 * np.log10(np.abs(subj.T)), label=f'Subject {i+1}')
+        plt.plot(f, 10 * np.log10(np.abs(subj.T)))
 
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Filter (dB)')
-    plt.title(title)
-    plt.legend()
+    plt.xlabel('Frequency (Hz)', fontsize=15)
+    plt.ylabel('Filter (dB)', fontsize=15)
+    plt.tick_params(axis='both', which='major', labelsize=12)
     
     if save_path:
         plt.savefig(save_path, format='pdf', bbox_inches='tight', 
@@ -495,7 +491,7 @@ def plot_time_filter(time_filter, fs=256, title='Time Domain Filter', save_path=
     Parameters:
     - time_filter: numpy array containing the filter in the time domain
     - fs: sampling frequency (default: 256 Hz)
-    - title: plot title (default: 'Time Domain Filter')
+    - title: plot title (ignored, kept for compatibility)
     - save_path: if provided, save the plot to this path as PDF
     """
     # for subj subj matching, the freq and time filters have channel components still.
@@ -506,12 +502,11 @@ def plot_time_filter(time_filter, fs=256, title='Time Domain Filter', save_path=
     plt.figure(figsize=(12, 8))
     t = np.arange(len(time_filter[0])) / fs
     for i, subj in enumerate(time_filter):
-        plt.plot(t, np.real(subj), label=f'Subject {i+1}')
+        plt.plot(t, np.real(subj))
 
-    plt.xlabel('Time (s)')
-    plt.ylabel('Amplitude')
-    plt.title(title)
-    plt.legend()
+    plt.xlabel('Time (s)', fontsize=15)
+    plt.ylabel('Amplitude', fontsize=15)
+    plt.tick_params(axis='both', which='major', labelsize=12)
     
     if save_path:
         plt.savefig(save_path, format='pdf', bbox_inches='tight', 
