@@ -22,7 +22,7 @@ EEG independent component analysis (ICA) separates brain signals from artifacts,
 
 This repository implements methods described in:
 
-1. **"Labeling EEG Components with a Bag of Waveforms from Learned Dictionaries"** (ICLR 2023 Workshop) - Original BoWav method for IC classification
+1. **["Labeling EEG Components with a Bag of Waveforms from Learned Dictionaries"](https://openreview.net/forum?id=i8zQLneFvn)** (ICLR 2023 Workshop) - Original BoWav method for IC classification
 2. **"Convolutional Monge Mapping between EEG Datasets to Support Independent Component Labeling"** - Work in progress
 3. **"Cross-Dataset EEG Independent Component Classification using Bag-of-Waves Features and Convolutional Monge Mapping Normalization"** - Work in progress
 
