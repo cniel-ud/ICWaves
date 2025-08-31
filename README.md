@@ -93,12 +93,58 @@ results = eval_classifier_per_subject_brain_F1(
 )
 ```
 
-### CMMN Domain Adaptation (WIP)
+### CMMN Domain Adaptation
+
+CMMN (Convolutional Monge Mapping Normalization) enables domain adaptation between EEG datasets by aligning their spectral characteristics. Our extension handles datasets with different channel counts through channel averaging before spectral alignment, as well as a different subject-to-subject adaptation scheme.
 
 ```python
-from icwaves.cmmn import
+from icwaves.cmmn import (
+    compute_normed_barycenter,
+    compute_filter_original,
+    subj_subj_matching,
+    compute_filter_subj_subj,
+    transform_original,
+    plot_psd,
+    plot_barycenter,
+    plot_freq_filter
+)
+import numpy as np
+from scipy.io import loadmat
 
+# Load source (emotion) and target (cue) datasets
+emotion_data = []  # List of arrays, each (n_channels, n_samples)
+cue_data = []      # List of arrays, each (n_channels, n_samples)
 
+# Method 1: Barycenter mapping
+# Compute normalized barycenter from source domain
+emotion_barycenter = compute_normed_barycenter(emotion_data)
+
+# Compute filters to map target domain to source barycenter
+freq_filters, time_filters = compute_filter_original(
+    cue_data, 
+    emotion_barycenter
+)
+
+# Apply transformation to align cue data with emotion domain
+cue_aligned = transform_original(cue_data, time_filters)
+
+# Method 2: Subject-to-subject mapping
+# Find optimal pairings between source and target subjects
+source_psds = [np.mean(psd(subj)[1], axis=0) for subj in emotion_data]
+target_psds = [np.mean(psd(subj)[1], axis=0) for subj in cue_data]
+matches = subj_subj_matching(source_psds, target_psds)
+
+# Compute subject-specific filters
+freq_filters_s2s, time_filters_s2s = compute_filter_subj_subj(
+    target_psds, 
+    source_psds, 
+    matches
+)
+
+# Visualization
+plot_psd(emotion_data, title='Source Domain PSDs')
+plot_barycenter(emotion_barycenter, title='Normalized Barycenter')
+plot_freq_filter(freq_filters, title='Frequency Domain Filters')
 ```
 
 ### Feature Extraction Options
@@ -158,6 +204,7 @@ psd_autocorr_features = psd_autocorr_extractor(
 ```
 ICWaves/
 ├── icwaves/              # Main package
+│   ├── cmmn/                # CMMN domain adaptation implementation
 │   ├── feature_extractors/  # BoWav and PSD/autocorr features
 │   ├── sikmeans/            # Shift-invariant k-means implementation
 │   ├── model_selection/     # Hyperparameter optimization
@@ -165,7 +212,9 @@ ICWaves/
 │   ├── data/               # Data handling utilities
 │   └── config/             # Configuration files
 ├── scripts/              # Training and HPO scripts
-├── notebooks/            # Analysis and evaluation scripts
+├── notebooks/            # Analysis and evaluation notebooks
+│   ├── cmmn_visualization.ipynb  # CMMN visualization and figure generation
+│   └── cmmn_figures/            # Generated PDF figures
 ├── matlab/               # MATLAB scripts for data processing
 ├── tests/                # Unit tests
 ├── requirements.txt      # Python dependencies
