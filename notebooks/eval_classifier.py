@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from icwaves.evaluation.evaluation import (
     get_results_filepath,
-    load_classifier,
+    load_estimator,
     eval_classifier_per_subject_brain_F1,
 )
 from icwaves.evaluation.config import EvalConfig
@@ -91,7 +91,7 @@ def run_evaluation_and_collect_results(
     feature_extractor_dict = {feature_extractor_str: feature_extractor}
 
     # Load classifier and get parameters
-    clf, best_params = load_classifier(config.path_to_classifier[feature_extractor_str])
+    clf, best_params = load_estimator(config.path_to_classifier[feature_extractor_str])
     clf_dict = {feature_extractor_str: clf}
     agg_method = {
         feature_extractor_str: best_params["input_or_output_aggregation_method"]
@@ -246,7 +246,7 @@ plot_dir.mkdir(exist_ok=True)
 
 # Plot 1: Compare feature extractors (bowav vs psd_autocorr) with all filter options
 dataset = "cue"
-validation_segment_len = -1
+validation_segment_len = 300
 classifier_type = "random_forest"
 validation_segment_len_str = "5min" if validation_segment_len == 300 else "50min"
 save_path = (

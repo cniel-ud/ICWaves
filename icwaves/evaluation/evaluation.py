@@ -1,6 +1,6 @@
 from pathlib import Path
 import pickle
-from typing import Callable, Dict, Tuple, Optional
+from typing import Callable, Dict, Tuple, Optional, Union
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -15,20 +15,16 @@ from icwaves.feature_extractors.utils import convert_segment_length
 from icwaves.file_utils import get_validation_segment_length_string, get_cmmn_suffix
 
 
-def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
+def load_estimator(path: Path) -> Tuple[Union[BaseEstimator, Pipeline], dict]:
     """Load trained classifier and its best parameters."""
     with path.open("rb") as f:
         results = pickle.load(f)
 
-    clf = (
-        results["best_estimator"]["clf"]
-        if isinstance(results["best_estimator"], Pipeline)
-        else results["best_estimator"]
-    )
+    best_estimator = results["best_estimator"]
 
     best_params = get_best_parameters(results)
 
-    return clf, best_params
+    return best_estimator, best_params
 
 
 def _should_skip_segment(val_segment_len, train_segment_len, agg_method):
