@@ -5,7 +5,11 @@ from pathlib import Path
 from sklearn.model_selection import ParameterGrid
 from sklearn.model_selection._validation import _aggregate_score_dicts
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import get_cmmn_suffix, get_validation_segment_length_string
+from icwaves.file_utils import (
+    build_base_classifier_name,
+    get_cmmn_suffix,
+    get_validation_segment_length_string,
+)
 from icwaves.model_selection.utils import _store
 
 TF_IDF_NORM_MAP = {
@@ -145,16 +149,10 @@ def process_candidate_results(args, cv, srate, subj_ind):
     candidate_params = build_grid_parameters(args, srate)
     n_candidates, n_splits = get_grid_size(candidate_params, cv, subj_ind)
 
-    valseglen = get_validation_segment_length_string(
-        int(args.validation_segment_length)
-    )
-    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    base_clf_name = build_base_classifier_name(args)
+    base_results_folder = Path(args.path_to_results) / base_clf_name
 
-    results_folder = Path(
-        args.path_to_results,
-        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}",
-    )
-    all_out = load_candidate_results(results_folder, n_candidates, n_splits)
+    all_out = load_candidate_results(base_results_folder, n_candidates, n_splits)
 
     timing_results = {
         **_store("fit_time", all_out["fit_time"], n_splits, n_candidates),

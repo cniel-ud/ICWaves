@@ -62,18 +62,15 @@ def get_results_filepath(config: EvalConfig) -> Path:
         Path to the results CSV file
     """
     results_path = config.root / "results" / config.eval_dataset / "evaluation"
-    valseglen = get_validation_segment_length_string(
-        int(config.validation_segment_length)
-    )
-    cmmn_suffix = get_cmmn_suffix(config.cmmn_filter)
+    base_clf_name = build_base_classifier_name(config)
 
+    # TODO: we need to better differentiate between CMMN applied during training vs test,
+    # both in the use of the cli args (and attributes of the EvalConfig object) and the file name
     if config.is_classifier_trained_on_normalized_data:
-        cmmn_suffix = cmmn_suffix + "_clf-trained-on-filtered-data"
+        base_clf_name += "_clf-trained-on-filtered-data"
+    base_clf_name += ".csv"
 
-    results_file = (
-        results_path
-        / f"{config.classifier_type}_{config.feature_extractor}_{valseglen}{cmmn_suffix}.csv"
-    )
+    results_file = results_path / base_clf_name
 
     # Create directories if they don't exist
     results_path.mkdir(parents=True, exist_ok=True)

@@ -13,6 +13,7 @@ from icwaves.model_selection.split import LeaveOneSubjectOutExpertOnly
 from icwaves.model_selection.validation import _fit_and_score
 from icwaves.model_selection.job_utils import get_job_parameters
 from icwaves.file_utils import (
+    build_base_classifier_name,
     get_cmmn_suffix,
     get_validation_segment_length_string,
     read_args_from_file,
@@ -85,16 +86,11 @@ if __name__ == "__main__":
     )
     logging.info(f"split_index: {job_params.split_index}, out of {n_splits} splits")
 
-    valseglen = get_validation_segment_length_string(
-        int(args.validation_segment_length)
+    base_clf_name = build_base_classifier_name(args)
+    base_results_folder = Path(args.path_to_results) / base_clf_name
+    results_folder = base_results_folder.joinpath(
+        f"candidate_{job_params.candidate_index}"
     )
-    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
-
-    results_folder = Path(
-        args.path_to_results,
-        f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}",
-    )
-    results_folder = results_folder.joinpath(f"candidate_{job_params.candidate_index}")
     results_folder.mkdir(parents=True, exist_ok=True)
 
     results_file = results_folder.joinpath(f"split_{job_params.split_index}.pkl")
