@@ -67,7 +67,9 @@ if __name__ == "__main__":
     params["n_centroids"] = data_bundle.n_centroids
 
     # Create estimator
-    clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
+    clf = create_estimator(
+        args.classifier_type, args.feature_extractor, args.use_idf, **params
+    )
     logging.info(f"clf: {clf}")
     candidate_params = build_grid_parameters(args, data_bundle.srate)
 

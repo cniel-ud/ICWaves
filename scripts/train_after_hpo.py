@@ -132,7 +132,9 @@ if __name__ == "__main__":
     # the bowav_psd_autocorr feature
     params["n_codebooks"] = 7  # number of ICLabel classes
     params["n_centroids"] = data_bundle.n_centroids
-    clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
+    clf = create_estimator(
+        args.classifier_type, args.feature_extractor, args.use_idf, **params
+    )
     logging.info(f"clf: {clf}")
 
     # Get best parameters from HPO results
