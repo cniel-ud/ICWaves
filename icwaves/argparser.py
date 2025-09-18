@@ -174,7 +174,6 @@ def _add_bowav_args(parser):
         default=2,
         help="Maximum number of ICs per subject to train the class-specific codebook",
     )
-    # add use_idf arg
     parser.add_argument(
         "--use-idf",
         help="Use idf in bowav classifier",

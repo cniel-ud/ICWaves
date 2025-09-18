@@ -56,15 +56,15 @@ def build_grid_parameters(args, srate):
 
     # Determine if we need to use a pipeline prefix for classifier parameters
     # Pipeline is used for bowav and bowav_psd_autocorr feature extractors
-    uses_pipeline = args.feature_extractor in ["bowav", "bowav_psd_autocorr"]
-    prefix = "clf__" if uses_pipeline else ""
+    prefix = "clf__" if args.use_idf and "bowav" in args.feature_extractor else ""
 
     # Apply TF-IDF parameters for feature extractors that use it
-    if args.feature_extractor == "bowav":
+    if args.feature_extractor == "bowav" and args.use_idf:
         candidate_params["scaler__norm"] = [
             TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
         ]
-    elif args.feature_extractor == "bowav_psd_autocorr":
+
+    elif args.feature_extractor == "bowav_psd_autocorr" and args.use_idf:
         candidate_params["scaler__bowav__norm"] = [
             TF_IDF_NORM_MAP[norm] for norm in args.tf_idf_norm
         ]
