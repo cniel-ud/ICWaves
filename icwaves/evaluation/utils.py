@@ -1,7 +1,12 @@
+from copy import deepcopy
+from pathlib import Path
+from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 import scipy
 from sklearn.metrics import f1_score
+
+from icwaves.feature_extractors.tfidf_rate_scaler import TfidfRateScaler
 
 
 def build_features_based_on_aggregation_method(
@@ -100,6 +105,7 @@ def compute_brain_F1_score_per_subject(
     validation_segment_length,
     training_segment_length,
     subj_mask=slice(None),
+    calibrate_idf=None,
 ):
     """Compute the brain F1 score for each subject. It assumes that the label for the 'brain' ICLabel
     class is 0.
@@ -145,6 +151,10 @@ def compute_brain_F1_score_per_subject(
         n_time_series, n_segments, n_features = feature_array.shape
         # vertically concatenate test BoWav vectors: (m, n, p) -> (m*n, p)
         feature_array = np.vstack(feature_array)
+        if calibrate_idf is not None:
+            clf = {k: v for k, v in clf.items()}
+            calibrated_clf = calibrate_idf(clf[feature_type], subj_mask)
+            clf[feature_type] = calibrated_clf
         y_pred = clf[feature_type].predict(feature_array)
         y_preds_proba = clf[feature_type].predict_proba(feature_array)
         y_preds_log_proba = np.log(y_preds_proba + 1e-12)
@@ -193,24 +203,50 @@ def compute_brain_F1_score_per_subject(
     return brain_f1_score.item()
 
 
-def jackknife_stddev(group):
-    subject_ids = group["Subject ID"].unique()
-    n = len(subject_ids)
-    means = []
+def sl2min(sl):
+    return "50min" if sl == -1 else "5min"
 
-    # Perform jackknife resampling
-    for subject_id in subject_ids:
-        jackknife_sample = group[group["Subject ID"] != subject_id]
-        means.append(jackknife_sample["Brain F1 score [holdout]"].mean())
 
-    # Calculate the jackknife estimate of the mean
-    jackknife_mean = np.mean(means)
+def make_calibrate_idf_fn(
+    root: Path, valseglen: int, cmmn_filter: Optional[str] = None
+) -> Callable:
+    def calibrate_idf(pipeline, subj_mask):
+        assert hasattr(pipeline, "named_steps")
+        assert "scaler" in pipeline.named_steps
+        assert "clf" in pipeline.named_steps
+        assert isinstance(pipeline["scaler"], TfidfRateScaler)
 
-    # Calculate the jackknife estimate of the standard deviation
-    squared_diffs = [(mean - jackknife_mean) ** 2 for mean in means]
-    jackknife_variance = (n - 1) / n * np.sum(squared_diffs)
-    jackknife_std = np.sqrt(jackknife_variance)
+        train_path = (
+            root
+            / f"data/emotion_study/bowav/train/{sl2min(valseglen)}/{sl2min(valseglen)}.npz"
+        )
+        with np.load(train_path, allow_pickle=True) as f:
+            bowav_train = f["bowav"]
 
-    return pd.Series(
-        {"Jackknife Mean": jackknife_mean, "Jackknife StdDev": jackknife_std}
-    )
+        bowav_train = bowav_train.reshape(-1, bowav_train.shape[-1])
+
+        # TODO: compute this on the go?
+        test_path = (
+            root
+            / f"data/cue/bowav/full/{sl2min(valseglen)}/cmmn-{cmmn_filter}/{sl2min(valseglen)}.npz"
+        )
+        with np.load(test_path, allow_pickle=True) as f:
+            bowav_full_cue = f["bowav"]
+
+        train_mean_vals = np.mean(bowav_train, axis=0)
+        cue_mean_vals = np.mean(bowav_full_cue[subj_mask], axis=(0, 1))
+        tf_ratio = np.divide(
+            train_mean_vals,
+            cue_mean_vals,
+            out=np.ones_like(train_mean_vals),  # Default to 1 for zero division
+            where=cue_mean_vals != 0,
+        )
+        clipped_tf_ratio = np.clip(tf_ratio, 0.1, 10.0)
+        calibrated_idf = pipeline["scaler"].idf_ * clipped_tf_ratio
+        calibrated_pipeline = deepcopy(pipeline)
+        calibrated_pipeline["scaler"].idf_ = calibrated_idf
+        calibrated_pipeline["scaler"]._tfidf_transformer.idf_ = calibrated_idf
+
+        return calibrated_pipeline
+
+    return calibrate_idf

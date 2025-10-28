@@ -1,6 +1,9 @@
 # %%
 # Set OMP constants to use only 8 CPUs
+from argparse import Namespace
 import os
+
+from icwaves.evaluation.utils import make_calibrate_idf_fn, sl2min
 from icwaves.file_utils import get_cmmn_suffix, parse_config_file_args
 
 os.environ["OMP_NUM_THREADS"] = "8"
@@ -94,6 +97,13 @@ def run_evaluation_and_collect_results(
             best_params["training_segment_length"]["psd_autocorr"] / 256 * 500
         )
 
+    if eval_dataset == "cue" and feature_extractor_str == "bowav":
+        calibrate_idf_fn = make_calibrate_idf_fn(
+            root, train_config.validation_segment_length, cmmn_filter
+        )
+    else:
+        calibrate_idf_fn = None
+
     # Run evaluation
     print("Computing F1 score...")
     # Get results file path
@@ -107,6 +117,7 @@ def run_evaluation_and_collect_results(
         agg_method,
         best_params["training_segment_length"],
         results_file,
+        calibrate_idf_fn,
     )
 
     # Convert evaluation results to flat format

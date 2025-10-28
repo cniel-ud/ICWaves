@@ -105,6 +105,7 @@ def _evaluate_subject(
     feature_extractor: Dict[str, Callable],
     input_or_output_aggregation_method: Dict[str, str],
     training_segment_length: Dict[str, int],
+    calibrate_idf: Optional[Callable] = None,
 ) -> Dict:
     """
     Evaluate classifier performance for a single subject.
@@ -134,6 +135,7 @@ def _evaluate_subject(
         converted_val_segment_len,
         training_segment_length,
         subj_mask,
+        calibrate_idf,
     )
 
     return {
@@ -185,6 +187,7 @@ def eval_classifier_per_subject_brain_F1(
     input_or_output_aggregation_method: Dict[str, str],
     training_segment_length: Dict[str, int],
     results_file: Path,
+    calibrate_idf: Optional[Callable] = None,
 ) -> pd.DataFrame:
     """
     Evaluate classifier performance across different time windows.
@@ -266,6 +269,7 @@ def eval_classifier_per_subject_brain_F1(
                         feature_extractor,
                         input_or_output_aggregation_method,
                         training_segment_length,
+                        calibrate_idf,
                     )
 
                     # Add to results DataFrame
