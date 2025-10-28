@@ -14,8 +14,6 @@ from icwaves.model_selection.validation import _fit_and_score
 from icwaves.model_selection.job_utils import get_job_parameters
 from icwaves.file_utils import (
     build_base_classifier_name,
-    get_cmmn_suffix,
-    get_validation_segment_length_string,
     read_args_from_file,
 )
 from icwaves.argparser import (

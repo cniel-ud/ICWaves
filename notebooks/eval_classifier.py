@@ -1,6 +1,7 @@
 # %%
 # Set OMP constants to use only 8 CPUs
 import os
+from icwaves.file_utils import get_cmmn_suffix, parse_config_file_args
 
 os.environ["OMP_NUM_THREADS"] = "8"
 
@@ -23,33 +24,29 @@ from icwaves.evaluation.iclabel import compute_iclabel_scores_for_dataset
 
 
 # %%
-def get_cmmn_filter_options(eval_dataset, is_classifier_trained_on_normalized_data):
+
+
+def get_eval_cmmn_filter_options(eval_dataset, train_cmmn_filter):
+    assert train_cmmn_filter in [None, "normed-barycenter"]
     if eval_dataset == "emotion_study":
-        # TODO: remove "normed-barycenter"
-        if is_classifier_trained_on_normalized_data:
-            cmmn_filter_options = ["normed-barycenter"]
-        else:
-            cmmn_filter_options = [None]
+        cmmn_filter_options = [train_cmmn_filter]
     else:
-        if is_classifier_trained_on_normalized_data:
-            cmmn_filter_options = ["normed-barycenter"]
-        else:
+        if train_cmmn_filter is None:
             cmmn_filter_options = [
                 None,
                 "unnormed-barycenter",
                 "subj_to_subj",
             ]
+        else:
+            cmmn_filter_options = [train_cmmn_filter]
+
     return cmmn_filter_options
 
 
 def run_evaluation_and_collect_results(
     eval_dataset: str,
     cmmn_filter: Union[str, None],
-    feature_extractor_str: str,
-    classifier_type: str,
-    validation_segment_len: int,
-    is_classifier_trained_on_normalized_data: bool,
-    is_cmmn_filter_resampled: bool,
+    train_config: Namespace,
     root: Path,
     validation_times: np.ndarray,
 ) -> pd.DataFrame:
@@ -58,34 +55,25 @@ def run_evaluation_and_collect_results(
 
     Args:
         eval_dataset: Dataset to evaluate on ("emotion_study" or "cue")
-        cmmn_filter: CMMN filter type (None, "barycenter", "subj_to_subj")
-        feature_extractor_str: Feature extractor type ("bowav" or "psd_autocorr")
-        classifier_type: Classifier type ("logistic" or "random_forest")
-        validation_segment_len: Validation segment length (300 or -1)
-        is_classifier_trained_on_normalized_data: Whether the classifier was trained on normalized data
-        is_cmmn_filter_resampled: Whether the CMMN filter was resampled
+        cmmn_filter: CMMN filter type (None, "unnormed-barycenter", "subj_to_subj") used on test data
+        train_config: Namespace object with args used to train the classifier
         root: Root path
         validation_times: Array of validation times in seconds
 
     Returns:
         DataFrame: Results in flat format with columns for all configuration dimensions
     """
+
     # Create evaluation configuration
     config = EvalConfig(
         eval_dataset=eval_dataset,
-        feature_extractor=feature_extractor_str,
-        classifier_type=classifier_type,
-        validation_segment_length=validation_segment_len,
+        train_config=train_config,
         root=root,
         cmmn_filter=cmmn_filter,
-        is_cmmn_filter_resampled=is_cmmn_filter_resampled,
-        is_classifier_trained_on_normalized_data=is_classifier_trained_on_normalized_data,
     )
 
     # Load and prepare data
-    print(
-        f"Getting data from {eval_dataset}, using CMMN filter {cmmn_filter}, and building feature extractor for {feature_extractor_str}..."
-    )
+    feature_extractor_str = train_config.feature_extractor
     data_bundles = load_data_bundles(config)
     feature_extractor = get_feature_extractor(feature_extractor_str, data_bundles)
     feature_extractor_dict = {feature_extractor_str: feature_extractor}
@@ -133,9 +121,9 @@ def run_evaluation_and_collect_results(
                 "eval_dataset": eval_dataset,
                 "cmmn_filter": str(cmmn_filter),
                 "feature_extractor": feature_extractor_str,
-                "classifier_type": classifier_type,
-                "is_normalized": is_classifier_trained_on_normalized_data,
-                "validation_segment_len": validation_segment_len,
+                "classifier_type": train_config.classifier_type,
+                "is_normalized": train_config.cmmn_filter == "normed-barycenter",
+                "validation_segment_len": train_config.validation_segment_length,
                 "prediction_window": prediction_window,
                 "mean_f1": mean_f1,
                 "std_f1": std_f1,
@@ -171,53 +159,56 @@ validation_times = np.r_[
 ].astype(float)
 
 # Define the root path
-root = Path().absolute().parent
+root = Path(__file__).parents[1]
 
 # Define the configuration options
-is_classifier_trained_on_normalized_data = False
 eval_datasets = ["cue", "emotion_study"]
 feature_extractors = ["bowav", "psd_autocorr"]
-classifier_types = ["random_forest"]  # , "logistic"]  # Both classifier types included
+classifier_types = ["random_forest", "logistic"]  # Both classifier types included
 validation_segment_lens = [300, -1]
+train_cmmn_filter = None  # "normed-barycenter"
+train_use_idf = [True]  # , False
+
+
+train_configs = []
+config_folder = root / "config/_private"
+for clf in classifier_types:
+    for feat in feature_extractors:
+        for sl in validation_segment_lens:
+            for use_idf in train_use_idf:
+                cmmn_str = get_cmmn_suffix(train_cmmn_filter)
+                idf_str = "_idf" if use_idf else ""
+                config_file_name = f"{clf}_{sl2min(sl)}{cmmn_str}{idf_str}.txt"
+                print(f"Reading config file: {config_file_name}")
+                config_path = config_folder / config_file_name
+                train_configs.append(parse_config_file_args(config_path, feat))
 
 # Run evaluation for each configuration
-
+# %%
 # Loop through configurations and run evaluations
 for eval_dataset in eval_datasets:
-    is_cmmn_filter_resampled = True if eval_dataset == "cue" else False
-    cmmn_filter_options = get_cmmn_filter_options(
-        eval_dataset, is_classifier_trained_on_normalized_data
+    eval_cmmn_filter_options = get_eval_cmmn_filter_options(
+        eval_dataset, train_cmmn_filter
     )
 
-    for cmmn_filter in cmmn_filter_options:
-        cmmn_filter_str = str(cmmn_filter)
+    for eval_cmmn_filter in eval_cmmn_filter_options:
+        for train_config in train_configs:
+            print(
+                f"\nRunning evaluation for: dataset={eval_dataset}, filter={eval_cmmn_filter}, "
+                f"feature={train_config.feature_extractor}, classifier={train_config.classifier_type}, "
+                f"validation_segment_len={train_config.validation_segment_length}"
+            )
+            # Run evaluation and get results
+            results = run_evaluation_and_collect_results(
+                eval_dataset=eval_dataset,
+                cmmn_filter=eval_cmmn_filter,
+                train_config=train_config,
+                root=root,
+                validation_times=validation_times,
+            )
 
-        for feature_extractor_str in feature_extractors:
-
-            for classifier_type in classifier_types:
-
-                for validation_segment_len in validation_segment_lens:
-                    print(
-                        f"\nRunning evaluation for: dataset={eval_dataset}, filter={cmmn_filter}, "
-                        f"feature={feature_extractor_str}, classifier={classifier_type}, "
-                        f"validation_segment_len={validation_segment_len}"
-                    )
-
-                    # Run evaluation and get results
-                    results = run_evaluation_and_collect_results(
-                        eval_dataset=eval_dataset,
-                        cmmn_filter=cmmn_filter,
-                        feature_extractor_str=feature_extractor_str,
-                        classifier_type=classifier_type,
-                        validation_segment_len=validation_segment_len,
-                        is_classifier_trained_on_normalized_data=is_classifier_trained_on_normalized_data,
-                        is_cmmn_filter_resampled=is_cmmn_filter_resampled,
-                        root=root,
-                        validation_times=validation_times,
-                    )
-
-                    # Append directly to the master results DataFrame
-                    all_results = pd.concat([all_results, results], ignore_index=True)
+            # Append directly to the master results DataFrame
+            all_results = pd.concat([all_results, results], ignore_index=True)
 
 # Compute and add ICLabel scores for each dataset
 print("\nComputing ICLabel scores...")
@@ -234,7 +225,9 @@ for eval_dataset in eval_datasets:
 # Save the results to a CSV file
 results_dir = root / "results"
 results_dir.mkdir(exist_ok=True)
-train_data_str = "normalized" if is_classifier_trained_on_normalized_data else "raw"
+train_data_str = (
+    "normalized" if train_config.cmmn_filter == "normed-barycenter" else "raw"
+)
 all_results.to_csv(results_dir / f"mean_std_brain_f1_{train_data_str}.csv", index=False)
 
 # %%

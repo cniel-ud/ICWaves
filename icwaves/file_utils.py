@@ -1,6 +1,7 @@
-from pathlib import Path
 import shlex
 from typing import Optional
+
+from icwaves.argparser import create_argparser_all_params
 
 
 def get_validation_segment_length_string(valseglen: int) -> str:
@@ -22,6 +23,14 @@ def read_args_from_file(file_path):
     args_list = shlex.split(file_contents)
 
     return args_list
+
+
+def parse_config_file_args(path_to_config_file, feature_extractor):
+    args_list = read_args_from_file(path_to_config_file)
+    all_params_parser = create_argparser_all_params(feature_extractor)
+    args, _ = all_params_parser.parse_known_args(args_list)
+    args.feature_extractor = feature_extractor
+    return args
 
 
 def _build_centroid_assignments_file(args):
@@ -64,7 +73,7 @@ def build_base_classifier_name(args):
         int(args.validation_segment_length)
     )
     cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
-    idf_str = "_idf" if args.use_idf else ""
+    idf_str = "_idf" if "bowav" in args.feature_extractor and args.use_idf else ""
 
     base_clf_name = f"{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}{idf_str}"
 

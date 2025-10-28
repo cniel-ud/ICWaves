@@ -12,7 +12,9 @@ from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import get_validation_segment_length_string, get_cmmn_suffix
+from icwaves.file_utils import (
+    build_base_classifier_name,
+)
 
 
 def load_estimator(path: Path) -> Tuple[Union[BaseEstimator, Pipeline], dict]:
@@ -64,9 +66,7 @@ def get_results_filepath(config: EvalConfig) -> Path:
     results_path = config.root / "results" / config.eval_dataset / "evaluation"
     base_clf_name = build_base_classifier_name(config)
 
-    # TODO: we need to better differentiate between CMMN applied during training vs test,
-    # both in the use of the cli args (and attributes of the EvalConfig object) and the file name
-    if config.is_classifier_trained_on_normalized_data:
+    if config.train_config.cmmn_filter is not None:
         base_clf_name += "_clf-trained-on-filtered-data"
     base_clf_name += ".csv"
 
@@ -219,11 +219,16 @@ def eval_classifier_per_subject_brain_F1(
         data_bundle = next(iter(data_bundles.values()))
 
         # Convert validation segment lengths
+        window_length = (
+            config.window_length if "bowav" in config.feature_extractor else None
+        )
+        # TODO: improve pattern in convert_segment_length:
+        #   - handling of window_length
         converted_val_segment_lengths = convert_segment_length(
             validation_segment_lengths.tolist(),
             config.feature_extractor,
             data_bundle.srate,
-            config.window_length,
+            window_length,
         )
 
         # Extract feature data
