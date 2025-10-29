@@ -41,7 +41,7 @@ def _create_pipeline(scaler, classifier, clf_kwargs: dict) -> Pipeline:
 
 
 def create_estimator(
-    classifier_name: str, feature_extractor: str, **kwargs
+    classifier_name: str, feature_extractor: str, use_idf: bool = False, **kwargs
 ) -> Union[Pipeline, LogisticRegression, RandomForestClassifier]:
     """Create a classifier instance based on name."""
     if classifier_name not in ["logistic", "random_forest"]:
@@ -51,9 +51,12 @@ def create_estimator(
     clf_kwargs = _filter_classifier_kwargs(kwargs)
 
     if feature_extractor == "bowav":
-        # Always use TfidfRateScaler for bowav features (count rates)
-        scaler = TfidfRateScaler()
-        clf = _create_pipeline(scaler, classifier, clf_kwargs)
+        if use_idf:
+            scaler = TfidfRateScaler()
+            clf = _create_pipeline(scaler, classifier, clf_kwargs)
+        else:
+            clf = classifier
+            clf.set_params(**clf_kwargs)
     elif feature_extractor == "psd_autocorr":
         clf = classifier
         clf.set_params(**clf_kwargs)
@@ -62,17 +65,19 @@ def create_estimator(
         # we want to apply the TfidfRateScaler only to bowav (count rates)
         # x = [x_{bowav} x_{psd_autocorr}], and len(x_{bowav}) = n_codebooks * n_centroids
         bowav_feat_len = kwargs["n_codebooks"] * kwargs["n_centroids"]
-        
-        # Always use TfidfRateScaler for bowav features (count rates)
-        bowav_scaler = TfidfRateScaler()
-        scaler = ColumnTransformer(
-            [
-                ("bowav", bowav_scaler, slice(0, bowav_feat_len)),
-            ],
-            remainder="passthrough",
-        )
 
-        clf = _create_pipeline(scaler, classifier, clf_kwargs)
+        if use_idf:
+            bowav_scaler = TfidfRateScaler()
+            scaler = ColumnTransformer(
+                [
+                    ("bowav", bowav_scaler, slice(0, bowav_feat_len)),
+                ],
+                remainder="passthrough",
+            )
+            clf = _create_pipeline(scaler, classifier, clf_kwargs)
+        else:
+            clf = classifier
+            clf.set_params(**clf_kwargs)
     else:
         raise ValueError(f"Unsupported feature extractor: {feature_extractor}")
 
@@ -92,7 +97,7 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
     and the output of the extractor has shape (n_ics, n_segments, 200). 200
     comes from the fact that we use 100 samples for the PSD and 100 samples
     for the autocorrelation.
-    
+
     Parameters
     ----------
     feature_type : str
@@ -106,10 +111,10 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
         segment_len: Dict[str, Optional[int]],
     ):
         return build_bowav_from_centroid_assignments(
-            time_series["bowav"], 
-            kwargs["n_centroids"], 
+            time_series["bowav"],
+            kwargs["n_centroids"],
             segment_len["bowav"],
-            normalize_by_windows=True  # Always use count rates for bowav
+            normalize_by_windows=True,  # Always use count rates for bowav
         )
 
     def psd_autocorr(

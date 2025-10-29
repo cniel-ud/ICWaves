@@ -1,6 +1,6 @@
 from pathlib import Path
 import pickle
-from typing import Callable, Dict, Tuple, Optional
+from typing import Callable, Dict, Tuple, Optional, Union
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -12,23 +12,21 @@ from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import get_validation_segment_length_string, get_cmmn_suffix
+from icwaves.file_utils import (
+    build_base_classifier_name,
+)
 
 
-def load_classifier(path: Path) -> Tuple[BaseEstimator, dict]:
+def load_estimator(path: Path) -> Tuple[Union[BaseEstimator, Pipeline], dict]:
     """Load trained classifier and its best parameters."""
     with path.open("rb") as f:
         results = pickle.load(f)
 
-    clf = (
-        results["best_estimator"]["clf"]
-        if isinstance(results["best_estimator"], Pipeline)
-        else results["best_estimator"]
-    )
+    best_estimator = results["best_estimator"]
 
     best_params = get_best_parameters(results)
 
-    return clf, best_params
+    return best_estimator, best_params
 
 
 def _should_skip_segment(val_segment_len, train_segment_len, agg_method):
@@ -66,18 +64,13 @@ def get_results_filepath(config: EvalConfig) -> Path:
         Path to the results CSV file
     """
     results_path = config.root / "results" / config.eval_dataset / "evaluation"
-    valseglen = get_validation_segment_length_string(
-        int(config.validation_segment_length)
-    )
-    cmmn_suffix = get_cmmn_suffix(config.cmmn_filter)
+    base_clf_name = build_base_classifier_name(config)
 
-    if config.is_classifier_trained_on_normalized_data:
-        cmmn_suffix = cmmn_suffix + "_clf-trained-on-filtered-data"
+    if config.train_config.cmmn_filter is not None:
+        base_clf_name += "_clf-trained-on-filtered-data"
+    base_clf_name += ".csv"
 
-    results_file = (
-        results_path
-        / f"{config.classifier_type}_{config.feature_extractor}_{valseglen}{cmmn_suffix}.csv"
-    )
+    results_file = results_path / base_clf_name
 
     # Create directories if they don't exist
     results_path.mkdir(parents=True, exist_ok=True)
@@ -112,6 +105,7 @@ def _evaluate_subject(
     feature_extractor: Dict[str, Callable],
     input_or_output_aggregation_method: Dict[str, str],
     training_segment_length: Dict[str, int],
+    calibrate_idf: Optional[Callable] = None,
 ) -> Dict:
     """
     Evaluate classifier performance for a single subject.
@@ -141,6 +135,7 @@ def _evaluate_subject(
         converted_val_segment_len,
         training_segment_length,
         subj_mask,
+        calibrate_idf,
     )
 
     return {
@@ -192,6 +187,7 @@ def eval_classifier_per_subject_brain_F1(
     input_or_output_aggregation_method: Dict[str, str],
     training_segment_length: Dict[str, int],
     results_file: Path,
+    calibrate_idf: Optional[Callable] = None,
 ) -> pd.DataFrame:
     """
     Evaluate classifier performance across different time windows.
@@ -226,11 +222,16 @@ def eval_classifier_per_subject_brain_F1(
         data_bundle = next(iter(data_bundles.values()))
 
         # Convert validation segment lengths
+        window_length = (
+            config.window_length if "bowav" in config.feature_extractor else None
+        )
+        # TODO: improve pattern in convert_segment_length:
+        #   - handling of window_length
         converted_val_segment_lengths = convert_segment_length(
             validation_segment_lengths.tolist(),
             config.feature_extractor,
             data_bundle.srate,
-            config.window_length,
+            window_length,
         )
 
         # Extract feature data
@@ -268,6 +269,7 @@ def eval_classifier_per_subject_brain_F1(
                         feature_extractor,
                         input_or_output_aggregation_method,
                         training_segment_length,
+                        calibrate_idf,
                     )
 
                     # Add to results DataFrame

@@ -11,8 +11,7 @@ from sklearn.base import clone
 
 from icwaves.factories import create_estimator
 from icwaves.file_utils import (
-    get_cmmn_suffix,
-    get_validation_segment_length_string,
+    build_base_classifier_name,
     read_args_from_file,
 )
 from icwaves.model_selection.hpo_utils import (
@@ -132,7 +131,9 @@ if __name__ == "__main__":
     # the bowav_psd_autocorr feature
     params["n_codebooks"] = 7  # number of ICLabel classes
     params["n_centroids"] = data_bundle.n_centroids
-    clf = create_estimator(args.classifier_type, args.feature_extractor, **params)
+    clf = create_estimator(
+        args.classifier_type, args.feature_extractor, args.use_idf, **params
+    )
     logging.info(f"clf: {clf}")
 
     # Get best parameters from HPO results
@@ -163,13 +164,10 @@ if __name__ == "__main__":
     )
 
     # Save final model and results
-    valseglen = get_validation_segment_length_string(
-        int(args.validation_segment_length)
-    )
-    cmmn_suffix = get_cmmn_suffix(args.cmmn_filter)
+    base_clf_name = build_base_classifier_name(args)
     results_file = Path(
         args.path_to_results,
-        f"train_{args.classifier_type}_{args.feature_extractor}_valSegLen{valseglen}{cmmn_suffix}.pkl",
+        f"train_{base_clf_name}.pkl",
     )
     with results_file.open("wb") as f:
         pickle.dump(results, f, pickle.HIGHEST_PROTOCOL)
