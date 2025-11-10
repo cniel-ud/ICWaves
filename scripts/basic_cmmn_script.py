@@ -20,7 +20,7 @@ def load_data_from_directory(directory):
         directory: Path to directory containing data files
 
     Returns:
-        Dictionary mapping subject IDs to data arrays (channels × samples)
+        Dictionary mapping subject IDs to data arrays (channels x samples)
     """
     directory = Path(directory)
     data_dict = {}
@@ -38,7 +38,7 @@ def load_data_from_directory(directory):
             subj_id = mat_file.stem  # e.g., 'subj-000'
             mat_data = scipy.io.loadmat(mat_file)
 
-            # Extract the data array (channels × samples)
+            # Extract the data array (channels x samples)
             if 'data' in mat_data:
                 data_dict[subj_id] = mat_data['data']
 
@@ -78,7 +78,7 @@ def load_data_from_directory(directory):
     # Validate data shapes
     for subj_id, data in data_dict.items():
         if data.ndim != 2:
-            raise ValueError(f"{subj_id}: Expected 2D array (channels × samples), got shape {data.shape}")
+            raise ValueError(f"{subj_id}: Expected 2D array (channels x samples), got shape {data.shape}")
         print(f"    {subj_id}: {data.shape[0]} channels, {data.shape[1]} samples")
 
     return data_dict
@@ -123,7 +123,7 @@ def main():
     processor.save_filters(OUTPUT_DIR)
 
     print("\n" + "="*60)
-    print("✅ COMPLETE!")
+    print("COMPLETE!")
     print("="*60)
     print(f"Processed {len(filtered_data)} subjects")
     print(f"Filters saved to {OUTPUT_DIR}/")
