@@ -12,8 +12,8 @@ import numpy as np
 from icwaves.cmmn import CMMNProcessor
 
 # Define your data directories here
-SOURCE_DATA_DIR = "/path/to/source/data"  # Directory with source EEG files (.mat, .npy, or .npz)
-TARGET_DATA_DIR = "/path/to/target/data"  # Directory with target EEG files (.mat, .npy, or .npz)
+SOURCE_DATA_DIR = "/work/cniel/data/emotion_study/raw_data_and_IC_labels"  # Directory with source EEG files (.mat, .npy, or .npz)
+TARGET_DATA_DIR = "/work/cniel/data/epic/raw_data_and_IC_labels"  # Directory with target EEG files (.mat, .npy, or .npz)
 OUTPUT_DIR = "./cmmn_filters"             # Where to save the filters
 SAMPLING_RATE = 256                       # Sampling rate in Hz (change if different)
 
