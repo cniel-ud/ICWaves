@@ -1,16 +1,21 @@
 # %%
 # Set OMP constants to use only 8 CPUs
-from argparse import Namespace
 import os
+
+os.environ["OMP_NUM_THREADS"] = "8"
+os.environ["MKL_NUM_THREADS"] = "8"
+os.environ["NUMEXPR_NUM_THREADS"] = "8"
+os.environ["OPENBLAS_NUM_THREADS"] = "8"
+
+
+from argparse import Namespace
 
 from icwaves.evaluation.utils import make_calibrate_idf_fn, sl2min
 from icwaves.file_utils import get_cmmn_suffix, parse_config_file_args
 
-os.environ["OMP_NUM_THREADS"] = "8"
-
 # Imports and setup
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 import numpy as np
 import pandas as pd
 from icwaves.evaluation.evaluation import (
@@ -52,6 +57,7 @@ def run_evaluation_and_collect_results(
     train_config: Namespace,
     root: Path,
     validation_times: np.ndarray,
+    minutes_per_ic: Optional[int] = None,
 ) -> pd.DataFrame:
     """
     Run evaluation for a specific configuration and return results in a flat DataFrame format.
@@ -62,7 +68,7 @@ def run_evaluation_and_collect_results(
         train_config: Namespace object with args used to train the classifier
         root: Root path
         validation_times: Array of validation times in seconds
-
+        minutes_per_ic: Use the first minutes_per_ic minutes of each IC for evaluation
     Returns:
         DataFrame: Results in flat format with columns for all configuration dimensions
     """
@@ -73,6 +79,7 @@ def run_evaluation_and_collect_results(
         train_config=train_config,
         root=root,
         cmmn_filter=cmmn_filter,
+        minutes_per_ic=minutes_per_ic,
     )
 
     # Load and prepare data
@@ -84,6 +91,19 @@ def run_evaluation_and_collect_results(
     # Load classifier and get parameters
     clf, best_params = load_estimator(config.path_to_classifier[feature_extractor_str])
     clf_dict = {feature_extractor_str: clf}
+    # Since EPIC has multiple 10-min ICs with segments that are zero for more than the training segment length,
+    # which is at maximum 5 minutes, we can't test with classifiers where the winning aggregation method was
+    # mayority vote, as the segments used to make predictions will be all-zeros. We want to make predictions on
+    # the full 10-min time series, which is only possible when the aggregation method is count pooling.
+    # Since we pre-compute centroid assignments to later compute the bowav feature, it's not possible to know
+    # if a segment in original IC time series was all-zeros, so we do not consider the option of dynamically discarding
+    # such segments before computing the features and making the prediction.
+    if (
+        best_params["input_or_output_aggregation_method"] == "majority_vote"
+        and eval_dataset == "epic"
+    ):
+        return pd.DataFrame()
+
     agg_method = {
         feature_extractor_str: best_params["input_or_output_aggregation_method"]
     }
@@ -173,7 +193,7 @@ validation_times = np.r_[
 root = Path(__file__).parents[1]
 
 # Define the configuration options
-eval_datasets = ["cue", "emotion_study"]
+eval_datasets = ["epic"]  # ["cue", "emotion_study"]
 feature_extractors = ["bowav", "psd_autocorr"]
 classifier_types = ["random_forest", "logistic"]  # Both classifier types included
 validation_segment_lens = [300, -1]
@@ -201,6 +221,14 @@ for eval_dataset in eval_datasets:
     eval_cmmn_filter_options = get_eval_cmmn_filter_options(
         eval_dataset, train_cmmn_filter
     )
+    if eval_dataset == "epic":
+        minutes_per_ic = 10
+        # only include 10 minutes in validation_times
+        validation_times = validation_times[validation_times == 10 * 60]
+        # TODO: remove once we have the CMMN filters for EPIC
+        eval_cmmn_filter_options = [None]
+    else:
+        minutes_per_ic = None  # use the same value as in training (emotion_study)
 
     for eval_cmmn_filter in eval_cmmn_filter_options:
         for train_config in train_configs:
@@ -216,11 +244,13 @@ for eval_dataset in eval_datasets:
                 train_config=train_config,
                 root=root,
                 validation_times=validation_times,
+                minutes_per_ic=minutes_per_ic,
             )
 
             # Append directly to the master results DataFrame
             all_results = pd.concat([all_results, results], ignore_index=True)
 
+# %%
 # Compute and add ICLabel scores for each dataset
 print("\nComputing ICLabel scores...")
 for eval_dataset in eval_datasets:
