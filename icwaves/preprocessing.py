@@ -15,7 +15,8 @@ def _get_base_metadata(args):
     if not data_dir.is_dir():
         raise FileNotFoundError(f"Directory {data_dir} does not exist.")
 
-    fnames = [f"subj-{i:02}.mat" for i in args.subj_ids]
+    num_digits = len(str(max(args.subj_ids)))
+    fnames = [f"subj-{i:0{num_digits}}.mat" for i in args.subj_ids]
 
     # TODO: build a dict instead, to keep a map of subj_id and file
     file_list = [data_dir.joinpath(f) for f in fnames]
@@ -46,7 +47,7 @@ def _load_cmmn_filter(args, subjID):
     """Load common filter for a subject if path is provided."""
     if args.path_to_cmmn_filters is None:
         return None
-    
+
     cmmn_path = Path(args.path_to_cmmn_filters)
     fname = f"subj-{subjID:02}.npz"
     fpath = cmmn_path.joinpath(fname)
