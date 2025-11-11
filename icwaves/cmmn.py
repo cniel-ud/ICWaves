@@ -319,8 +319,8 @@ class CMMNProcessor:
             # Average across channels
             avg_subj_psd = np.mean(subj_psd, axis=0)
 
-            # Compute filter
-            freq_filter = np.sqrt(self.barycenter) / np.sqrt(avg_subj_psd)
+            # Compute filter (add small epsilon to avoid divide by zero)
+            freq_filter = np.sqrt(self.barycenter) / (np.sqrt(avg_subj_psd) + 1e-10)
             time_filter = np.fft.irfft(freq_filter)
 
             freq_filters[subj_id] = freq_filter
@@ -374,7 +374,7 @@ class CMMNProcessor:
             source_psd = averaged_source_psds[self.subj_matches[i]]
             target_psd = averaged_target_psds[i]
 
-            freq_filter = np.sqrt(source_psd) / np.sqrt(target_psd)
+            freq_filter = np.sqrt(source_psd) / (np.sqrt(target_psd) + 1e-10)
             time_filter = np.fft.irfft(freq_filter)
 
             freq_filters[target_id] = freq_filter

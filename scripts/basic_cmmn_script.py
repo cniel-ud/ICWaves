@@ -20,7 +20,8 @@ SOURCE_DATA_DIR = "/work/cniel/data/emotion_study/raw_data_and_IC_labels"  # Dir
 TARGET_DATA_DIR = "/work/cniel/data/epic/raw_data_and_IC_labels"  # Directory with target EEG files (.mat, .npy, or .npz)
 SOURCE_DATASET_NAME = "emotion"  # Name for source dataset cache ('emotion', 'cue', 'epic', etc.)
 TARGET_DATASET_NAME = "epic"     # Name for target dataset cache ('emotion', 'cue', 'epic', etc.)
-OUTPUT_DIR = "./cmmn_filters"    # Where to save the filters
+METHOD = "normed-barycenter"     # Method: 'normed-barycenter', 'unnormed-barycenter', or 'subj-to-subj'
+OUTPUT_BASE_DIR = "./cmmn_filters"  # Base directory for filters
 SAMPLING_RATE = 256               # Sampling rate in Hz (change if different)
 
 def load_data_from_directory(directory):
@@ -98,10 +99,23 @@ def main():
     print("="*60)
     print("CMMN Filter Generation")
     print(f"Source: {SOURCE_DATASET_NAME} -> Target: {TARGET_DATASET_NAME}")
+    print(f"Method: {METHOD}")
     print("="*60)
 
+    # Create output directory based on method and dataset pair
+    method_suffix = METHOD.replace('-', '_')  # Convert normed-barycenter to normed_barycenter
+    if METHOD == 'normed-barycenter':
+        method_suffix = 'barycenter'  # Simplify for normed-barycenter
+    elif METHOD == 'unnormed-barycenter':
+        method_suffix = 'unnormed_barycenter'
+    elif METHOD == 'subj-to-subj':
+        method_suffix = 'subj_to_subj'
+
+    OUTPUT_DIR = Path(OUTPUT_BASE_DIR) / f"{SOURCE_DATASET_NAME}_to_{TARGET_DATASET_NAME}_{method_suffix}"
+    print(f"Output directory: {OUTPUT_DIR}")
+
     # Check for cached PSDs using dataset names
-    psd_cache_dir = Path(OUTPUT_DIR) / "psd_cache"
+    psd_cache_dir = Path(OUTPUT_BASE_DIR) / "psd_cache"
     source_psd_file = psd_cache_dir / SOURCE_DATASET_NAME / "all_psds.npz"
     target_psd_file = psd_cache_dir / TARGET_DATASET_NAME / "all_psds.npz"
 
@@ -136,11 +150,11 @@ def main():
 
     # 3. Create processor with detected or specified sampling rate
     print(f"\nCreating CMMN processor:")
-    print(f"  Method: normed-barycenter")
+    print(f"  Method: {METHOD}")
     print(f"  Sampling rate: {SAMPLING_RATE} Hz")
 
     processor = CMMNProcessor(
-        method='normed-barycenter',
+        method=METHOD,
         sampling_rate=SAMPLING_RATE,
         nperseg=min(SAMPLING_RATE, 256)  # Use appropriate segment length
     )
@@ -172,12 +186,15 @@ def main():
         print(f"  Computed {len(processor.target_psds)} {TARGET_DATASET_NAME} PSDs")
 
     # Generate filters using the PSDs (cached or computed)
-    if processor.method == 'normed-barycenter':
+    print(f"\nGenerating {METHOD} filters...")
+    if METHOD == 'normed-barycenter':
         processor._generate_normed_barycenter_filters()
-    elif processor.method == 'unnormed-barycenter':
+    elif METHOD == 'unnormed-barycenter':
         processor._generate_unnormed_barycenter_filters()
-    elif processor.method == 'subj-to-subj':
+    elif METHOD == 'subj-to-subj':
         processor._generate_subj_to_subj_filters()
+        if processor.subj_matches is not None:
+            print(f"  Subject matching completed: {len(processor.subj_matches)} matches")
 
     # Save PSDs that weren't cached
     if source_data != 'cached' or target_data != 'cached':
@@ -211,12 +228,28 @@ def main():
     print("COMPLETE!")
     print("="*60)
     print(f"Processed {len(filtered_data)} subjects")
-    print(f"Filters saved to {OUTPUT_DIR}/")
+    print(f"Method: {METHOD}")
+    print(f"Filters saved to: {OUTPUT_DIR}/")
+
+    if METHOD == 'subj-to-subj' and processor.subj_matches is not None:
+        # Save subject matches for reference
+        matches_file = OUTPUT_DIR / "subject_matches.txt"
+        with open(matches_file, 'w') as f:
+            f.write(f"Subject-to-Subject Matching Results\n")
+            f.write(f"Source: {SOURCE_DATASET_NAME}, Target: {TARGET_DATASET_NAME}\n")
+            f.write("="*40 + "\n")
+            target_ids = list(processor.target_psds.keys())
+            source_ids = list(processor.source_psds.keys())
+            for i, match_idx in enumerate(processor.subj_matches):
+                if i < len(target_ids):
+                    f.write(f"Target {target_ids[i]} -> Source {source_ids[match_idx]}\n")
+        print(f"Subject matches saved to: {matches_file}")
+
     print(f"\nDataset-specific PSDs cached in:")
     print(f"  {psd_cache_dir}/{SOURCE_DATASET_NAME}/all_psds.npz")
     print(f"  {psd_cache_dir}/{TARGET_DATASET_NAME}/all_psds.npz")
     print(f"\nTo apply these filters later:")
-    print(f"  processor = CMMNProcessor()")
+    print(f"  processor = CMMNProcessor(method='{METHOD}')")
     print(f"  processor.load_filters('{OUTPUT_DIR}')")
     print(f"  filtered = processor.transform(new_data)")
 
