@@ -200,6 +200,8 @@ def eval_classifier_per_subject_brain_F1(
         data_bundles: Data bundles
         input_or_output_aggregation_method: Input or output aggregation method
         training_segment_length: Training segment length
+        results_file: Path to file where results are to be saved
+        calibrate_idf: If not None, a function used to calibrate the idf term
 
     Returns:
         DataFrame with mean and standard deviation of F1 scores
@@ -236,6 +238,15 @@ def eval_classifier_per_subject_brain_F1(
 
         # Extract feature data
         X = {k: v.data for k, v in data_bundles.items()}
+
+        # Add zero_window_mask if it exists (for handling all-zero windows in bowav)
+        # TODO: That is a hacky way of adding this mask without changing too much the
+        # existing code, since the keys in `X` are supposed to be the names of feature
+        # types. It would be better to have a more elegant solution.
+        if "bowav" in config.feature_extractor and hasattr(
+            data_bundles["bowav"], "zero_window_mask"
+        ):
+            X["zero_window_mask"] = data_bundles["bowav"].zero_window_mask
 
         # Calculate total iterations for progress bar
         total_iterations = len(validation_segment_lengths) * len(config.subj_ids)

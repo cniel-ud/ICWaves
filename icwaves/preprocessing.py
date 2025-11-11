@@ -76,6 +76,8 @@ def _get_windowed_ics_and_labels(args):
     # NOTE: float32. ICs were saved in matlab as single.
     windowed_ics = np.zeros((n_ics, n_win_per_ic, window_length), dtype=np.float32)
     labels = -1 * np.ones(n_ics, dtype=int)
+    # Track which windows are all-zero
+    zero_window_mask = np.zeros((n_ics, n_win_per_ic), dtype=bool)
 
     cum_ic_ind = 0
     expert_label_mask = np.full(n_ics, False)
@@ -105,7 +107,13 @@ def _get_windowed_ics_and_labels(args):
             # Apply CMM filter here if vectorization is not possible, o.w., do it outside
             if cmmn_filter is not None:
                 ic = np.convolve(ic, cmmn_filter, mode="full")[: len(ic)]
-            windowed_ics[cum_ic_ind] = ic[time_idx]
+
+            windowed_ic = ic[time_idx]
+            windowed_ics[cum_ic_ind] = windowed_ic
+
+            # Track which windows are all-zero (or near-zero to handle floating point precision)
+            zero_window_mask[cum_ic_ind] = np.all(np.abs(windowed_ic) < 1e-10, axis=1)
+
             labels[cum_ic_ind] = labels_per_subject[ic_ind]
             noisy_labels[cum_ic_ind] = noisy_labels_per_subject[ic_ind]
             expert_label_mask[cum_ic_ind] = expert_label_mask_per_subject[ic_ind]
@@ -121,6 +129,7 @@ def _get_windowed_ics_and_labels(args):
         subj_ind=subj_ind,
         noisy_labels=noisy_labels,
         srate=srate,
+        zero_window_mask=zero_window_mask,
     )
 
 
@@ -221,6 +230,8 @@ def load_or_build_preprocessed_data(args):
     preprocessed_data_file = data_folder.joinpath(preprocessed_data_file)
     if preprocessed_data_file.is_file():
         with np.load(preprocessed_data_file) as data:
+            # Handle backwards compatibility - older files may not have zero_window_mask
+            zero_window_mask = data.get("zero_window_mask", None)
             db = DataBundle(
                 data=data["windowed_ics"],
                 labels=data["labels"],
@@ -228,6 +239,7 @@ def load_or_build_preprocessed_data(args):
                 subj_ind=data["subj_ind"],
                 noisy_labels=data["noisy_labels"],
                 srate=data["srate"],
+                zero_window_mask=zero_window_mask,
             )
     else:
         db = _get_windowed_ics_and_labels(args)
@@ -240,6 +252,7 @@ def load_or_build_preprocessed_data(args):
                 expert_label_mask=db.expert_label_mask,
                 subj_ind=db.subj_ind,
                 noisy_labels=db.noisy_labels,
+                zero_window_mask=db.zero_window_mask,
             )
 
     return db

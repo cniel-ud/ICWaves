@@ -42,19 +42,24 @@ def build_features_based_on_aggregation_method(
               where n_segments is equal 1 if agg_method is "count_pooling", or equal to
               k = floor(X.shape[-1] / training_segment_length) if agg_method is "majority_vote".
     """
+    feature_types = list(feature_extractor.keys())
     # X is a dict. Make a deep copy to avoid messing with upstream data.
     X = {k: np.copy(v) for k, v in X.items()}
-    for feature_type in X.keys():
+    for feature_type in feature_types:
         X[feature_type] = X[feature_type][
             subj_mask, ..., slice(0, validation_segment_length[feature_type])
         ]
 
+    if "zero_window_mask" in X:
+        X["zero_window_mask"] = X["zero_window_mask"][
+            subj_mask, ..., slice(0, validation_segment_length["bowav"])
+        ]
+
     features = {}
-    feature_extractor_keys = list(feature_extractor.keys())
     seg_len_keys = list(validation_segment_length.keys())
-    if len(feature_extractor_keys) == len(seg_len_keys):
+    if len(feature_types) == len(seg_len_keys):
         """Individual features (e.g., 'bowav', 'psd_autocorr')"""
-        for feature_type in feature_extractor.keys():
+        for feature_type in feature_types:
             if agg_method[feature_type] == "count_pooling":
                 features[feature_type] = feature_extractor[feature_type](
                     X,
@@ -73,7 +78,7 @@ def build_features_based_on_aggregation_method(
                 )
     else:
         """Concatenated features (e.g., 'bowav_psd_autocorr')"""
-        extractor_key = feature_extractor_keys[0]
+        extractor_key = feature_types[0]
         if agg_method[extractor_key] == "count_pooling":
             features[extractor_key] = feature_extractor[extractor_key](
                 X,

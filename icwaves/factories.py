@@ -110,11 +110,14 @@ def create_feature_extractor(feature_type: str, **kwargs) -> Callable:
         time_series: dict[str, npt.ArrayLike],
         segment_len: Dict[str, Optional[int]],
     ):
+        # Get zero_window_mask if available
+        zero_window_mask = time_series.get("zero_window_mask", None)
         return build_bowav_from_centroid_assignments(
             time_series["bowav"],
             kwargs["n_centroids"],
             segment_len["bowav"],
             normalize_by_windows=True,  # Always use count rates for bowav
+            zero_window_mask=zero_window_mask,
         )
 
     def psd_autocorr(

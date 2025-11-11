@@ -86,9 +86,13 @@ def build_or_load_centroid_assignments_and_labels(args: Namespace) -> DataBundle
 
 
 def build_bowav_from_centroid_assignments(
-    centroid_assignments, n_centroids, n_windows_per_segment, normalize_by_windows=True
+    centroid_assignments,
+    n_centroids,
+    n_windows_per_segment,
+    normalize_by_windows=True,
+    zero_window_mask=None,
 ):
-    """Build flattened bag of waves from centroid assignments. Use all windows on each time series.
+    """Build flattened bag of waves from centroid assignments, ignoring all-zero windows.
 
     Parameters
     ----------
@@ -109,6 +113,9 @@ def build_bowav_from_centroid_assignments(
         This produces rates representing the proportion of windows containing each
         centroid within a segment, making features comparable across different
         segment lengths.
+    zero_window_mask : array, optional
+        Boolean mask of shape (m, n) where True indicates all-zero windows to ignore.
+        If None, no windows are ignored.
     """
     n_time_series, n_codebooks, n_windows_per_time_series = centroid_assignments.shape
     n_features = n_codebooks * n_centroids
@@ -124,20 +131,39 @@ def build_bowav_from_centroid_assignments(
     bowav = np.zeros(
         (n_time_series, n_segments_per_time_series, n_features), dtype=dtype
     )
-    
+
     for i_ts in range(n_time_series):
         for i_seg in range(n_segments_per_time_series):
             start_ind = i_seg * n_windows_per_segment
             end_ind = start_ind + n_windows_per_segment
-            for r in np.arange(n_codebooks):
-                nu, counts = np.unique(
-                    centroid_assignments[i_ts, r, start_ind:end_ind], return_counts=True
-                )
+
+            # Get segment assignments for all codebooks
+            segment_assignments = centroid_assignments[i_ts, :, start_ind:end_ind]
+
+            # Apply valid window mask if needed
+            if zero_window_mask is not None:
+                segment_zero_mask = zero_window_mask[i_ts, start_ind:end_ind]
+                valid_window_mask = ~segment_zero_mask
+                n_valid_windows = np.sum(valid_window_mask)
+
+                # Skip segments where all windows are zero
+                if n_valid_windows == 0:
+                    continue
+
+                # Apply mask to all codebooks at once
+                segment_assignments = segment_assignments[:, valid_window_mask]
+            else:
+                n_valid_windows = n_windows_per_segment
+
+            for i_codebook in np.arange(n_codebooks):
+                valid_assignments = segment_assignments[i_codebook]
+
+                nu, counts = np.unique(valid_assignments, return_counts=True)
                 # centroid index->feature index
-                i_feature = nu + r * n_centroids
+                i_feature = nu + i_codebook * n_centroids
                 if normalize_by_windows:
-                    # Normalize by number of windows per segment to get rates
-                    bowav[i_ts, i_seg, i_feature] = counts / n_windows_per_segment
+                    # Normalize by number of valid windows, not total windows
+                    bowav[i_ts, i_seg, i_feature] = counts / n_valid_windows
                 else:
                     bowav[i_ts, i_seg, i_feature] = counts
 
