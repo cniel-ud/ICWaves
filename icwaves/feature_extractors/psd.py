@@ -99,6 +99,12 @@ def _psd_compute_psdmed(
         # equivalent to:
         # np.vstack([icaact[it, index[:, k]] for k in range(index.shape[-1])]).T
         temp = (temp[:, subset].T * window).T
+        # drop windows that are all-zeros
+        is_all_zeros = np.all(temp == 0.0, axis=0)
+        # raise error if all windows are all-zeros
+        if is_all_zeros.all():
+            raise ValueError("All windows are all-zeros.")
+        temp = temp[:, ~is_all_zeros]
         temp = np.fft.fft(temp, n_points, axis=0)
         temp = temp * np.conjugate(temp)
         temp = temp[1 : n_freqs + 1, :] * 2 / denominator
