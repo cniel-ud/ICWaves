@@ -291,11 +291,25 @@ class CMMNProcessor:
 
     def _generate_normed_barycenter_filters(self):
         """Generate filters using normalized barycenter."""
-        # Convert PSDs to array
-        source_psd_array = np.stack(list(self.source_psds.values()))
+        # Average across channels FIRST to handle different channel counts
+        # This is necessary due to inhomogenous dimensions between subjects
+        source_psds_list = []
+        for subj_id, psd in self.source_psds.items():
+            # Average across channels (axis 0) for each subject
+            avg_psd = np.mean(psd, axis=0)
+            source_psds_list.append(avg_psd)
 
-        # Compute normalized barycenter
-        self.barycenter = self._compute_normed_barycenter(source_psd_array)
+        # Now all subjects have same shape (n_freqs,) and can be stacked
+        source_psd_array = np.stack(source_psds_list)
+
+        # Compute normalized barycenter from averaged PSDs
+        # First do L1 normalization on each subject's averaged PSD
+        normalized_psds = []
+        for subj_avg in source_psd_array:
+            normalized_psds.append(subj_avg / np.sum(subj_avg))
+
+        # Finally average across subjects
+        self.barycenter = np.mean(normalized_psds, axis=0)
 
         # Generate filters for each target subject
         freq_filters = {}
@@ -316,10 +330,9 @@ class CMMNProcessor:
 
     def _generate_unnormed_barycenter_filters(self):
         """Generate filters using unnormalized barycenter."""
-        # Compute unnormalized barycenter
-        source_psd_array = np.stack(list(self.source_psds.values()))
+        # Average across channels FIRST to handle different channel counts
         avg_psds = []
-        for subj_psd in source_psd_array:
+        for subj_id, subj_psd in self.source_psds.items():
             avg_psd = np.mean(subj_psd, axis=0)  # Average across channels
             avg_psds.append(avg_psd)
         self.barycenter = np.mean(avg_psds, axis=0)
@@ -341,21 +354,21 @@ class CMMNProcessor:
 
     def _generate_subj_to_subj_filters(self):
         """Generate filters using subject-to-subject matching."""
-        # Convert to arrays
-        source_psd_array = np.stack(list(self.source_psds.values()))
-        target_psd_array = np.stack(list(self.target_psds.values()))
+        # Don't stack yet - pass lists to handle different channel counts
+        source_psds_list = list(self.source_psds.values())
+        target_psds_list = list(self.target_psds.values())
         target_ids = list(self.target_psds.keys())
 
-        # Perform matching
-        self.subj_matches = self._subj_subj_matching(source_psd_array, target_psd_array)
+        # Perform matching (this will handle averaging internally)
+        self.subj_matches = self._subj_subj_matching(source_psds_list, target_psds_list)
 
         # Generate filters
         freq_filters = {}
         time_filters = {}
 
         # Average PSDs across channels
-        averaged_source_psds = [np.mean(psd, axis=0) for psd in source_psd_array]
-        averaged_target_psds = [np.mean(psd, axis=0) for psd in target_psd_array]
+        averaged_source_psds = [np.mean(psd, axis=0) for psd in source_psds_list]
+        averaged_target_psds = [np.mean(psd, axis=0) for psd in target_psds_list]
 
         for i, target_id in enumerate(target_ids):
             source_psd = averaged_source_psds[self.subj_matches[i]]
@@ -396,17 +409,17 @@ class CMMNProcessor:
 
         return barycenter
 
-    def _subj_subj_matching(self, source_psds: np.ndarray, target_psds: np.ndarray) -> List[int]:
+    def _subj_subj_matching(self, source_psds: List[np.ndarray], target_psds: List[np.ndarray]) -> List[int]:
         """Match each target subject to best source subject using Hellinger distance.
 
         Parameters:
-            source_psds: Source PSDs, shape (n_source_subjects, n_channels, n_freqs)
-            target_psds: Target PSDs, shape (n_target_subjects, n_channels, n_freqs)
+            source_psds: List of source PSDs, each can have different channel counts
+            target_psds: List of target PSDs, each can have different channel counts
 
         Returns:
             List of source subject indices for each target subject
         """
-        # Average across channels
+        # Average across channels - handles different channel counts
         correct_source_psds = [np.mean(subj, axis=0) for subj in source_psds]
         correct_target_psds = [np.mean(subj, axis=0) for subj in target_psds]
 

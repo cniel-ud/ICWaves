@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """
 Basic CMMN Script - Works with .mat, .npy, and .npz files
+
+Dataset-specific caching: PSDs are cached separately for each dataset name,
+so you can switch between datasets without clearing the cache.
+Just change SOURCE_DATASET_NAME and TARGET_DATASET_NAME below.
 """
 
 import sys
@@ -11,11 +15,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import numpy as np
 from icwaves.cmmn import CMMNProcessor
 
-# Define your data directories here
+# Define your data directories and dataset names here
 SOURCE_DATA_DIR = "/work/cniel/data/emotion_study/raw_data_and_IC_labels"  # Directory with source EEG files (.mat, .npy, or .npz)
 TARGET_DATA_DIR = "/work/cniel/data/epic/raw_data_and_IC_labels"  # Directory with target EEG files (.mat, .npy, or .npz)
-OUTPUT_DIR = "./cmmn_filters"             # Where to save the filters
-SAMPLING_RATE = 256                       # Sampling rate in Hz (change if different)
+SOURCE_DATASET_NAME = "emotion"  # Name for source dataset cache ('emotion', 'cue', 'epic', etc.)
+TARGET_DATASET_NAME = "epic"     # Name for target dataset cache ('emotion', 'cue', 'epic', etc.)
+OUTPUT_DIR = "./cmmn_filters"    # Where to save the filters
+SAMPLING_RATE = 256               # Sampling rate in Hz (change if different)
 
 def load_data_from_directory(directory):
     """Load EEG data from directory, automatically handling .mat, .npy, and .npz files.
@@ -91,17 +97,42 @@ def load_data_from_directory(directory):
 def main():
     print("="*60)
     print("CMMN Filter Generation")
+    print(f"Source: {SOURCE_DATASET_NAME} -> Target: {TARGET_DATASET_NAME}")
     print("="*60)
 
-    # 1. Load source data
-    print(f"\nLoading source data from: {SOURCE_DATA_DIR}")
-    source_data = load_data_from_directory(SOURCE_DATA_DIR)
-    print(f"  Loaded {len(source_data)} subjects")
+    # Check for cached PSDs using dataset names
+    psd_cache_dir = Path(OUTPUT_DIR) / "psd_cache"
+    source_psd_file = psd_cache_dir / SOURCE_DATASET_NAME / "all_psds.npz"
+    target_psd_file = psd_cache_dir / TARGET_DATASET_NAME / "all_psds.npz"
 
-    # 2. Load target data
-    print(f"\nLoading target data from: {TARGET_DATA_DIR}")
-    target_data = load_data_from_directory(TARGET_DATA_DIR)
-    print(f"  Loaded {len(target_data)} subjects")
+    # Try to load cached PSDs
+    source_data = None
+    target_data = None
+
+    if source_psd_file.exists():
+        print(f"\nFound cached PSDs for {SOURCE_DATASET_NAME} dataset")
+        source_data = 'cached'
+    else:
+        print(f"\nNo cached PSDs for {SOURCE_DATASET_NAME} dataset")
+
+    if target_psd_file.exists():
+        print(f"Found cached PSDs for {TARGET_DATASET_NAME} dataset")
+        target_data = 'cached'
+    else:
+        print(f"No cached PSDs for {TARGET_DATASET_NAME} dataset")
+
+    # Load data if not using cache
+    if source_data != 'cached':
+        # 1. Load source data
+        print(f"\nLoading source data from: {SOURCE_DATA_DIR}")
+        source_data = load_data_from_directory(SOURCE_DATA_DIR)
+        print(f"  Loaded {len(source_data)} subjects")
+
+    if target_data != 'cached':
+        # 2. Load target data
+        print(f"\nLoading target data from: {TARGET_DATA_DIR}")
+        target_data = load_data_from_directory(TARGET_DATA_DIR)
+        print(f"  Loaded {len(target_data)} subjects")
 
     # 3. Create processor with detected or specified sampling rate
     print(f"\nCreating CMMN processor:")
@@ -116,10 +147,60 @@ def main():
 
     # 4. Fit filters from source to target
     print("\nFitting CMMN filters...")
-    processor.fit(source_data, target_data)
+
+    # Load cached PSDs if available
+    if source_data == 'cached':
+        print(f"Loading cached {SOURCE_DATASET_NAME} PSDs...")
+        source_psd_data = np.load(source_psd_file, allow_pickle=True)
+        processor.source_psds = {k: v for k, v in source_psd_data.items()}
+        print(f"  Loaded {len(processor.source_psds)} {SOURCE_DATASET_NAME} PSDs from cache")
+    else:
+        # Compute source PSDs
+        processor.source_data = source_data
+        processor.source_psds = processor._compute_psds(source_data)
+        print(f"  Computed {len(processor.source_psds)} {SOURCE_DATASET_NAME} PSDs")
+
+    if target_data == 'cached':
+        print(f"Loading cached {TARGET_DATASET_NAME} PSDs...")
+        target_psd_data = np.load(target_psd_file, allow_pickle=True)
+        processor.target_psds = {k: v for k, v in target_psd_data.items()}
+        print(f"  Loaded {len(processor.target_psds)} {TARGET_DATASET_NAME} PSDs from cache")
+    else:
+        # Compute target PSDs
+        processor.target_data = target_data
+        processor.target_psds = processor._compute_psds(target_data)
+        print(f"  Computed {len(processor.target_psds)} {TARGET_DATASET_NAME} PSDs")
+
+    # Generate filters using the PSDs (cached or computed)
+    if processor.method == 'normed-barycenter':
+        processor._generate_normed_barycenter_filters()
+    elif processor.method == 'unnormed-barycenter':
+        processor._generate_unnormed_barycenter_filters()
+    elif processor.method == 'subj-to-subj':
+        processor._generate_subj_to_subj_filters()
+
+    # Save PSDs that weren't cached
+    if source_data != 'cached' or target_data != 'cached':
+        print("\nSaving newly computed PSDs to cache...")
+
+        if source_data != 'cached':
+            # Save source PSDs
+            source_psd_file.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(source_psd_file, **processor.source_psds)
+            print(f"  Saved {len(processor.source_psds)} {SOURCE_DATASET_NAME} PSDs to cache")
+
+        if target_data != 'cached':
+            # Save target PSDs
+            target_psd_file.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(target_psd_file, **processor.target_psds)
+            print(f"  Saved {len(processor.target_psds)} {TARGET_DATASET_NAME} PSDs to cache")
 
     # 5. Transform target data
     print("\nApplying filters to target data...")
+    if target_data == 'cached':
+        # Need to load actual target data for transformation
+        print("Loading target data for transformation...")
+        target_data = load_data_from_directory(TARGET_DATA_DIR)
     filtered_data = processor.transform(target_data)
 
     # 6. Save filters for later use
@@ -131,6 +212,9 @@ def main():
     print("="*60)
     print(f"Processed {len(filtered_data)} subjects")
     print(f"Filters saved to {OUTPUT_DIR}/")
+    print(f"\nDataset-specific PSDs cached in:")
+    print(f"  {psd_cache_dir}/{SOURCE_DATASET_NAME}/all_psds.npz")
+    print(f"  {psd_cache_dir}/{TARGET_DATASET_NAME}/all_psds.npz")
     print(f"\nTo apply these filters later:")
     print(f"  processor = CMMNProcessor()")
     print(f"  processor.load_filters('{OUTPUT_DIR}')")
