@@ -28,6 +28,7 @@ end
 % Process each segment
 srate = 256;
 segments = unique([brain_info(:,1); non_brain_info(:,1)]);
+num_digits = length(num2str(max(segments)));
 for i = 1:length(segments)
     fprintf("Processing segment %d out of %d\n", i, length(segments));
     seg_id = segments(i);
@@ -69,7 +70,7 @@ for i = 1:length(segments)
     expert_label_mask = ones(n_comps, 1, 'logical');
 
     % Save subject file
-    out_file = fullfile(out_dir, sprintf('subj-%d.mat', seg_id));
+    out_file = fullfile(out_dir, sprintf(['subj-%0' num2str(num_digits) 'd.mat'], seg_id));
     save(out_file, 'data', 'srate', 'icaweights', 'icasphere', 'noisy_labels', 'labels', 'expert_label_mask', '-v7');
     fprintf('Created %s\n', out_file);
 end
