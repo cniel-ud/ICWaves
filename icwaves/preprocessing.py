@@ -43,18 +43,18 @@ def _get_base_metadata(args):
     return file_list, n_ics, n_points, srate
 
 
-def _load_cmmn_filter(args, subjID):
+def _load_cmmn_filter(args, file_stem):
     """Load common filter for a subject if path is provided."""
     if args.path_to_cmmn_filters is None:
         return None
 
     cmmn_path = Path(args.path_to_cmmn_filters)
-    fname = f"subj-{subjID:02}.npz"
+    fname = f"{file_stem}.npz"
     fpath = cmmn_path.joinpath(fname)
     if not fpath.exists():
         raise FileNotFoundError(f"File {fpath} does not exist.")
     with np.load(fpath) as cmmn_map:
-        return cmmn_map["arr_0"]
+        return cmmn_map["time_filter"]
 
 
 def _get_metadata_for_windowed_ics(args):
@@ -98,7 +98,7 @@ def _get_windowed_ics_and_labels(args):
 
         expert_label_mask_per_subject = expert_label_mask_per_subject.astype(bool)
         ica_activations = icaweights @ icasphere @ data
-        cmmn_filter = _load_cmmn_filter(args, subjID)
+        cmmn_filter = _load_cmmn_filter(args, file.stem)
 
         for ic_ind, ic in enumerate(ica_activations):
             time_idx = np.arange(0, ic.size - window_length + 1, window_length)
@@ -160,7 +160,7 @@ def _get_ics_and_labels(args):
 
         expert_label_mask_per_subject = expert_label_mask_per_subject.astype(bool)
         ica_activations = icaweights @ icasphere @ data
-        cmmn_filter = _load_cmmn_filter(args, subjID)
+        cmmn_filter = _load_cmmn_filter(args, file.stem)
 
         for ic_ind, ic in enumerate(ica_activations):
             if cmmn_filter is not None:
