@@ -1,5 +1,4 @@
-from argparse import Namespace
-from typing import Optional
+from typing import Optional, Union
 
 
 def _get_conversion_factor(

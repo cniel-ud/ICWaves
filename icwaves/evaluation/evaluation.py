@@ -9,12 +9,12 @@ from tqdm import tqdm
 
 from icwaves.data.types import DataBundle
 from icwaves.evaluation.config import EvalConfig
-from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
+from icwaves.evaluation.utils import (
+    compute_brain_F1_score_per_subject,
+    get_base_results_filename,
+)
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import (
-    build_base_classifier_name,
-)
 
 
 def load_estimator(path: Path) -> Tuple[Union[BaseEstimator, Pipeline], dict]:
@@ -64,10 +64,7 @@ def get_results_filepath(config: EvalConfig) -> Path:
         Path to the results CSV file
     """
     results_path = config.root / "results" / config.eval_dataset / "evaluation"
-    base_clf_name = build_base_classifier_name(config)
-
-    if config.train_config.cmmn_filter is not None:
-        base_clf_name += "_clf-trained-on-filtered-data"
+    base_clf_name = get_base_results_filename(config)
     base_clf_name += ".csv"
 
     results_file = results_path / base_clf_name

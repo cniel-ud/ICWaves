@@ -117,10 +117,10 @@ def run_evaluation_and_collect_results(
             best_params["training_segment_length"]["psd_autocorr"] / 256 * 500
         )
 
-    if eval_dataset == "cue" and feature_extractor_str == "bowav":
-        calibrate_idf_fn = make_calibrate_idf_fn(
-            root, train_config.validation_segment_length, cmmn_filter
-        )
+    classifier_type = train_config.classifier_type
+    valseglen = train_config.validation_segment_length
+    if eval_dataset != "emotion_study" and feature_extractor_str == "bowav":
+        calibrate_idf_fn = make_calibrate_idf_fn(config)
     else:
         calibrate_idf_fn = None
 

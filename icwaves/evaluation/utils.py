@@ -1,12 +1,12 @@
 from copy import deepcopy
-from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 import numpy as np
-import pandas as pd
 import scipy
 from sklearn.metrics import f1_score
 
+from icwaves.evaluation.config import EvalConfig
 from icwaves.feature_extractors.tfidf_rate_scaler import TfidfRateScaler
+from icwaves.file_utils import build_base_classifier_name
 
 
 def build_features_based_on_aggregation_method(
@@ -212,8 +212,15 @@ def sl2min(sl):
     return "50min" if sl == -1 else "5min"
 
 
+def get_base_results_filename(config: EvalConfig) -> str:
+    base_clf_name = build_base_classifier_name(config)
+    if config.train_config.cmmn_filter is not None:
+        base_clf_name += "_clf-trained-on-filtered-data"
+    return base_clf_name
+
+
 def make_calibrate_idf_fn(
-    root: Path, valseglen: int, cmmn_filter: Optional[str] = None
+    config: EvalConfig,
 ) -> Callable:
     def calibrate_idf(pipeline, subj_mask):
         assert hasattr(pipeline, "named_steps")
@@ -221,30 +228,34 @@ def make_calibrate_idf_fn(
         assert "clf" in pipeline.named_steps
         assert isinstance(pipeline["scaler"], TfidfRateScaler)
 
-        train_path = (
-            root
-            / f"data/emotion_study/bowav/train/{sl2min(valseglen)}/{sl2min(valseglen)}.npz"
-        )
+        # For the source dataset (emotion_study), the cmmn_filter used to
+        # create these bowav features we are loading here is the same
+        # one used during training
+        config_train = deepcopy(config)
+        config_train.cmmn_filter = config_train.train_config.cmmn_filter
+
+        train_dir = config_train.root / "data/emotion_study/bowav/train"
+        output_base_filename = get_base_results_filename(config_train)
+        train_path = train_dir / f"{output_base_filename}.npz"
+
         with np.load(train_path, allow_pickle=True) as f:
             bowav_train = f["bowav"]
 
         bowav_train = bowav_train.reshape(-1, bowav_train.shape[-1])
 
         # TODO: compute this on the go?
-        test_path = (
-            root
-            / f"data/cue/bowav/full/{sl2min(valseglen)}/cmmn-{cmmn_filter}/{sl2min(valseglen)}.npz"
-        )
+        test_dir = config.root / f"data/{config.eval_dataset}/bowav/full"
+        test_path = test_dir / f"{output_base_filename}.npz"
         with np.load(test_path, allow_pickle=True) as f:
-            bowav_full_cue = f["bowav"]
+            bowav_full_test = f["bowav"]
 
         train_mean_vals = np.mean(bowav_train, axis=0)
-        cue_mean_vals = np.mean(bowav_full_cue[subj_mask], axis=(0, 1))
+        test_mean_vals = np.mean(bowav_full_test[subj_mask], axis=(0, 1))
         tf_ratio = np.divide(
             train_mean_vals,
-            cue_mean_vals,
+            test_mean_vals,
             out=np.ones_like(train_mean_vals),  # Default to 1 for zero division
-            where=cue_mean_vals != 0,
+            where=test_mean_vals != 0,
         )
         clipped_tf_ratio = np.clip(tf_ratio, 0.1, 10.0)
         calibrated_idf = pipeline["scaler"].idf_ * clipped_tf_ratio
