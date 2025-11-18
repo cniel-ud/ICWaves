@@ -128,9 +128,9 @@ def run_evaluation_and_collect_results(
                 "eval_dataset": eval_dataset,
                 "cmmn_filter": str(cmmn_filter),
                 "feature_extractor": feature_extractor_str,
-                "classifier_type": train_config.classifier_type,
+                "classifier_type": classifier_type,
                 "is_normalized": train_config.cmmn_filter == "normed-barycenter",
-                "validation_segment_len": train_config.validation_segment_length,
+                "validation_segment_len": valseglen,
                 "prediction_window": prediction_window,
                 "mean_f1": mean_f1,
                 "std_f1": std_f1,
@@ -201,8 +201,6 @@ for eval_dataset in eval_datasets:
         minutes_per_ic = 10
         # only include 10 minutes in validation_times
         validation_times = validation_times[validation_times == 10 * 60]
-        # TODO: remove once we have the CMMN filters for EPIC
-        eval_cmmn_filter_options = [None]
     else:
         minutes_per_ic = None  # use the same value as in training (emotion_study)
 
@@ -228,10 +226,6 @@ for eval_dataset in eval_datasets:
             # Append directly to the master results DataFrame
             all_results = pd.concat([all_results, results], ignore_index=True)
 
-# %%
-# Compute and add ICLabel scores for each dataset
-print("\nComputing ICLabel scores...")
-for eval_dataset in eval_datasets:
     print(f"Computing ICLabel scores for {eval_dataset}...")
     mean_std_f1_iclabel, per_subject_f1_iclabel = compute_iclabel_scores_for_dataset(
         eval_dataset, subj_ids, validation_times, root
@@ -241,6 +235,7 @@ for eval_dataset in eval_datasets:
         root / "results" / f"{eval_dataset}" / "evaluation" / "ICLabel.csv", index=False
     )
 
+# %%
 # Save the results to a CSV file
 results_dir = root / "results"
 results_dir.mkdir(exist_ok=True)
