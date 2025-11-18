@@ -37,10 +37,11 @@ def calculate_iclabel_f1_scores(
     ]
     df = pd.DataFrame(columns=columns)
 
+    num_digits = len(str(max(subj_ids)))
     for test_segment_len in validation_segment_lengths:
         subdir = dataset_dir.joinpath(f"IC_labels_at_{test_segment_len:.1f}_seconds")
         for subj_id in subj_ids:
-            file = subdir.joinpath(f"subj-{subj_id:02}.mat")
+            file = subdir.joinpath(f"subj-{subj_id:0{num_digits}}.mat")
             with file.open("rb") as f:
                 data = loadmat(f)
                 expert_label_mask = data["expert_label_mask"].flatten().astype(bool)
@@ -74,6 +75,7 @@ def calculate_iclabel_f1_scores(
 
 def compute_iclabel_scores_for_dataset(
     eval_dataset: str,
+    subj_ids: list[int],
     validation_times: np.ndarray,
     root: Path,
 ) -> pd.DataFrame:
@@ -81,7 +83,8 @@ def compute_iclabel_scores_for_dataset(
     Compute ICLabel F1 scores for a specific dataset.
 
     Args:
-        eval_dataset: Dataset name ("emotion_study" or "cue")
+        eval_dataset: Dataset name ("emotion_study", "cue", "epic")
+        subj_ids: List of subject ids
         validation_times: Array of validation times in seconds
         root: Root path
 
@@ -90,11 +93,6 @@ def compute_iclabel_scores_for_dataset(
     """
     # Get ICLabel data directory
     iclabel_data_dir = root / f"data/{eval_dataset}/ICLabels"
-
-    # Define subject IDs based on dataset
-    subj_ids = (
-        list(range(1, 8)) if eval_dataset == "emotion_study" else list(range(1, 13))
-    )
 
     # Calculate ICLabel F1 scores
     mean_std_f1, per_subject_f1 = calculate_iclabel_f1_scores(

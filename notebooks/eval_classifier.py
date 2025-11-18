@@ -58,12 +58,12 @@ def run_evaluation_and_collect_results(
     root: Path,
     validation_times: np.ndarray,
     minutes_per_ic: Optional[int] = None,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list]:
     """
     Run evaluation for a specific configuration and return results in a flat DataFrame format.
 
     Args:
-        eval_dataset: Dataset to evaluate on ("emotion_study" or "cue")
+        eval_dataset: Dataset to evaluate on ("emotion_study", "cue", "epic")
         cmmn_filter: CMMN filter type (None, "unnormed-barycenter", "subj_to_subj") used on test data
         train_config: Namespace object with args used to train the classifier
         root: Root path
@@ -71,6 +71,7 @@ def run_evaluation_and_collect_results(
         minutes_per_ic: Use the first minutes_per_ic minutes of each IC for evaluation
     Returns:
         DataFrame: Results in flat format with columns for all configuration dimensions
+        List: List of subject ids we test on
     """
 
     # Create evaluation configuration
@@ -161,7 +162,7 @@ def run_evaluation_and_collect_results(
             }
         )
 
-    return pd.DataFrame(flat_results)
+    return pd.DataFrame(flat_results), config.subj_ids
 
 
 # %%
@@ -238,7 +239,9 @@ for eval_dataset in eval_datasets:
                 f"validation_segment_len={train_config.validation_segment_length}"
             )
             # Run evaluation and get results
-            results = run_evaluation_and_collect_results(
+            # TODO: isolate functionality to get test subj_ids, as this can be empty if agg method is
+            # majority_vote and dataset is "epic"
+            results, subj_ids = run_evaluation_and_collect_results(
                 eval_dataset=eval_dataset,
                 cmmn_filter=eval_cmmn_filter,
                 train_config=train_config,
@@ -256,7 +259,7 @@ print("\nComputing ICLabel scores...")
 for eval_dataset in eval_datasets:
     print(f"Computing ICLabel scores for {eval_dataset}...")
     mean_std_f1_iclabel, per_subject_f1_iclabel = compute_iclabel_scores_for_dataset(
-        eval_dataset, validation_times, root
+        eval_dataset, subj_ids, validation_times, root
     )
     all_results = pd.concat([all_results, mean_std_f1_iclabel], ignore_index=True)
     per_subject_f1_iclabel.to_csv(
