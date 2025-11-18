@@ -57,8 +57,8 @@ class EvalConfig:
             and self.cmmn_filter not in SUPPORTED_CMNN_FILTERS
         ):
             raise ValueError(f"Unknown cmmn filter {self.cmmn_filter}")
-        if self.cmmn_filter == "subj_to_subj" and self.eval_dataset != "cue":
-            raise ValueError(f"cmmn filter only supported for cue dataset")
+        if self.cmmn_filter == "subj_to_subj" and self.eval_dataset == "emotion_study":
+            raise ValueError(f"cmmn filter not supported for emotion_study dataset")
 
         # Wheter we use codebooks that were trained using CMMN-filtered data
         if self.train_config.cmmn_filter == "normed-barycenter":
