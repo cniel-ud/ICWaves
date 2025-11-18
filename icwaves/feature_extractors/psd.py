@@ -8,6 +8,7 @@ All rights reserved.
 """
 
 from typing import Tuple
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -101,9 +102,10 @@ def _psd_compute_psdmed(
         temp = (temp[:, subset].T * window).T
         # drop windows that are all-zeros
         is_all_zeros = np.all(temp == 0.0, axis=0)
-        # raise error if all windows are all-zeros
+        # raise a warning if all windows are all-zeros
         if is_all_zeros.all():
-            raise ValueError("All windows are all-zeros.")
+            warnings.warn("All windows are all-zeros.")
+            continue
         temp = temp[:, ~is_all_zeros]
         temp = np.fft.fft(temp, n_points, axis=0)
         temp = temp * np.conjugate(temp)
@@ -115,6 +117,10 @@ def _psd_compute_psdmed(
         else:  # linear scale
             psdmed[it, :] = np.real(np.median(temp, axis=1))
 
+    # drop segments where the PSD is all-zeros
+    is_all_zeros = np.all(psdmed == 0.0, axis=0)
+    psdmed = psdmed[:, ~is_all_zeros]
+
     return psdmed
 
 
@@ -125,6 +131,9 @@ def _psd_format(
 ) -> NDArray[np.float32]:
     """Apply the formatting steps after 'eeg_rpsd.m'."""
     # extrapolate or prune as needed
+    if psd.size == 0:
+        return psd
+
     nfreq = psd.shape[1]
     if nfreq < 100:  # XXX: parametrize?
         psd = np.concatenate([psd, np.tile(psd[:, -1:], (1, 100 - nfreq))], axis=1)
