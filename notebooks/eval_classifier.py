@@ -82,7 +82,9 @@ def run_evaluation_and_collect_results(
         feature_extractor_str: best_params["input_or_output_aggregation_method"]
     }
 
-    # Handle conversion for PSD autocorr segment length
+    # Handle conversion for PSD autocorr segment length, as the sampling rate of
+    # cue and emotion_study are 500 Hz and 256 Hz, respectively
+    # TODO: improve this manual fix
     if (
         eval_dataset == "cue"
         and "psd_autocorr" in best_params["training_segment_length"]
