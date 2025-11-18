@@ -50,7 +50,7 @@ def _process_list_of_segment_lengths(
     for segment_length in segment_lengths:
         segment_dict = {}
         for extractor, factor in conversion_factors.items():
-            if segment_length == -1:
+            if segment_length == -1.0:
                 segment_dict[extractor] = None
                 continue
             _validate_segment_length(segment_length, factor)
@@ -60,7 +60,7 @@ def _process_list_of_segment_lengths(
     return processed_segment_lengths
 
 
-def _check_segment_length(segment_length):
+def _check_segment_length(segment_length: Union[float, list[float]]) -> list[float]:
     if isinstance(segment_length, float):
         return [segment_length]
     elif isinstance(segment_length, list):
@@ -70,7 +70,7 @@ def _check_segment_length(segment_length):
 
 
 def convert_segment_length(
-    segment_length,
+    segment_length: Union[float, list[float]],
     feature_extractor: str,
     srate: float,
     window_length: Optional[float] = None,
