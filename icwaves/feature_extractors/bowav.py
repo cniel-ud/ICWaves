@@ -167,6 +167,11 @@ def build_bowav_from_centroid_assignments(
                 else:
                     bowav[i_ts, i_seg, i_feature] = counts
 
+    # raise an error if there are all-zero segments
+    all_zeros = np.all(bowav == 0, axis=2)
+    if all_zeros.any():
+        raise ValueError("There are all-zero feature vectors")
+
     return bowav
 
 
