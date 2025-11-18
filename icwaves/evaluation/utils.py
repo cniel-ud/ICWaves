@@ -266,3 +266,20 @@ def make_calibrate_idf_fn(
         return calibrated_pipeline
 
     return calibrate_idf
+
+
+def get_eval_cmmn_filter_options(eval_dataset, train_cmmn_filter):
+    assert train_cmmn_filter in [None, "normed-barycenter"]
+    if eval_dataset == "emotion_study":
+        cmmn_filter_options = [train_cmmn_filter]
+    else:
+        if train_cmmn_filter is None:
+            cmmn_filter_options = [
+                None,
+                "unnormed-barycenter",
+                "subj_to_subj",
+            ]
+        else:
+            cmmn_filter_options = [train_cmmn_filter]
+
+    return cmmn_filter_options

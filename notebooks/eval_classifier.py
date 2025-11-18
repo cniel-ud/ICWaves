@@ -10,7 +10,11 @@ os.environ["OPENBLAS_NUM_THREADS"] = "8"
 
 from argparse import Namespace
 
-from icwaves.evaluation.utils import make_calibrate_idf_fn, sl2min
+from icwaves.evaluation.utils import (
+    get_eval_cmmn_filter_options,
+    make_calibrate_idf_fn,
+    sl2min,
+)
 from icwaves.file_utils import get_cmmn_suffix, parse_config_file_args
 
 # Imports and setup
@@ -32,25 +36,6 @@ from icwaves.evaluation.iclabel import compute_iclabel_scores_for_dataset
 
 
 # %%
-
-
-def get_eval_cmmn_filter_options(eval_dataset, train_cmmn_filter):
-    assert train_cmmn_filter in [None, "normed-barycenter"]
-    if eval_dataset == "emotion_study":
-        cmmn_filter_options = [train_cmmn_filter]
-    else:
-        if train_cmmn_filter is None:
-            cmmn_filter_options = [
-                None,
-                "unnormed-barycenter",
-                "subj_to_subj",
-            ]
-        else:
-            cmmn_filter_options = [train_cmmn_filter]
-
-    return cmmn_filter_options
-
-
 def run_evaluation_and_collect_results(
     eval_dataset: str,
     cmmn_filter: Union[str, None],
