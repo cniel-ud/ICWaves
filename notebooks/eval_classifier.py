@@ -77,18 +77,6 @@ def run_evaluation_and_collect_results(
     # Load classifier and get parameters
     clf, best_params = load_estimator(config.path_to_classifier[feature_extractor_str])
     clf_dict = {feature_extractor_str: clf}
-    # Since EPIC has multiple 10-min ICs with segments that are zero for more than the training segment length,
-    # which is at maximum 5 minutes, we can't test with classifiers where the winning aggregation method was
-    # mayority vote, as the segments used to make predictions will be all-zeros. We want to make predictions on
-    # the full 10-min time series, which is only possible when the aggregation method is count pooling.
-    # Since we pre-compute centroid assignments to later compute the bowav feature, it's not possible to know
-    # if a segment in original IC time series was all-zeros, so we do not consider the option of dynamically discarding
-    # such segments before computing the features and making the prediction.
-    if (
-        best_params["input_or_output_aggregation_method"] == "majority_vote"
-        and eval_dataset == "epic"
-    ):
-        return pd.DataFrame()
 
     agg_method = {
         feature_extractor_str: best_params["input_or_output_aggregation_method"]
