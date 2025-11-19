@@ -13,6 +13,8 @@ def get_iclabel_features(
 ) -> NDArray[np.float32]:
 
     out = eeg_psd(signal, sfreq)
+    if out.size == 0:
+        return out
 
     if use_autocorr:
         autocorr = eeg_autocorr(signal, sfreq)
@@ -29,8 +31,7 @@ def get_iclabel_features_per_segment(
 ) -> NDArray[np.float32]:
     n_time_series, time_series_len = signal.shape
 
-    # TODO: parametrize this inside eeg_psd and eeg_autocorr
-    n_features = 200
+    n_features = 200 if use_autocorr else 100
 
     if segment_len is None:
         segment_len = time_series_len
@@ -41,7 +42,20 @@ def get_iclabel_features_per_segment(
         start = segment_ind * segment_len
         end = start + segment_len
         segment = signal[:, start:end]
-        features[segment_ind] = get_iclabel_features(segment, sfreq, use_autocorr)
+        feature = get_iclabel_features(segment, sfreq, use_autocorr)
+        if feature.size > 0:
+            features[segment_ind] = feature
+
+    # drop segments that are all-zeros
+    all_zeros = np.all(features == 0.0, axis=(1, 2))
+    features = features[~all_zeros]
 
     # reshape `features` to (n_time_series, n_segments, n_features)
-    return features.transpose((1, 0, 2))
+    features = features.transpose((1, 0, 2))
+
+    # raise an error if all segments of a time series are zero
+    all_zeros = np.all(features == 0.0, axis=(1, 2))
+    if all_zeros.any():
+        raise ValueError("There are all-zero feature vectors")
+
+    return features

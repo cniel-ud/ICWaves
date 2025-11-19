@@ -15,3 +15,4 @@ class DataBundle:
     noisy_labels: Optional[Any] = None
     n_centroids: Optional[int] = None
     srate: Optional[float] = None
+    zero_window_mask: Optional[Any] = None

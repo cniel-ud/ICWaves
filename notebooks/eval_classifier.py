@@ -1,16 +1,25 @@
 # %%
 # Set OMP constants to use only 8 CPUs
-from argparse import Namespace
 import os
 
-from icwaves.evaluation.utils import make_calibrate_idf_fn, sl2min
-from icwaves.file_utils import get_cmmn_suffix, parse_config_file_args
-
 os.environ["OMP_NUM_THREADS"] = "8"
+os.environ["MKL_NUM_THREADS"] = "8"
+os.environ["NUMEXPR_NUM_THREADS"] = "8"
+os.environ["OPENBLAS_NUM_THREADS"] = "8"
+
+
+from argparse import Namespace
+
+from icwaves.evaluation.utils import (
+    get_eval_cmmn_filter_options,
+    make_calibrate_idf_fn,
+    sl2min,
+)
+from icwaves.file_utils import get_cmmn_suffix, parse_config_file_args
 
 # Imports and setup
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 import numpy as np
 import pandas as pd
 from icwaves.evaluation.evaluation import (
@@ -27,44 +36,27 @@ from icwaves.evaluation.iclabel import compute_iclabel_scores_for_dataset
 
 
 # %%
-
-
-def get_eval_cmmn_filter_options(eval_dataset, train_cmmn_filter):
-    assert train_cmmn_filter in [None, "normed-barycenter"]
-    if eval_dataset == "emotion_study":
-        cmmn_filter_options = [train_cmmn_filter]
-    else:
-        if train_cmmn_filter is None:
-            cmmn_filter_options = [
-                None,
-                "unnormed-barycenter",
-                "subj_to_subj",
-            ]
-        else:
-            cmmn_filter_options = [train_cmmn_filter]
-
-    return cmmn_filter_options
-
-
 def run_evaluation_and_collect_results(
     eval_dataset: str,
     cmmn_filter: Union[str, None],
     train_config: Namespace,
     root: Path,
     validation_times: np.ndarray,
-) -> pd.DataFrame:
+    minutes_per_ic: Optional[int] = None,
+) -> tuple[pd.DataFrame, list]:
     """
     Run evaluation for a specific configuration and return results in a flat DataFrame format.
 
     Args:
-        eval_dataset: Dataset to evaluate on ("emotion_study" or "cue")
+        eval_dataset: Dataset to evaluate on ("emotion_study", "cue", "epic")
         cmmn_filter: CMMN filter type (None, "unnormed-barycenter", "subj_to_subj") used on test data
         train_config: Namespace object with args used to train the classifier
         root: Root path
         validation_times: Array of validation times in seconds
-
+        minutes_per_ic: Use the first minutes_per_ic minutes of each IC for evaluation
     Returns:
         DataFrame: Results in flat format with columns for all configuration dimensions
+        List: List of subject ids we test on
     """
 
     # Create evaluation configuration
@@ -73,6 +65,7 @@ def run_evaluation_and_collect_results(
         train_config=train_config,
         root=root,
         cmmn_filter=cmmn_filter,
+        minutes_per_ic=minutes_per_ic,
     )
 
     # Load and prepare data
@@ -84,11 +77,14 @@ def run_evaluation_and_collect_results(
     # Load classifier and get parameters
     clf, best_params = load_estimator(config.path_to_classifier[feature_extractor_str])
     clf_dict = {feature_extractor_str: clf}
+
     agg_method = {
         feature_extractor_str: best_params["input_or_output_aggregation_method"]
     }
 
-    # Handle conversion for PSD autocorr segment length
+    # Handle conversion for PSD autocorr segment length, as the sampling rate of
+    # cue and emotion_study are 500 Hz and 256 Hz, respectively
+    # TODO: improve this manual fix
     if (
         eval_dataset == "cue"
         and "psd_autocorr" in best_params["training_segment_length"]
@@ -97,10 +93,10 @@ def run_evaluation_and_collect_results(
             best_params["training_segment_length"]["psd_autocorr"] / 256 * 500
         )
 
-    if eval_dataset == "cue" and feature_extractor_str == "bowav":
-        calibrate_idf_fn = make_calibrate_idf_fn(
-            root, train_config.validation_segment_length, cmmn_filter
-        )
+    classifier_type = train_config.classifier_type
+    valseglen = train_config.validation_segment_length
+    if eval_dataset != "emotion_study" and feature_extractor_str == "bowav":
+        calibrate_idf_fn = make_calibrate_idf_fn(config)
     else:
         calibrate_idf_fn = None
 
@@ -132,16 +128,16 @@ def run_evaluation_and_collect_results(
                 "eval_dataset": eval_dataset,
                 "cmmn_filter": str(cmmn_filter),
                 "feature_extractor": feature_extractor_str,
-                "classifier_type": train_config.classifier_type,
+                "classifier_type": classifier_type,
                 "is_normalized": train_config.cmmn_filter == "normed-barycenter",
-                "validation_segment_len": train_config.validation_segment_length,
+                "validation_segment_len": valseglen,
                 "prediction_window": prediction_window,
                 "mean_f1": mean_f1,
                 "std_f1": std_f1,
             }
         )
 
-    return pd.DataFrame(flat_results)
+    return pd.DataFrame(flat_results), config.subj_ids
 
 
 # %%
@@ -173,7 +169,7 @@ validation_times = np.r_[
 root = Path(__file__).parents[1]
 
 # Define the configuration options
-eval_datasets = ["cue", "emotion_study"]
+eval_datasets = ["epic"]  # ["cue", "emotion_study"]
 feature_extractors = ["bowav", "psd_autocorr"]
 classifier_types = ["random_forest", "logistic"]  # Both classifier types included
 validation_segment_lens = [300, -1]
@@ -201,6 +197,12 @@ for eval_dataset in eval_datasets:
     eval_cmmn_filter_options = get_eval_cmmn_filter_options(
         eval_dataset, train_cmmn_filter
     )
+    if eval_dataset == "epic":
+        minutes_per_ic = 10
+        # only include 10 minutes in validation_times
+        validation_times = validation_times[validation_times == 10 * 60]
+    else:
+        minutes_per_ic = None  # use the same value as in training (emotion_study)
 
     for eval_cmmn_filter in eval_cmmn_filter_options:
         for train_config in train_configs:
@@ -210,29 +212,30 @@ for eval_dataset in eval_datasets:
                 f"validation_segment_len={train_config.validation_segment_length}"
             )
             # Run evaluation and get results
-            results = run_evaluation_and_collect_results(
+            # TODO: isolate functionality to get test subj_ids, as this can be empty if agg method is
+            # majority_vote and dataset is "epic"
+            results, subj_ids = run_evaluation_and_collect_results(
                 eval_dataset=eval_dataset,
                 cmmn_filter=eval_cmmn_filter,
                 train_config=train_config,
                 root=root,
                 validation_times=validation_times,
+                minutes_per_ic=minutes_per_ic,
             )
 
             # Append directly to the master results DataFrame
             all_results = pd.concat([all_results, results], ignore_index=True)
 
-# Compute and add ICLabel scores for each dataset
-print("\nComputing ICLabel scores...")
-for eval_dataset in eval_datasets:
     print(f"Computing ICLabel scores for {eval_dataset}...")
     mean_std_f1_iclabel, per_subject_f1_iclabel = compute_iclabel_scores_for_dataset(
-        eval_dataset, validation_times, root
+        eval_dataset, subj_ids, validation_times, root
     )
     all_results = pd.concat([all_results, mean_std_f1_iclabel], ignore_index=True)
     per_subject_f1_iclabel.to_csv(
         root / "results" / f"{eval_dataset}" / "evaluation" / "ICLabel.csv", index=False
     )
 
+# %%
 # Save the results to a CSV file
 results_dir = root / "results"
 results_dir.mkdir(exist_ok=True)

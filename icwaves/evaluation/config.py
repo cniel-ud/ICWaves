@@ -7,7 +7,7 @@ from typing import Optional
 from copy import deepcopy
 
 SUPPORTED_CLASSIFIERS = ["random_forest", "logistic", "ensembled_logistic"]
-SUPPORTED_DATASETS = ["emotion_study", "cue"]
+SUPPORTED_DATASETS = ["emotion_study", "cue", "epic"]
 SUPPORTED_FEATURES = ["bowav", "psd_autocorr", "bowav_psd_autocorr"]
 SUPPORTED_CMNN_FILTERS = ["normed-barycenter", "unnormed-barycenter", "subj_to_subj"]
 
@@ -21,15 +21,17 @@ class EvalConfig:
     8 to 35 (excluding subject 22, which is missing).
     """
 
-    eval_dataset: str  # 'emotion_study' or 'cue'
+    eval_dataset: str  # 'emotion_study', cue', or 'epic'
     train_config: Namespace  # Namespace object with args used to train the classifier
     root: Path
     cmmn_filter: Optional[str] = None
+    minutes_per_ic: Optional[int] = None
 
     def _flatten_train_config(self) -> None:
         self.validation_segment_length = self.train_config.validation_segment_length
         self.classifier_type = self.train_config.classifier_type
-        self.minutes_per_ic = self.train_config.minutes_per_ic
+        if self.minutes_per_ic is None:
+            self.minutes_per_ic = self.train_config.minutes_per_ic
         self.feature_extractor = self.train_config.feature_extractor
         if "bowav" in self.feature_extractor:
             self.window_length = self.train_config.window_length
@@ -55,8 +57,8 @@ class EvalConfig:
             and self.cmmn_filter not in SUPPORTED_CMNN_FILTERS
         ):
             raise ValueError(f"Unknown cmmn filter {self.cmmn_filter}")
-        if self.cmmn_filter == "subj_to_subj" and self.eval_dataset != "cue":
-            raise ValueError(f"cmmn filter only supported for cue dataset")
+        if self.cmmn_filter == "subj_to_subj" and self.eval_dataset == "emotion_study":
+            raise ValueError(f"cmmn filter not supported for emotion_study dataset")
 
         # Wheter we use codebooks that were trained using CMMN-filtered data
         if self.train_config.cmmn_filter == "normed-barycenter":
@@ -72,6 +74,8 @@ class EvalConfig:
             return list(range(1, 8))  # test subjects
         elif self.eval_dataset == "cue":
             return list(range(1, 13))
+        elif self.eval_dataset == "epic":
+            return list(range(1, 910))
 
     @property
     def path_to_train_output(self) -> Path:
@@ -111,14 +115,15 @@ class EvalConfig:
     @property
     def path_to_codebooks(self) -> Path:
         if "bowav" in self.train_config.feature_extractor:
-            if self.eval_dataset == "emotion_study":
-                return self.path_to_train_output / "dictionaries" / self.cmmn_subfolder
-            else:  # cue
+            if self.eval_dataset == "cue":  # sampling rate = 500 Hz
                 return (
                     self.path_to_train_output
                     / "dictionaries_resampled"
                     / self.cmmn_subfolder
                 )
+            # TODO: generalize to any dataset of any sampling rate
+            else:  # ["emotion_study", "epic"]. sampling rate = 256 Hz
+                return self.path_to_train_output / "dictionaries" / self.cmmn_subfolder
         else:
             raise ValueError(
                 f"Codebooks not available for {self.train_config.feature_extractor}"

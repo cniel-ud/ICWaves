@@ -9,12 +9,12 @@ from tqdm import tqdm
 
 from icwaves.data.types import DataBundle
 from icwaves.evaluation.config import EvalConfig
-from icwaves.evaluation.utils import compute_brain_F1_score_per_subject
+from icwaves.evaluation.utils import (
+    compute_brain_F1_score_per_subject,
+    get_base_results_filename,
+)
 from icwaves.model_selection.hpo_utils import get_best_parameters
 from icwaves.feature_extractors.utils import convert_segment_length
-from icwaves.file_utils import (
-    build_base_classifier_name,
-)
 
 
 def load_estimator(path: Path) -> Tuple[Union[BaseEstimator, Pipeline], dict]:
@@ -64,10 +64,7 @@ def get_results_filepath(config: EvalConfig) -> Path:
         Path to the results CSV file
     """
     results_path = config.root / "results" / config.eval_dataset / "evaluation"
-    base_clf_name = build_base_classifier_name(config)
-
-    if config.train_config.cmmn_filter is not None:
-        base_clf_name += "_clf-trained-on-filtered-data"
+    base_clf_name = get_base_results_filename(config)
     base_clf_name += ".csv"
 
     results_file = results_path / base_clf_name
@@ -200,6 +197,8 @@ def eval_classifier_per_subject_brain_F1(
         data_bundles: Data bundles
         input_or_output_aggregation_method: Input or output aggregation method
         training_segment_length: Training segment length
+        results_file: Path to file where results are to be saved
+        calibrate_idf: If not None, a function used to calibrate the idf term
 
     Returns:
         DataFrame with mean and standard deviation of F1 scores
@@ -236,6 +235,15 @@ def eval_classifier_per_subject_brain_F1(
 
         # Extract feature data
         X = {k: v.data for k, v in data_bundles.items()}
+
+        # Add zero_window_mask if it exists (for handling all-zero windows in bowav)
+        # TODO: That is a hacky way of adding this mask without changing too much the
+        # existing code, since the keys in `X` are supposed to be the names of feature
+        # types. It would be better to have a more elegant solution.
+        if "bowav" in config.feature_extractor and hasattr(
+            data_bundles["bowav"], "zero_window_mask"
+        ):
+            X["zero_window_mask"] = data_bundles["bowav"].zero_window_mask
 
         # Calculate total iterations for progress bar
         total_iterations = len(validation_segment_lengths) * len(config.subj_ids)
