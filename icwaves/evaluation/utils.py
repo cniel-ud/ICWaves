@@ -277,6 +277,7 @@ def get_eval_cmmn_filter_options(eval_dataset, train_cmmn_filter):
             cmmn_filter_options = [
                 None,
                 "unnormed-barycenter",
+                "normed-barycenter",
                 "subj_to_subj",
             ]
         else:
