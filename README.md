@@ -253,6 +253,18 @@ url={https://openreview.net/forum?id=i8zQLneFvn}
 }
 ```
 
+and
+
+```bibtex
+@inproceedings{meek2025cmmn,
+  title={Convolutional Monge Mapping between {EEG} Datasets to Support Independent Component Labeling},
+  author={Meek, Austin and Mendoza-Cardenas, Carlos H and Brockmeier, Austin J},
+  booktitle={NeurIPS 2025 Workshop on Time Series for Health},
+  year={2025},
+  url={https://openreview.net/forum?id=phmVS0qNo5}
+}
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
