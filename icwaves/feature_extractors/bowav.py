@@ -141,7 +141,7 @@ def build_bowav_from_centroid_assignments(
             segment_assignments = centroid_assignments[i_ts, :, start_ind:end_ind]
 
             # Apply valid window mask if needed
-            if zero_window_mask.item() is not None:
+            if zero_window_mask is not None:
                 segment_zero_mask = zero_window_mask[i_ts, start_ind:end_ind]
                 valid_window_mask = ~segment_zero_mask
                 n_valid_windows = np.sum(valid_window_mask)

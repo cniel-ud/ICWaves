@@ -50,7 +50,7 @@ def build_features_based_on_aggregation_method(
             subj_mask, ..., slice(0, validation_segment_length[feature_type])
         ]
 
-    if "zero_window_mask" in X and X["zero_window_mask"].item() is not None:
+    if "zero_window_mask" in X and X["zero_window_mask"] is not None:
         X["zero_window_mask"] = X["zero_window_mask"][
             subj_mask, ..., slice(0, validation_segment_length["bowav"])
         ]
