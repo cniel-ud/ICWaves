@@ -15,8 +15,8 @@ import pandas as pd
 import shap
 
 from icwaves.evaluation.evaluation import load_estimator
-from icwaves.evaluation.utils import make_calibrate_idf_fn
 from icwaves.evaluation.config import EvalConfig
+from icwaves.evaluation.utils import make_calibrate_idf_fn
 from icwaves.file_utils import parse_config_file_args
 
 os.environ["OMP_NUM_THREADS"] = "8"
@@ -76,10 +76,8 @@ def load_data(eval_config, background_size=100, sample_size=1000):
     )
     eval_data = np.load(eval_file)
     eval_bowav = eval_data["bowav"]
-    eval_subj_ind = eval_data["subj_ind"]
     n_ics, n_seg, n_feats = eval_bowav.shape
     eval_bowav = eval_bowav.reshape(n_ics * n_seg, n_feats)
-    eval_subj_ind = np.repeat(eval_subj_ind, n_seg)
 
     # Sample if needed
     if eval_bowav.shape[0] > sample_size:
@@ -87,45 +85,33 @@ def load_data(eval_config, background_size=100, sample_size=1000):
             eval_bowav.shape[0], sample_size, replace=False
         )
         eval_bowav = eval_bowav[sample_indices]
-        eval_subj_ind = eval_subj_ind[sample_indices]
 
-    return best_estimator, background_data, eval_bowav, eval_subj_ind
+    return best_estimator, background_data, eval_bowav
 
 
-def compute_shap_importance(
-    estimator, background_data, eval_data, eval_subj_ind, calibrate_idf_fn
-):
+def compute_shap_importance(estimator, background_data, eval_data, calibrate_idf_fn):
     """Compute SHAP feature importance for all classes."""
     clf = (
         estimator.named_steps["clf"] if hasattr(estimator, "named_steps") else estimator
     )
 
-    unique_subj = np.unique(eval_subj_ind)
-    subj_shap_values = []
-    for subj_ind in unique_subj:
-        mask = eval_subj_ind == subj_ind
+    # Calibrate IDF for all eval data (use slice(None) to select all subjects)
+    calibrated_estimator = calibrate_idf_fn(estimator, slice(None))
 
-        calibrated_estimator = calibrate_idf_fn(estimator, mask)
-        # calibrated_background_data = (
-        #     calibrated_estimator["scaler"].transform(background_data).toarray()
-        # )
-        explainer = shap.TreeExplainer(
-            clf, background_data, feature_perturbation="interventional"
-        )
+    # Transform background data with original scaler (from training dataset)
+    background_data = estimator["scaler"].transform(background_data).toarray()
 
-        subj_eval_data = eval_data[mask]
-        subj_eval_data = (
-            calibrated_estimator["scaler"].transform(subj_eval_data).toarray()
-        )
+    # Transform eval data with calibrated scaler (for cross-dataset generalization)
+    eval_data = calibrated_estimator["scaler"].transform(eval_data).toarray()
 
-        subj_shap_values.append(
-            explainer.shap_values(subj_eval_data, check_additivity=False)
-        )
+    # Create SHAP explainer and compute values
+    explainer = shap.TreeExplainer(
+        clf, background_data, feature_perturbation="interventional"
+    )
+    shap_values = explainer.shap_values(eval_data, check_additivity=False)
 
-    # Concatenate across subjects and average across samples
-    all_shap_values = np.concatenate(subj_shap_values, axis=0)
     # Return mean absolute importance for each class: shape (n_classes, n_features)
-    return np.mean(np.abs(all_shap_values), axis=0).T
+    return np.mean(np.abs(shap_values), axis=0).T
 
 
 def create_feature_dataframe(importances, eval_config):
@@ -358,13 +344,13 @@ def main():
     )
 
     # Load data
-    estimator, background_data, eval_data, eval_subj_ind = load_data(eval_config)
+    estimator, background_data, eval_data = load_data(eval_config)
     calibrate_idf_fn = make_calibrate_idf_fn(eval_config)
 
     # Compute SHAP importance
     print("Computing SHAP values...")
     importances = compute_shap_importance(
-        estimator, background_data, eval_data, eval_subj_ind, calibrate_idf_fn
+        estimator, background_data, eval_data, calibrate_idf_fn
     )
 
     # Create structured results
