@@ -27,7 +27,7 @@ def compute_subject_f1_score(y_true, y_pred, expert_mask):
 
 
 # Setup paths
-root = Path(__file__).parents[1]
+root = Path(__file__).parents[2]
 
 # Load trained classifier with TF-IDF scaler
 classifier_path = (
@@ -50,8 +50,8 @@ else:
     )
 
 # Load training data (emotion_study)
-# 200.npz corresponds to 5-min segments (200 windows of length 1.5 sec)
-train_path = root / "data/emotion_study/bowav/train/5min" / "200.npz"
+output_base_filename = "random_forest_bowav_valSegLen300_cmmn-None_idf"
+train_path = root / "data/emotion_study/bowav/train" / f"{output_base_filename}.npz"
 with np.load(train_path, allow_pickle=True) as f:
     bowav_train = f["bowav"]
 
@@ -60,7 +60,7 @@ bowav_train = bowav_train.reshape(-1, bowav_train.shape[-1])
 # We want to use the full time series for idf calibration
 # cmmn_filter_options = [None, "unnormed-barycenter", "subj_to_subj"]
 cmmn_filter = None
-test_path = root / f"data/cue/bowav/full/5min/cmmn-{cmmn_filter}" / "200.npz"
+test_path = root / "data/cue/bowav/full" / f"{output_base_filename}.npz"
 with np.load(test_path, allow_pickle=True) as f:
     bowav_full_cue = f["bowav"]
     subj_ind_full_cue = f["subj_ind"]
@@ -73,7 +73,7 @@ print(f"Shape of bowav using all 50-min ICs: {bowav_full_cue.shape}")
 # subj_ind_full_cue = np.repeat(subj_ind_full_cue, n_seg)
 
 # %%
-test_path = root / f"data/cue/bowav/test_segment/5min/cmmn-{cmmn_filter}" / "200.npz"
+test_path = root / "data/cue/bowav/test_segment" / f"{output_base_filename}.npz"
 with np.load(test_path, allow_pickle=True) as f:
     bowav_cue = f["bowav"]
     labels = f["labels"]

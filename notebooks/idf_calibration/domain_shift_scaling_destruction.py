@@ -11,21 +11,20 @@ from pathlib import Path
 
 # Load data
 root = Path(__file__).parents[2]
+output_base_filename = "random_forest_bowav_valSegLen300_cmmn-None_idf"
 classifier_path = (
-    root
-    / "results/emotion_study/classifier"
-    / "train_random_forest_bowav_valSegLen300_cmmn-None_idf.pkl"
+    root / "results/emotion_study/classifier" / f"train_{output_base_filename}.pkl"
 )
 with open(classifier_path, "rb") as f:
     results = pickle.load(f)
 scaler = results["best_estimator"]["scaler"]
 
-train_path = root / "data/emotion_study/bowav/train/5min" / "5min.npz"
+train_path = root / "data/emotion_study/bowav/train" / f"{output_base_filename}.npz"
 with np.load(train_path, allow_pickle=True) as f:
     bowav_train = f["bowav"]
 bowav_train = bowav_train.reshape(-1, bowav_train.shape[-1])
 
-test_path = root / "data/cue/bowav/full/5min/cmmn-None" / "5min.npz"
+test_path = root / "data/cue/bowav/full" / f"{output_base_filename}.npz"
 with np.load(test_path, allow_pickle=True) as f:
     bowav_full_cue = f["bowav"]
 bowav_full_cue = bowav_full_cue.reshape(-1, bowav_full_cue.shape[-1])
