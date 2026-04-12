@@ -2,23 +2,24 @@
 """
 SHAP Feature Importance Analysis for Random Forest BoWav Classifier
 
-This script analyzes Brain class using two correlation-based approaches:
+This script analyzes Brain class using two covariance-based approaches:
 
 Plot 1 - Positive SHAP Centroids:
-   - Computes correlation between SHAP values (target class Brain) and y_true == Brain
+   - Computes covariance between SHAP values (target class Brain) and y_true == Brain
    - Computes mean SHAP across samples for target class Brain
    - Drops features with mean SHAP < 0
-   - Sorts remaining centroids by correlation or max SHAP (descending) and selects top k
+   - Sorts remaining centroids by covariance or max SHAP (descending) and selects top k
 
 Plot 2 - Negative SHAP Centroids:
-   - Computes correlation between SHAP values (target class Brain) and y_true == Brain
+   - Computes covariance between SHAP values (target class Brain) and y_true == Brain
    - Computes mean SHAP across samples for target class Brain
    - Drops features with mean SHAP >= 0
-   - Sorts remaining centroids by absolute correlation or min SHAP (most negative, descending) and selects top k
+   - Sorts remaining centroids by absolute covariance or min SHAP (most negative, descending) and selects top k
 
 Usage:
     python scripts/feature_importance.py --num-centroids 10
     python scripts/feature_importance.py --num-centroids 10 --sort-by magnitude
+    python scripts/feature_importance.py --num-centroids 10 --sample-size 2000
 """
 
 import os
@@ -68,22 +69,26 @@ def analyze_brain_shap(
     shap_values,
     true_labels,
     eval_bowav,
+    full_eval_bowav,
+    full_eval_labels,
     num_centroids,
-    sort_by="correlation",
+    sort_by="covariance",
     positive=True,
 ):
     """
     Analyze Brain class centroids with positive or negative mean SHAP.
 
     Steps:
-    1. Compute correlation between SHAP values (Brain class) and y_true == Brain
+    1. Compute covariance between SHAP values (Brain class) and y_true == Brain
     2. Compute mean SHAP across samples for Brain class
     3. Drop features based on mean SHAP sign (>= 0 for positive, < 0 for negative)
-    4. Sort by correlation or max/min SHAP and get top k
+    4. Sort by covariance or max/min SHAP and get top k
 
     Args:
         positive: If True, analyze positive mean SHAP centroids; if False, negative
-        sort_by: "correlation" or "magnitude"
+        sort_by: "covariance" or "magnitude"
+        full_eval_bowav: Full evaluation dataset for computing occurrence rates
+        full_eval_labels: Full evaluation labels for computing occurrence rates
     """
     # Brain class is index 0
     brain_shap = shap_values[:, :, 0]
@@ -91,14 +96,10 @@ def analyze_brain_shap(
     # Binary indicator: is true label Brain?
     y_brain = (true_labels == 0).astype(float)
 
-    # Compute correlation between each feature's SHAP and y_brain
-    correlations = np.array(
-        [
-            np.corrcoef(brain_shap[:, i], y_brain)[0, 1]
-            for i in range(brain_shap.shape[1])
-        ]
-    )
-    correlations = np.nan_to_num(correlations, nan=0.0)
+    # Compute covariance between each feature's SHAP and y_brain
+    brain_shap_centered = brain_shap - np.mean(brain_shap, axis=0)
+    y_brain_centered = y_brain - np.mean(y_brain)
+    covariances = (brain_shap_centered.T @ y_brain_centered) / (brain_shap.shape[0] - 1)
 
     # Compute SHAP statistics across samples
     mean_shap = np.mean(brain_shap, axis=0)
@@ -114,8 +115,8 @@ def analyze_brain_shap(
         magnitude_values = np.abs(min_shap)
 
     # Apply mask based on sort_by
-    if sort_by == "correlation":
-        filtered_values = np.abs(correlations) if not positive else correlations
+    if sort_by == "covariance":
+        filtered_values = np.abs(covariances)
         filtered_values = filtered_values.copy()
         filtered_values[~mask] = -np.inf
     else:  # magnitude
@@ -125,10 +126,10 @@ def analyze_brain_shap(
     # Get top k
     top_indices = np.argsort(filtered_values)[-num_centroids:][::-1]
 
-    # Occurrence rates: Brain vs Not Brain
-    brain_mask = true_labels == 0
-    rate_in_brain = np.mean(eval_bowav[brain_mask], axis=0)
-    rate_not_brain = np.mean(eval_bowav[~brain_mask], axis=0)
+    # Occurrence rates: Brain vs Not Brain (computed on FULL eval dataset)
+    brain_mask = full_eval_labels == 0
+    rate_in_brain = np.mean(full_eval_bowav[brain_mask], axis=0)
+    rate_not_brain = np.mean(full_eval_bowav[~brain_mask], axis=0)
 
     # Build results
     results = []
@@ -136,7 +137,7 @@ def analyze_brain_shap(
         results.append(
             {
                 "centroid_index": idx,
-                "correlation": correlations[idx],
+                "covariance": covariances[idx],
                 "mean_shap": mean_shap[idx],
                 "max_shap": max_shap[idx],
                 "min_shap": min_shap[idx],
@@ -148,9 +149,16 @@ def analyze_brain_shap(
     return pd.DataFrame(results)
 
 
-def plot_centroids(df, codebooks, class_name, output_path, num_centroids):
-    """Plot top centroids with time-domain waveforms and PSDs."""
+def plot_centroids(
+    df, codebooks, class_name, output_path, num_centroids, psd_method="mtm"
+):
+    """Plot top centroids with time-domain waveforms and PSDs.
+
+    Args:
+        psd_method: Method for PSD computation, either "mtm" (multitaper) or "welch"
+    """
     from mne.time_frequency import psd_array_multitaper
+    from scipy import signal
 
     # Grid: k rows (one per centroid), 2 columns (time domain + PSD)
     n_rows = num_centroids
@@ -192,7 +200,7 @@ def plot_centroids(df, codebooks, class_name, output_path, num_centroids):
         axes[i, 0].text(
             0.02,
             0.98,
-            f"Corr: {row['correlation']:.4f}\n"
+            f"Cov: {row['covariance']:.4f}\n"
             f"Min SHAP: {row['min_shap']:.4f}\n"
             f"Max SHAP: {row['max_shap']:.4f}\n"
             f"Mean SHAP: {row['mean_shap']:.4f}\n"
@@ -203,16 +211,29 @@ def plot_centroids(df, codebooks, class_name, output_path, num_centroids):
             fontsize=8,
         )
 
-        # PSD plot (right column) - Thomson Multitaper Method
-        psd, freqs = psd_array_multitaper(
-            waveform.reshape(1, -1),
-            sfreq=sampling_rate,
-            fmin=0,
-            fmax=sampling_rate / 2,
-            bandwidth=2.0,
-            verbose=False,
-        )
-        psd = psd.squeeze()
+        # PSD plot (right column)
+        if psd_method == "mtm":
+            # Thomson Multitaper Method
+            psd, freqs = psd_array_multitaper(
+                waveform.reshape(1, -1),
+                sfreq=sampling_rate,
+                fmin=0,
+                fmax=sampling_rate / 2,
+                bandwidth=2.0,
+                verbose=False,
+            )
+            psd = psd.squeeze()
+        else:  # welch
+            # Welch's method
+            nfft = 2048
+            n = len(waveform)
+            freqs, psd = signal.welch(
+                waveform,
+                fs=sampling_rate,
+                nfft=nfft,
+                nperseg=int(0.95 * n),
+                noverlap=int(0.9 * n),
+            )
 
         # Convert to dB
         psd_db = 10 * np.log10(psd)
@@ -224,15 +245,25 @@ def plot_centroids(df, codebooks, class_name, output_path, num_centroids):
         axes[i, 1].plot(freqs, psd_db)
         axes[i, 1].set_xlabel("Frequency (Hz)")
         axes[i, 1].set_ylabel("Power (dB/Hz)")
-        axes[i, 1].set_title(f"PSD (Peak: {max_freq:.1f} Hz)")
+        method_label = "MTM" if psd_method == "mtm" else "Welch"
+        axes[i, 1].set_title(f"PSD ({method_label}, Peak: {max_freq:.1f} Hz)")
 
     plt.tight_layout()
     plt.savefig(output_path)
     plt.close()
 
 
-def load_data(eval_config, background_size=100, sample_size=1000):
-    """Load classifier, background data, and evaluation data."""
+def load_data(eval_config, background_size=500, sample_size=1000):
+    """Load classifier, background data, and evaluation data.
+
+    Returns:
+        best_estimator: Trained classifier
+        background_data: Sampled training data for SHAP
+        eval_bowav: Sampled evaluation data for SHAP
+        eval_labels: Sampled evaluation labels for SHAP
+        full_eval_bowav: Full evaluation data for occurrence rates
+        full_eval_labels: Full evaluation labels for occurrence rates
+    """
     # Set random seed for reproducibility
     np.random.seed(42)
 
@@ -268,7 +299,11 @@ def load_data(eval_config, background_size=100, sample_size=1000):
     # Reshape labels to match bowav: repeat each label n_seg times
     eval_labels = np.repeat(eval_labels, n_seg)
 
-    # Sample if needed
+    # Keep full dataset for occurrence rates
+    full_eval_bowav = eval_bowav.copy()
+    full_eval_labels = eval_labels.copy()
+
+    # Sample if needed for SHAP computation
     if eval_bowav.shape[0] > sample_size:
         sample_indices = np.random.choice(
             eval_bowav.shape[0], sample_size, replace=False
@@ -276,7 +311,14 @@ def load_data(eval_config, background_size=100, sample_size=1000):
         eval_bowav = eval_bowav[sample_indices]
         eval_labels = eval_labels[sample_indices]
 
-    return best_estimator, background_data, eval_bowav, eval_labels
+    return (
+        best_estimator,
+        background_data,
+        eval_bowav,
+        eval_labels,
+        full_eval_bowav,
+        full_eval_labels,
+    )
 
 
 def compute_shap_importance(
@@ -325,6 +367,8 @@ def compute_shap_importance(
     explainer = shap.TreeExplainer(
         clf, background_data, feature_perturbation="interventional"
     )
+    # Additivity check disabled because the difference found using a background data of
+    # 500 instances and a test data of 7560 instances is small (0.510843 vs 0.486079)
     shap_values = explainer.shap_values(eval_data_transformed, check_additivity=False)
 
     # Get predictions
@@ -352,22 +396,34 @@ def main(
     ),
     num_centroids: int = typer.Option(10, help="Number of top centroids to display"),
     sort_by: str = typer.Option(
-        "correlation", help="Sort by 'correlation' or 'magnitude' (max/min SHAP values)"
+        "covariance", help="Sort by 'covariance' or 'magnitude' (max/min SHAP values)"
+    ),
+    sample_size: int = typer.Option(
+        1000, help="Number of samples to use for SHAP computation"
+    ),
+    psd_method: str = typer.Option(
+        "mtm", help="PSD computation method: 'mtm' (multitaper) or 'welch'"
     ),
 ):
     """
     SHAP Feature Importance Analysis for Random Forest BoWav Classifier.
 
     Generates two plots for Brain class:
-    - Plot 1: Positive mean SHAP centroids sorted by correlation or max SHAP
-    - Plot 2: Negative mean SHAP centroids sorted by absolute correlation or absolute min SHAP (most negative)
+    - Plot 1: Positive mean SHAP centroids sorted by covariance or max SHAP
+    - Plot 2: Negative mean SHAP centroids sorted by absolute covariance or absolute min SHAP (most negative)
     """
-    # Validate sort_by
-    if sort_by not in ["correlation", "magnitude"]:
-        typer.echo("Error: --sort-by must be 'correlation' or 'magnitude'")
+    # Validate arguments
+    if sort_by not in ["covariance", "magnitude"]:
+        typer.echo("Error: --sort-by must be 'covariance' or 'magnitude'")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Starting SHAP Feature Importance Analysis (sort_by={sort_by})...")
+    if psd_method not in ["mtm", "welch"]:
+        typer.echo("Error: --psd-method must be 'mtm' or 'welch'")
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"Starting SHAP Feature Importance Analysis (sort_by={sort_by}, sample_size={sample_size})..."
+    )
 
     # Setup root path
     root = Path(__file__).absolute().parents[1]
@@ -389,7 +445,14 @@ def main(
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Load data
-    estimator, background_data, eval_data, eval_labels = load_data(eval_config)
+    (
+        estimator,
+        background_data,
+        eval_data,
+        eval_labels,
+        full_eval_data,
+        full_eval_labels,
+    ) = load_data(eval_config, sample_size=sample_size)
     calibrate_idf_fn = make_calibrate_idf_fn(eval_config)
 
     # Load codebooks
@@ -408,50 +471,59 @@ def main(
 
     # Plot 1: Positive mean SHAP centroids
     typer.echo(
-        f"Analyzing Brain class - Positive mean SHAP centroids (sort_by={sort_by})..."
+        f"Analyzing Brain class - Positive mean SHAP centroids (sort_by={sort_by}, psd_method={psd_method})..."
     )
     positive_df = analyze_brain_shap(
         shap_values,
         eval_labels,
         eval_data,
+        full_eval_data,
+        full_eval_labels,
         num_centroids,
         sort_by,
         positive=True,
     )
     positive_df.to_csv(
-        output_path / f"brain_positive_shap_{sort_by}_centroid_analysis.csv",
+        output_path
+        / f"brain_positive_shap_{sort_by}_{psd_method}_centroid_analysis.csv",
         index=False,
     )
     plot_centroids(
         positive_df,
         codebooks,
         "Brain (Positive SHAP)",
-        output_path / f"brain_positive_shap_{sort_by}_top_centroids.pdf",
+        output_path
+        / f"brain_positive_shap_{sort_by}_{psd_method}_{psd_method}_top_centroids.pdf",
         num_centroids,
+        psd_method,
     )
 
     # Plot 2: Negative mean SHAP centroids
     typer.echo(
-        f"Analyzing Brain class - Negative mean SHAP centroids (sort_by={sort_by})..."
+        f"Analyzing Brain class - Negative mean SHAP centroids (sort_by={sort_by}, psd_method={psd_method})..."
     )
     negative_df = analyze_brain_shap(
         shap_values,
         eval_labels,
         eval_data,
+        full_eval_data,
+        full_eval_labels,
         num_centroids,
         sort_by,
         positive=False,
     )
     negative_df.to_csv(
-        output_path / f"brain_negative_shap_{sort_by}_centroid_analysis.csv",
+        output_path
+        / f"brain_negative_shap_{sort_by}_{psd_method}_centroid_analysis.csv",
         index=False,
     )
     plot_centroids(
         negative_df,
         codebooks,
         "Brain (Negative SHAP)",
-        output_path / f"brain_negative_shap_{sort_by}_top_centroids.pdf",
+        output_path / f"brain_negative_shap_{psd_method}_{sort_by}_top_centroids.pdf",
         num_centroids,
+        psd_method,
     )
 
     typer.echo(f"Analysis complete. Results saved to {output_path}")
