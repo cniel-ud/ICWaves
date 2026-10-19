@@ -44,7 +44,7 @@ def build_features_based_on_aggregation_method(
     """
     feature_types = list(feature_extractor.keys())
     # X is a dict. Make a deep copy to avoid messing with upstream data.
-    X = {k: np.copy(v) for k, v in X.items()}
+    X = {k: np.copy(v) if v is not None else None for k, v in X.items()}
     for feature_type in feature_types:
         X[feature_type] = X[feature_type][
             subj_mask, ..., slice(0, validation_segment_length[feature_type])
