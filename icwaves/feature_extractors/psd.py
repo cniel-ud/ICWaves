@@ -117,10 +117,6 @@ def _psd_compute_psdmed(
         else:  # linear scale
             psdmed[it, :] = np.real(np.median(temp, axis=1))
 
-    # drop segments where the PSD is all-zeros
-    is_all_zeros = np.all(psdmed == 0.0, axis=0)
-    psdmed = psdmed[:, ~is_all_zeros]
-
     return psdmed
 
 
@@ -130,9 +126,8 @@ def _psd_format(
     normalize: bool = True,
 ) -> NDArray[np.float32]:
     """Apply the formatting steps after 'eeg_rpsd.m'."""
-    # extrapolate or prune as needed
-    if psd.size == 0:
-        return psd
+    if psd.size == 0 or np.all(psd == 0):
+        return psd.astype(np.float32)
 
     nfreq = psd.shape[1]
     if nfreq < 100:  # XXX: parametrize?
