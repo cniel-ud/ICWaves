@@ -44,13 +44,13 @@ def build_features_based_on_aggregation_method(
     """
     feature_types = list(feature_extractor.keys())
     # X is a dict. Make a deep copy to avoid messing with upstream data.
-    X = {k: np.copy(v) for k, v in X.items()}
+    X = {k: np.copy(v) if v is not None else None for k, v in X.items()}
     for feature_type in feature_types:
         X[feature_type] = X[feature_type][
             subj_mask, ..., slice(0, validation_segment_length[feature_type])
         ]
 
-    if "zero_window_mask" in X:
+    if "zero_window_mask" in X and X["zero_window_mask"] is not None:
         X["zero_window_mask"] = X["zero_window_mask"][
             subj_mask, ..., slice(0, validation_segment_length["bowav"])
         ]
@@ -222,6 +222,23 @@ def get_base_results_filename(config: EvalConfig) -> str:
 def make_calibrate_idf_fn(
     config: EvalConfig,
 ) -> Callable:
+    """Build a per-subject, unsupervised IDF-recalibration closure for BoWav.
+
+    The returned ``calibrate_idf(pipeline, subj_mask)`` adapts the source-trained
+    TF-IDF scaler to a target subject by reweighting the IDF with a
+    variance-matching correction derived from the source/target BoWav rate ratio
+    (``tf_ratio == mean_source / mean_target == p_source / p_target``).
+
+    For sparse count/TF-IDF features the per-feature variance scales with the
+    marginal rate, ``Var(x_t) ~ p(t)``. Multiplying a feature by
+    ``sqrt(tf_ratio)`` therefore scales its variance by exactly ``tf_ratio``,
+    forcing the target feature variances to mimic the source's -- the first-order
+    optimal rescaling in the variance-stabilized (sqrt / Hellinger) coordinate.
+    The mean-matching alternative (multiplying by the raw ``tf_ratio``)
+    over-corrects, inflating variance by ``tf_ratio ** 2``. The correction is
+    fit from unlabeled target BoWav means only; labels are never used.
+    """
+
     def calibrate_idf(pipeline, subj_mask):
         assert hasattr(pipeline, "named_steps")
         assert "scaler" in pipeline.named_steps
@@ -257,8 +274,8 @@ def make_calibrate_idf_fn(
             out=np.ones_like(train_mean_vals),  # Default to 1 for zero division
             where=test_mean_vals != 0,
         )
-        clipped_tf_ratio = np.clip(tf_ratio, 0.1, 10.0)
-        calibrated_idf = pipeline["scaler"].idf_ * clipped_tf_ratio
+        sqrt_tf_ratio = np.sqrt(tf_ratio)
+        calibrated_idf = pipeline["scaler"].idf_ * sqrt_tf_ratio
         calibrated_pipeline = deepcopy(pipeline)
         calibrated_pipeline["scaler"].idf_ = calibrated_idf
         calibrated_pipeline["scaler"]._tfidf_transformer.idf_ = calibrated_idf
@@ -277,6 +294,7 @@ def get_eval_cmmn_filter_options(eval_dataset, train_cmmn_filter):
             cmmn_filter_options = [
                 None,
                 "unnormed-barycenter",
+                "normed-barycenter",
                 "subj_to_subj",
             ]
         else:

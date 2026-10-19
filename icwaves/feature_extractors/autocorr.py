@@ -50,8 +50,11 @@ def _eeg_autocorr_welch(
     # is different than 100.. thus, 'pct_data' is not used by this autocorrelation
     # function and is omitted here.
 
-    # setup constants
     n_chan, n_points_ = signal.shape
+    if np.all(signal == 0):
+        return np.zeros((n_chan, 100), dtype=np.float32)
+
+    # setup constants
     n_points = min(n_points_, int(sfreq * 3))
     nfft = _next_power_of_2(2 * n_points - 1)
     cutoff = np.floor(n_points_ / n_points) * n_points

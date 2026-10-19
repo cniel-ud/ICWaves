@@ -119,10 +119,14 @@ def create_comparison_plot(
     results_df,
     fixed_params,
     vary_by,
+    cmmn_filters=None,
     include_iclabel=True,
     figsize=(10, 6),
     save_path=None,
     add_title=True,
+    xlim=None,
+    ylim=None,
+    font_size=14,
 ):
     """
     Create a comparison plot showing mean F1 score vs prediction window.
@@ -134,10 +138,21 @@ def create_comparison_plot(
         results_df: DataFrame containing all results (including pre-computed ICLabel data)
         fixed_params: Dict of parameters to fix for filtering (e.g., {'eval_dataset': 'cue', 'validation_segment_len': 300})
         vary_by: Parameter to vary in the plot (e.g., 'feature_extractor', 'classifier_type')
+        cmmn_filters: Optional list of cmmn_filter values to plot (e.g., ["None"]). The values
+            are matched as strings (use "None" for the no-filter case). If None, all filters
+            present in the data are plotted. When only a single filter is plotted, the
+            "(filter: ...)" suffix is omitted from the legend labels.
         include_iclabel: Whether to include ICLabel results (must be pre-computed in results_df)
         figsize: Size of the figure
         save_path: Path to save the figure (if None, don't save)
         add_title: If True, add title. This is for debugging purposes.
+        xlim: Optional (xmin, xmax) tuple to fix the x-axis range across figures
+            for easier comparison. If None, the lower limit follows the smallest
+            prediction window present in the data and the upper limit is 50.
+        ylim: Optional (ymin, ymax) tuple to fix the y-axis range across figures
+            for easier comparison. If None, the y-axis is autoscaled.
+        font_size: Base font size (in points) for axis labels, tick labels,
+            legend, and title. Increase for figures embedded in a 2-column paper.
 
     Returns:
         Figure and axis objects
@@ -192,8 +207,16 @@ def create_comparison_plot(
     vary_colors = plt.cm.tab10(np.linspace(0, 1, len(vary_values)))
     vary_color_map = {value: vary_colors[i] for i, value in enumerate(vary_values)}
 
-    # Get unique filter values in the filtered dataframe
+    # Get unique filter values in the filtered dataframe, optionally restricted
+    # to a caller-specified subset (values are matched as strings)
     filter_values = filtered_df["cmmn_filter"].unique()
+    if cmmn_filters is not None:
+        requested = {str(f) for f in cmmn_filters}
+        filter_values = [f for f in filter_values if f in requested]
+        if len(filter_values) == 0:
+            raise ValueError(
+                f"No data matching the requested cmmn_filters: {cmmn_filters}"
+            )
 
     # Create a colormap specifically for filters with pastel colors
     filter_colors = plt.cm.Pastel1(np.linspace(0, 1, len(filter_values)))
@@ -238,8 +261,11 @@ def create_comparison_plot(
             else:
                 base_label = f"{vary_by}: {vary_value}"
 
-            # Add filter to the label
-            label = f"{base_label} (filter: {filter_value})"
+            # Add filter to the label only when plotting more than one filter
+            if len(filter_values) == 1:
+                label = base_label
+            else:
+                label = f"{base_label} (filter: {filter_value})"
 
             # Choose color based on the varying parameter
             color = vary_color_map[vary_value]
@@ -268,9 +294,16 @@ def create_comparison_plot(
     # Format the plot
     ax.set_xscale("log")
     ax.set_xticks(global_x_ticks, labels=global_x_ticks)
-    ax.set_xlim(filtered_df["prediction_window"].min(), 50)
-    ax.set_xlabel("Prediction window [minutes]")
-    ax.set_ylabel("Mean Brain F1 score")
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    else:
+        ax.set_xlim(filtered_df["prediction_window"].min(), 50)
+    ax.set_xlabel("Prediction window [minutes]", fontsize=font_size)
+    ax.set_ylabel("Mean Brain F1 score", fontsize=font_size)
+    ax.tick_params(axis="both", labelsize=font_size)
+
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
     if add_title:
         # Create descriptive title
@@ -281,8 +314,10 @@ def create_comparison_plot(
             if param != "cmmn_filter":  # Don't include cmmn_filter in title
                 title_parts.append(f"{param}: {value}")
 
-        ax.set_title(f"Mean Brain F1 score | {' | '.join(title_parts)}")
-    ax.legend()
+        ax.set_title(
+            f"Mean Brain F1 score | {' | '.join(title_parts)}", fontsize=font_size
+        )
+    ax.legend(fontsize=font_size)
     ax.grid(True)
 
     # Save the figure if a path is provided

@@ -37,9 +37,12 @@ def calculate_iclabel_f1_scores(
     ]
     df = pd.DataFrame(columns=columns)
 
-    num_digits = len(str(max(subj_ids)))
     for test_segment_len in validation_segment_lengths:
         subdir = dataset_dir.joinpath(f"IC_labels_at_{test_segment_len:.1f}_seconds")
+        # TODO: this is a hacky way of getting the number of digits in the subject ID
+        # is there a better solution?
+        files = list(subdir.glob("*.mat"))
+        num_digits = len(str(max([int(f.stem.split("-")[1]) for f in files])))
         for subj_id in subj_ids:
             file = subdir.joinpath(f"subj-{subj_id:0{num_digits}}.mat")
             with file.open("rb") as f:
