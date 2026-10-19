@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-SHAP Feature Importance Analysis for Random Forest BoWav Classifier
+SHAP Feature Importance Analysis for BoWav classifiers.
 
-This script analyzes Brain class using two covariance-based approaches:
+Generalized over classifier (logistic / random_forest) and evaluation dataset
+(emotion_study test subjects / cue / epic). For each (classifier, dataset)
+combination the Brain class is analyzed with two covariance-based approaches:
 
 Plot 1 - Positive SHAP Centroids:
    - Computes covariance between SHAP values (target class Brain) and y_true == Brain
@@ -16,10 +18,23 @@ Plot 2 - Negative SHAP Centroids:
    - Drops features with mean SHAP >= 0
    - Sorts remaining centroids by absolute covariance or min SHAP (most negative, descending) and selects top k
 
+Classifier-specific SHAP explainer:
+   - random_forest -> shap.TreeExplainer (interventional)
+   - logistic       -> shap.LinearExplainer
+Both return SHAP values shaped (n_samples, n_features, n_classes), so the
+downstream analysis/plotting is identical.
+
+Dataset-specific details are resolved through EvalConfig:
+   - Sampling rate: cue = 500 Hz (resampled codebooks); emotion_study / epic =
+     256 Hz (native codebooks). Used for both the centroid time axis and PSDs.
+   - IDF reweighting: applied only when evaluating a target dataset different
+     from the source (emotion_study is the source, so it uses the source IDF
+     unchanged). Mirrors notebooks/eval_classifier.py.
+
 Usage:
-    python scripts/feature_importance.py --num-centroids 10
-    python scripts/feature_importance.py --num-centroids 10 --sort-by magnitude
-    python scripts/feature_importance.py --num-centroids 10 --sample-size 2000
+    python scripts/feature_importance.py --classifier random_forest --dataset cue
+    python scripts/feature_importance.py --classifier logistic --dataset epic --num-centroids 10
+    python scripts/feature_importance.py --classifier all --dataset all --sort-by magnitude
 """
 
 import os
@@ -32,7 +47,7 @@ import typer
 
 from icwaves.evaluation.evaluation import load_estimator
 from icwaves.evaluation.config import EvalConfig
-from icwaves.evaluation.utils import make_calibrate_idf_fn
+from icwaves.evaluation.utils import make_calibrate_idf_fn, get_base_results_filename
 from icwaves.file_utils import parse_config_file_args
 
 os.environ["OMP_NUM_THREADS"] = "8"
@@ -48,6 +63,21 @@ CLASS_LABELS = [
     "Channel Noise",
     "Other",
 ]
+
+# Config-file stems (config/_private/<stem>.txt) per classifier. The 5-min
+# (valSegLen300 / count_pooling) BoWav classifiers are used for the analysis.
+CONFIG_STEMS = {
+    "logistic": "logistic_5min_cmmn-None_idf",
+    "random_forest": "random_forest_5min_cmmn-None_idf",
+}
+
+SUPPORTED_CLASSIFIERS = list(CONFIG_STEMS.keys())
+SUPPORTED_DATASETS = ["emotion_study", "cue", "epic"]
+
+# The IDF reweighting adapts the source-trained scaler to a *target* dataset.
+# emotion_study is the source (subjects 8-35 train), so its test subjects use
+# the source IDF unchanged -- matching notebooks/eval_classifier.py.
+SOURCE_DATASET = "emotion_study"
 
 
 def load_codebooks(eval_config):
@@ -150,11 +180,18 @@ def analyze_brain_shap(
 
 
 def plot_centroids(
-    df, codebooks, class_name, output_path, num_centroids, psd_method="mtm"
+    df,
+    codebooks,
+    class_name,
+    output_path,
+    num_centroids,
+    sampling_rate,
+    psd_method="mtm",
 ):
     """Plot top centroids with time-domain waveforms and PSDs.
 
     Args:
+        sampling_rate: Sampling rate (Hz) of the centroids (dataset-dependent).
         psd_method: Method for PSD computation, either "mtm" (multitaper) or "welch"
     """
     from mne.time_frequency import psd_array_multitaper
@@ -167,9 +204,6 @@ def plot_centroids(
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 3 * n_rows))
     if n_rows == 1:
         axes = axes.reshape(1, -1)
-
-    # Sampling rate for cue dataset is 500 Hz, centroid length is 1.0 second
-    sampling_rate = 500
 
     for i, row in df.iterrows():
         idx = int(row["centroid_index"])
@@ -256,6 +290,9 @@ def plot_centroids(
 def load_data(eval_config, background_size=500, sample_size=1000):
     """Load classifier, background data, and evaluation data.
 
+    The training (background) data always comes from the source dataset
+    (emotion_study), while the evaluation data comes from eval_config's dataset.
+
     Returns:
         best_estimator: Trained classifier
         background_data: Sampled training data for SHAP
@@ -272,8 +309,10 @@ def load_data(eval_config, background_size=500, sample_size=1000):
         eval_config.path_to_classifier["bowav"]
     )
 
-    # Load background data (training)
-    output_base_filename = "random_forest_bowav_valSegLen300_cmmn-None_idf"
+    # Base filename is classifier/valseg/cmmn specific (source-side stem).
+    output_base_filename = get_base_results_filename(eval_config)
+
+    # Load background data (source training data: emotion_study subjects 8-35)
     train_file = (
         eval_config.root
         / "data/emotion_study/bowav/train"
@@ -288,8 +327,13 @@ def load_data(eval_config, background_size=500, sample_size=1000):
     )
     background_data = train_bowav[background_indices]
 
-    # Load evaluation data (cue)
-    eval_file = eval_config.root / "data/cue/bowav/full" / f"{output_base_filename}.npz"
+    # Load evaluation data (target dataset). emotion_study test subjects live in
+    # the "full" split, same as cue/epic.
+    eval_file = (
+        eval_config.root
+        / f"data/{eval_config.eval_dataset}/bowav/full"
+        / f"{output_base_filename}.npz"
+    )
     eval_data = np.load(eval_file)
     eval_bowav = eval_data["bowav"]
     eval_labels = eval_data["labels"]
@@ -321,7 +365,24 @@ def load_data(eval_config, background_size=500, sample_size=1000):
     )
 
 
+def _make_explainer(classifier, clf, background_data):
+    """SHAP explainer appropriate for the classifier type.
+
+    random_forest -> TreeExplainer (interventional); logistic -> LinearExplainer.
+    Both produce SHAP values of shape (n_samples, n_features, n_classes).
+    """
+    if classifier == "random_forest":
+        return shap.TreeExplainer(
+            clf, background_data, feature_perturbation="interventional"
+        )
+    elif classifier == "logistic":
+        return shap.LinearExplainer(clf, background_data)
+    else:
+        raise ValueError(f"Unsupported classifier: {classifier}")
+
+
 def compute_shap_importance(
+    classifier,
     estimator,
     background_data,
     eval_data,
@@ -333,6 +394,9 @@ def compute_shap_importance(
     Compute SHAP feature importance for all classes.
 
     Args:
+        classifier: "random_forest" or "logistic" (selects the SHAP explainer).
+        calibrate_idf_fn: IDF reweighting closure, or None to use the source IDF
+            unchanged (source dataset).
         cache_file: Path to cache file. If exists, load from cache. If None, don't cache.
 
     Returns:
@@ -352,8 +416,12 @@ def compute_shap_importance(
         estimator.named_steps["clf"] if hasattr(estimator, "named_steps") else estimator
     )
 
-    # Calibrate IDF for all eval data (use slice(None) to select all subjects)
-    calibrated_estimator = calibrate_idf_fn(estimator, slice(None))
+    # Calibrate IDF for all eval data (use slice(None) to select all subjects).
+    # For the source dataset there is no reweighting -> use the estimator as-is.
+    if calibrate_idf_fn is not None:
+        calibrated_estimator = calibrate_idf_fn(estimator, slice(None))
+    else:
+        calibrated_estimator = estimator
 
     # Transform background data with original scaler (from training dataset)
     background_data = estimator["scaler"].transform(background_data).toarray()
@@ -364,12 +432,17 @@ def compute_shap_importance(
     )
 
     # Create SHAP explainer and compute values
-    explainer = shap.TreeExplainer(
-        clf, background_data, feature_perturbation="interventional"
-    )
-    # Additivity check disabled because the difference found using a background data of
-    # 500 instances and a test data of 7560 instances is small (0.510843 vs 0.486079)
-    shap_values = explainer.shap_values(eval_data_transformed, check_additivity=False)
+    explainer = _make_explainer(classifier, clf, background_data)
+    if classifier == "random_forest":
+        # Additivity check disabled because the difference found using a background
+        # data of 500 instances and a test data of 7560 instances is small
+        # (0.510843 vs 0.486079). LinearExplainer has no such kwarg.
+        shap_values = explainer.shap_values(
+            eval_data_transformed, check_additivity=False
+        )
+    else:
+        shap_values = explainer.shap_values(eval_data_transformed)
+    shap_values = np.asarray(shap_values)
 
     # Get predictions
     predictions = calibrated_estimator["clf"].predict(eval_data_transformed)
@@ -389,59 +462,41 @@ def compute_shap_importance(
     return shap_values, predictions, eval_data, eval_labels
 
 
-@app.command()
-def main(
-    output_dir: str = typer.Option(
-        "results/feature_importance", help="Output directory"
-    ),
-    num_centroids: int = typer.Option(10, help="Number of top centroids to display"),
-    sort_by: str = typer.Option(
-        "covariance", help="Sort by 'covariance' or 'magnitude' (max/min SHAP values)"
-    ),
-    sample_size: int = typer.Option(
-        1000, help="Number of samples to use for SHAP computation"
-    ),
-    psd_method: str = typer.Option(
-        "mtm", help="PSD computation method: 'mtm' (multitaper) or 'welch'"
-    ),
+def run_analysis(
+    classifier,
+    dataset,
+    output_dir,
+    num_centroids,
+    sort_by,
+    sample_size,
+    psd_method,
+    root,
 ):
-    """
-    SHAP Feature Importance Analysis for Random Forest BoWav Classifier.
-
-    Generates two plots for Brain class:
-    - Plot 1: Positive mean SHAP centroids sorted by covariance or max SHAP
-    - Plot 2: Negative mean SHAP centroids sorted by absolute covariance or absolute min SHAP (most negative)
-    """
-    # Validate arguments
-    if sort_by not in ["covariance", "magnitude"]:
-        typer.echo("Error: --sort-by must be 'covariance' or 'magnitude'")
-        raise typer.Exit(code=1)
-
-    if psd_method not in ["mtm", "welch"]:
-        typer.echo("Error: --psd-method must be 'mtm' or 'welch'")
-        raise typer.Exit(code=1)
-
+    """Run the full SHAP feature-importance analysis for one (classifier,
+    dataset) combination and write plots + CSVs under output_dir/<clf>_<ds>."""
     typer.echo(
-        f"Starting SHAP Feature Importance Analysis (sort_by={sort_by}, sample_size={sample_size})..."
+        f"\n=== {classifier} / {dataset} "
+        f"(sort_by={sort_by}, sample_size={sample_size}, psd_method={psd_method}) ==="
     )
 
-    # Setup root path
-    root = Path(__file__).absolute().parents[1]
-
-    # Load the train_config from the config file
-    config_file = root / "config/_private/random_forest_5min_cmmn-None_idf.txt"
+    # Load the train_config from the classifier's config file
+    config_file = root / "config/_private" / f"{CONFIG_STEMS[classifier]}.txt"
     train_config = parse_config_file_args(config_file, feature_extractor="bowav")
+
+    # epic ICs are 10-min; cue/emotion_study use the default (50 min).
+    minutes_per_ic = 10 if dataset == "epic" else None
 
     # Create EvalConfig object
     eval_config = EvalConfig(
-        eval_dataset="cue",
+        eval_dataset=dataset,
         train_config=train_config,
         root=root,
         cmmn_filter=None,
+        minutes_per_ic=minutes_per_ic,
     )
 
-    # Create output directory
-    output_path = Path(output_dir)
+    # Per-combination output directory
+    output_path = Path(output_dir) / f"{classifier}_{dataset}"
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Load data
@@ -453,10 +508,16 @@ def main(
         full_eval_data,
         full_eval_labels,
     ) = load_data(eval_config, sample_size=sample_size)
-    calibrate_idf_fn = make_calibrate_idf_fn(eval_config)
 
-    # Load codebooks
+    # IDF reweighting only for target datasets; the source uses its own IDF.
+    if dataset == SOURCE_DATASET:
+        calibrate_idf_fn = None
+    else:
+        calibrate_idf_fn = make_calibrate_idf_fn(eval_config)
+
+    # Load codebooks (dataset-appropriate sampling rate) and its rate
     codebooks = load_codebooks(eval_config)
+    sampling_rate = 500 if dataset == "cue" else 256
 
     # Define cache file path
     cache_file = output_path / "shap_cache.npz"
@@ -466,12 +527,19 @@ def main(
     if cache_file.exists():
         typer.echo(f"Cache found at {cache_file}")
     shap_values, predictions, eval_data, eval_labels = compute_shap_importance(
-        estimator, background_data, eval_data, eval_labels, calibrate_idf_fn, cache_file
+        classifier,
+        estimator,
+        background_data,
+        eval_data,
+        eval_labels,
+        calibrate_idf_fn,
+        cache_file,
     )
 
     # Plot 1: Positive mean SHAP centroids
     typer.echo(
-        f"Analyzing Brain class - Positive mean SHAP centroids (sort_by={sort_by}, psd_method={psd_method})..."
+        f"Analyzing Brain class - Positive mean SHAP centroids "
+        f"(sort_by={sort_by}, psd_method={psd_method})..."
     )
     positive_df = analyze_brain_shap(
         shap_values,
@@ -492,15 +560,16 @@ def main(
         positive_df,
         codebooks,
         "Brain (Positive SHAP)",
-        output_path
-        / f"brain_positive_shap_{sort_by}_{psd_method}_{psd_method}_top_centroids.pdf",
+        output_path / f"brain_positive_shap_{sort_by}_{psd_method}_top_centroids.pdf",
         num_centroids,
+        sampling_rate,
         psd_method,
     )
 
     # Plot 2: Negative mean SHAP centroids
     typer.echo(
-        f"Analyzing Brain class - Negative mean SHAP centroids (sort_by={sort_by}, psd_method={psd_method})..."
+        f"Analyzing Brain class - Negative mean SHAP centroids "
+        f"(sort_by={sort_by}, psd_method={psd_method})..."
     )
     negative_df = analyze_brain_shap(
         shap_values,
@@ -521,12 +590,92 @@ def main(
         negative_df,
         codebooks,
         "Brain (Negative SHAP)",
-        output_path / f"brain_negative_shap_{psd_method}_{sort_by}_top_centroids.pdf",
+        output_path / f"brain_negative_shap_{sort_by}_{psd_method}_top_centroids.pdf",
         num_centroids,
+        sampling_rate,
         psd_method,
     )
 
     typer.echo(f"Analysis complete. Results saved to {output_path}")
+
+
+@app.command()
+def main(
+    classifier: str = typer.Option(
+        "random_forest",
+        help="Classifier: 'logistic', 'random_forest', or 'all'",
+    ),
+    dataset: str = typer.Option(
+        "cue",
+        help="Eval dataset: 'emotion_study', 'cue', 'epic', or 'all'",
+    ),
+    output_dir: str = typer.Option(
+        "results/feature_importance", help="Output directory"
+    ),
+    num_centroids: int = typer.Option(10, help="Number of top centroids to display"),
+    sort_by: str = typer.Option(
+        "covariance", help="Sort by 'covariance' or 'magnitude' (max/min SHAP values)"
+    ),
+    sample_size: int = typer.Option(
+        1000, help="Number of samples to use for SHAP computation"
+    ),
+    psd_method: str = typer.Option(
+        "mtm", help="PSD computation method: 'mtm' (multitaper) or 'welch'"
+    ),
+):
+    """
+    SHAP Feature Importance Analysis for BoWav classifiers.
+
+    Generates two Brain-class plots (positive / negative mean SHAP) for each
+    selected (classifier, dataset) combination:
+    - Plot 1: Positive mean SHAP centroids sorted by covariance or max SHAP
+    - Plot 2: Negative mean SHAP centroids sorted by absolute covariance or absolute min SHAP (most negative)
+    """
+    # Validate arguments
+    if sort_by not in ["covariance", "magnitude"]:
+        typer.echo("Error: --sort-by must be 'covariance' or 'magnitude'")
+        raise typer.Exit(code=1)
+
+    if psd_method not in ["mtm", "welch"]:
+        typer.echo("Error: --psd-method must be 'mtm' or 'welch'")
+        raise typer.Exit(code=1)
+
+    classifiers = SUPPORTED_CLASSIFIERS if classifier == "all" else [classifier]
+    datasets = SUPPORTED_DATASETS if dataset == "all" else [dataset]
+
+    for c in classifiers:
+        if c not in SUPPORTED_CLASSIFIERS:
+            typer.echo(
+                f"Error: --classifier must be one of {SUPPORTED_CLASSIFIERS} or 'all'"
+            )
+            raise typer.Exit(code=1)
+    for d in datasets:
+        if d not in SUPPORTED_DATASETS:
+            typer.echo(f"Error: --dataset must be one of {SUPPORTED_DATASETS} or 'all'")
+            raise typer.Exit(code=1)
+
+    typer.echo(
+        f"Starting SHAP Feature Importance Analysis "
+        f"(classifiers={classifiers}, datasets={datasets})..."
+    )
+
+    # Setup root path
+    root = Path(__file__).absolute().parents[1]
+
+    for c in classifiers:
+        for d in datasets:
+            run_analysis(
+                c,
+                d,
+                output_dir,
+                num_centroids,
+                sort_by,
+                sample_size,
+                psd_method,
+                root,
+            )
+
+    typer.echo("All analyses complete.")
 
 
 if __name__ == "__main__":
