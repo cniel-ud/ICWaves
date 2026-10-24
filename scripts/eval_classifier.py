@@ -85,7 +85,6 @@ RESULTS_COLUMNS = [
 VALIDATION_TIMES = np.r_[
     [9.0, 19.5, 30.0, 39.0, 49.5, 60],
     np.arange(2 * 60, 5 * 60 + 1, 60),
-    np.arange(5 * 60, 5 * 60 + 1, 60),
     np.arange(10 * 60, 50 * 60 + 1, 5 * 60),
 ].astype(float)
 
