@@ -351,8 +351,12 @@ def main(
 
     # One plot per evaluated (dataset, classifier type, validation segment length).
     # ICLabel rows have classifier_type "iclabel", so they are excluded here and
-    # added to every plot by create_comparison_plot.
-    evaluated = all_results[all_results["classifier_type"].isin(classifier_types)]
+    # added to every plot by create_comparison_plot. EPIC is not plotted: it is
+    # evaluated on a single prediction window, so there is no curve to compare.
+    evaluated = all_results[
+        all_results["classifier_type"].isin(classifier_types)
+        & (all_results["eval_dataset"] != EvalDataset.epic.value)
+    ]
     plot_keys = evaluated[
         ["eval_dataset", "classifier_type", "validation_segment_len"]
     ].drop_duplicates()
