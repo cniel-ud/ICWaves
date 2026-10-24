@@ -25,8 +25,9 @@ os.environ["OPENBLAS_NUM_THREADS"] = "8"
 
 from argparse import Namespace
 from enum import Enum
+from functools import partial
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -128,24 +129,19 @@ def load_train_config(
     return parse_config_file_args(config_folder / config_file_name, feature_extractor)
 
 
-def evaluate_config(
+def compute_per_subject_brain_F1(
     config: EvalConfig,
-    data_bundles: dict[str, DataBundle],
+    get_data_bundles: Callable[[], dict[str, DataBundle]],
     validation_times: np.ndarray,
+    results_file: Path,
 ) -> pd.DataFrame:
-    """
-    Evaluate one trained classifier on config.eval_dataset.
+    """Load the data and the classifier, and compute the per-subject Brain F1.
 
-    Args:
-        config: Evaluation configuration
-        data_bundles: Data bundles of config.eval_dataset for config.feature_extractor
-        validation_times: Array of validation times (prediction windows) in seconds
-
-    Returns:
-        DataFrame with RESULTS_COLUMNS: one row per prediction window
+    The per-subject results are saved to results_file, and the mean and std of
+    the Brain F1 score per prediction window are returned.
     """
     feature_extractor_str = config.feature_extractor
-    train_config = config.train_config
+    data_bundles = get_data_bundles()
     feature_extractor_dict = {
         feature_extractor_str: get_feature_extractor(
             feature_extractor_str, data_bundles
@@ -178,7 +174,7 @@ def evaluate_config(
         calibrate_idf_fn = None
 
     typer.echo("Computing F1 score...")
-    results = eval_classifier_per_subject_brain_F1(
+    return eval_classifier_per_subject_brain_F1(
         config,
         clf_dict,
         feature_extractor_dict,
@@ -186,9 +182,42 @@ def evaluate_config(
         data_bundles,
         agg_method,
         best_params["training_segment_length"],
-        get_results_filepath(config),
+        results_file,
         calibrate_idf_fn,
     )
+
+
+def evaluate_config(
+    config: EvalConfig,
+    get_data_bundles: Callable[[], dict[str, DataBundle]],
+    validation_times: np.ndarray,
+) -> pd.DataFrame:
+    """
+    Evaluate one trained classifier on config.eval_dataset.
+
+    Args:
+        config: Evaluation configuration
+        get_data_bundles: Returns the data bundles of config.eval_dataset for
+            config.feature_extractor. Only called if the results are not cached.
+        validation_times: Array of validation times (prediction windows) in seconds
+
+    Returns:
+        DataFrame with RESULTS_COLUMNS: one row per prediction window
+    """
+    feature_extractor_str = config.feature_extractor
+    train_config = config.train_config
+    results_file = get_results_filepath(config)
+    if results_file.exists():
+        # eval_classifier_per_subject_brain_F1 loads the cached per-subject
+        # results before using any of the classifier/data arguments, so skip
+        # loading the data bundles, feature extractor, and classifier.
+        results = eval_classifier_per_subject_brain_F1(
+            config, {}, {}, validation_times, {}, {}, {}, results_file
+        )
+    else:
+        results = compute_per_subject_brain_F1(
+            config, get_data_bundles, validation_times, results_file
+        )
 
     cmmn_filter = str(config.cmmn_filter)
     return pd.DataFrame(
@@ -235,8 +264,15 @@ def evaluate_dataset(
     ):
         for feature_extractor in feature_extractors:
             # The data bundles only depend on the dataset, the eval CMMN filter,
-            # and the feature extractor: load them once for all classifiers
-            data_bundles = None
+            # and the feature extractor: load them at most once for all
+            # classifiers, and only if some results are not cached
+            loaded: dict[str, dict[str, DataBundle]] = {}
+
+            def get_data_bundles(config: EvalConfig) -> dict[str, DataBundle]:
+                if "data_bundles" not in loaded:
+                    loaded["data_bundles"] = load_data_bundles(config)
+                return loaded["data_bundles"]
+
             for classifier_type in classifier_types:
                 for sl in VALIDATION_SEGMENT_LENS:
                     train_config = train_configs[
@@ -256,10 +292,12 @@ def evaluate_dataset(
                         minutes_per_ic=minutes_per_ic,
                     )
                     subj_ids = config.subj_ids
-                    if data_bundles is None:
-                        data_bundles = load_data_bundles(config)
                     dataset_results.append(
-                        evaluate_config(config, data_bundles, validation_times)
+                        evaluate_config(
+                            config,
+                            partial(get_data_bundles, config),
+                            validation_times,
+                        )
                     )
 
     typer.echo(f"Computing ICLabel scores for {eval_dataset}...")
