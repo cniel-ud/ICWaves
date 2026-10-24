@@ -14,8 +14,11 @@ Outputs:
         combinations, and the evaluated datasets' ICLabel rows, are replaced;
         all other rows are kept.
     results/plots/feature_comparison_*.pdf: feature extractors vs ICLabel, one
-        per (dataset, classifier_type, validation_segment_length). Not created
-        for EPIC, which is evaluated on a single prediction window.
+        per (dataset, classifier_type, validation_segment_length) in the summary
+        file, for the evaluated datasets. Plots are built from all the rows in
+        the summary file, so a narrowed run (e.g. a single feature extractor)
+        only updates its own rows and the plots keep every curve in the file.
+        Not created for EPIC, which is evaluated on a single prediction window.
 
 Usage:
     python scripts/eval_classifier.py
@@ -433,19 +436,24 @@ def main(
     save_summary_results(all_results, results_file)
     typer.echo(f"Saved results to {results_file}")
 
-    # One plot per evaluated (dataset, classifier type, validation segment length).
-    # ICLabel rows have classifier_type "iclabel", so they are excluded here and
-    # added to every plot by create_comparison_plot. EPIC is not plotted: it is
-    # evaluated on a single prediction window, so there is no curve to compare.
-    evaluated = all_results[
-        all_results["classifier_type"].isin(classifier_types)
-        & (all_results["eval_dataset"] != EvalDataset.epic.value)
+    # Plot from the merged results file, so that a narrowed run only updates its
+    # own rows and the plots still show every feature extractor in the file.
+    # One plot per (dataset, classifier type, validation segment length) in the
+    # file, for the datasets evaluated in this run. ICLabel rows have
+    # classifier_type "iclabel", so they are excluded here and added to every
+    # plot by create_comparison_plot. EPIC is not plotted: it is evaluated on a
+    # single prediction window, so there is no curve to compare.
+    merged_results = load_summary_results(results_file)
+    to_plot = merged_results[
+        merged_results["eval_dataset"].isin(eval_datasets)
+        & (merged_results["eval_dataset"] != EvalDataset.epic.value)
+        & (merged_results["classifier_type"] != "iclabel")
     ]
-    plot_keys = evaluated[
+    plot_keys = to_plot[
         ["eval_dataset", "classifier_type", "validation_segment_len"]
     ].drop_duplicates()
     for d, c, sl in plot_keys.itertuples(index=False):
-        plot_feature_comparison(all_results, d, c, sl, plot_dir, train_data_str)
+        plot_feature_comparison(merged_results, d, c, sl, plot_dir, train_data_str)
 
 
 if __name__ == "__main__":
