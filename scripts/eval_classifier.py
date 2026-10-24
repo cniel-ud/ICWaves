@@ -4,10 +4,16 @@ Evaluate the trained (emotion_study) classifiers on the evaluation datasets.
 
 For each selected (eval_dataset, eval CMMN filter, feature_extractor,
 classifier_type, validation_segment_length) combination, the per-subject Brain
-F1 score is computed over a sweep of prediction windows, together with the
-ICLabel reference scores. Results are collected in a flat summary CSV, and a
-comparison plot (feature extractors vs ICLabel) is created per dataset and
-classifier type.
+F1 score is computed over a sweep of prediction windows (EPIC: a single
+10-minute window), together with the ICLabel reference scores. Per-config
+results are cached in results/<eval_dataset>/evaluation/ and reused if present.
+
+Outputs:
+    results/mean_std_brain_f1_<raw|normalized>.csv: flat summary. The rows of
+        the evaluated datasets are replaced; other datasets' rows are kept.
+    results/plots/feature_comparison_*.pdf: feature extractors vs ICLabel, one
+        per (dataset, classifier_type, validation_segment_length). Not created
+        for EPIC, which is evaluated on a single prediction window.
 
 Usage:
     python scripts/eval_classifier.py
@@ -358,6 +364,11 @@ def plot_feature_comparison(
     typer.echo(f"Saved plot to {save_path}")
 
 
+def _unique_values(options: list[Enum]) -> list[str]:
+    """Option values in the given order, without repetitions."""
+    return list(dict.fromkeys(o.value for o in options))
+
+
 @app.command()
 def main(
     eval_dataset: Annotated[
@@ -379,11 +390,9 @@ def main(
 
     Options left unset default to all their values.
     """
-    eval_datasets = [d.value for d in (eval_dataset or list(EvalDataset))]
-    feature_extractors = [
-        f.value for f in (feature_extractor or list(FeatureExtractor))
-    ]
-    classifier_types = [c.value for c in (classifier_type or list(ClassifierType))]
+    eval_datasets = _unique_values(eval_dataset or list(EvalDataset))
+    feature_extractors = _unique_values(feature_extractor or list(FeatureExtractor))
+    classifier_types = _unique_values(classifier_type or list(ClassifierType))
 
     root = Path(__file__).resolve().parents[1]
     results_dir = root / "results"
