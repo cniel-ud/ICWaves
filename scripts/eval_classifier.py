@@ -275,6 +275,23 @@ def evaluate_dataset(
     return pd.concat(dataset_results, ignore_index=True)
 
 
+def save_summary_results(
+    results: pd.DataFrame, eval_datasets: list[str], results_file: Path
+) -> None:
+    """Save results to results_file, keeping the rows of the datasets not evaluated.
+
+    Rows of the evaluated datasets in an existing results_file are replaced, so
+    that runs on different datasets add up in the same file.
+    """
+    if results_file.exists():
+        # Keep the "None" cmmn_filter as a string, not NaN, as in fresh results
+        previous = pd.read_csv(results_file, dtype={"cmmn_filter": str})
+        previous["cmmn_filter"] = previous["cmmn_filter"].fillna("None")
+        previous = previous[~previous["eval_dataset"].isin(eval_datasets)]
+        results = pd.concat([previous, results], ignore_index=True)
+    results.to_csv(results_file, index=False)
+
+
 def plot_feature_comparison(
     all_results: pd.DataFrame,
     eval_dataset: str,
@@ -346,7 +363,7 @@ def main(
     )
 
     results_file = results_dir / f"mean_std_brain_f1_{train_data_str}.csv"
-    all_results.to_csv(results_file, index=False)
+    save_summary_results(all_results, eval_datasets, results_file)
     typer.echo(f"Saved results to {results_file}")
 
     # One plot per evaluated (dataset, classifier type, validation segment length).
