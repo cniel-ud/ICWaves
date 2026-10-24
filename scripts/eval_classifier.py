@@ -10,7 +10,9 @@ results are cached in results/<eval_dataset>/evaluation/ and reused if present.
 
 Outputs:
     results/mean_std_brain_f1_<raw|normalized>.csv: flat summary. The rows of
-        the evaluated datasets are replaced; other datasets' rows are kept.
+        the evaluated (dataset, feature_extractor, classifier_type)
+        combinations, and the evaluated datasets' ICLabel rows, are replaced;
+        all other rows are kept.
     results/plots/feature_comparison_*.pdf: feature extractors vs ICLabel, one
         per (dataset, classifier_type, validation_segment_length). Not created
         for EPIC, which is evaluated on a single prediction window.
@@ -318,20 +320,39 @@ def evaluate_dataset(
     return pd.concat(dataset_results, ignore_index=True)
 
 
-def save_summary_results(
-    results: pd.DataFrame, eval_datasets: list[str], results_file: Path
-) -> None:
-    """Save results to results_file, keeping the rows of the datasets not evaluated.
+# Columns identifying the rows re-evaluated by a run. A run always evaluates
+# every eval CMMN filter and validation segment length of each selected
+# (eval_dataset, feature_extractor, classifier_type), so those are not part of
+# the key: stale rows of filters/lengths no longer evaluated are dropped too.
+# ICLabel rows have feature_extractor and classifier_type "iclabel".
+REPLACE_KEY_COLUMNS = ["eval_dataset", "feature_extractor", "classifier_type"]
 
-    Rows of the evaluated datasets in an existing results_file are replaced, so
-    that runs on different datasets add up in the same file.
+
+def load_summary_results(results_file: Path) -> pd.DataFrame:
+    """Read a summary results file written by save_summary_results."""
+    # Keep the "None" cmmn_filter as a string, not NaN, as in fresh results
+    results = pd.read_csv(results_file, dtype={"cmmn_filter": str})
+    results["cmmn_filter"] = results["cmmn_filter"].fillna("None")
+    return results
+
+
+def save_summary_results(results: pd.DataFrame, results_file: Path) -> None:
+    """Save results to results_file, keeping the rows not re-evaluated.
+
+    Rows of an existing results_file with the same REPLACE_KEY_COLUMNS values
+    as some row of results are replaced; all other rows are kept, so that runs
+    on different datasets, feature extractors, or classifiers add up in the
+    same file.
     """
     if results_file.exists():
-        # Keep the "None" cmmn_filter as a string, not NaN, as in fresh results
-        previous = pd.read_csv(results_file, dtype={"cmmn_filter": str})
-        previous["cmmn_filter"] = previous["cmmn_filter"].fillna("None")
-        previous = previous[~previous["eval_dataset"].isin(eval_datasets)]
-        results = pd.concat([previous, results], ignore_index=True)
+        previous = load_summary_results(results_file)
+        evaluated = pd.MultiIndex.from_frame(
+            results[REPLACE_KEY_COLUMNS].drop_duplicates()
+        )
+        replaced = pd.MultiIndex.from_frame(previous[REPLACE_KEY_COLUMNS]).isin(
+            evaluated
+        )
+        results = pd.concat([previous[~replaced], results], ignore_index=True)
     results.to_csv(results_file, index=False)
 
 
@@ -409,7 +430,7 @@ def main(
     )
 
     results_file = results_dir / f"mean_std_brain_f1_{train_data_str}.csv"
-    save_summary_results(all_results, eval_datasets, results_file)
+    save_summary_results(all_results, results_file)
     typer.echo(f"Saved results to {results_file}")
 
     # One plot per evaluated (dataset, classifier type, validation segment length).
