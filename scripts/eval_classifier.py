@@ -366,6 +366,7 @@ def plot_feature_comparison(
     validation_segment_len: float,
     plot_dir: Path,
     train_data_str: str,
+    cmmn_filters: Optional[list[str]] = None,
 ) -> None:
     """Plot mean Brain F1 vs prediction window for each feature extractor and ICLabel."""
     validation_segment_len_str = sl2min(validation_segment_len)
@@ -381,6 +382,10 @@ def plot_feature_comparison(
             "classifier_type": classifier_type,
         },
         vary_by="feature_extractor",
+        cmmn_filters=cmmn_filters,
+        xlim=(0.15, 50),  # same x-axis in all figures, even without data at 0.15 min
+        ylim=(0.4, 1.0),  # same y-axis in all figures
+        yticks=np.arange(0.4, 1.01, 0.1),
         save_path=save_path,
         add_title=False,
     )
@@ -409,6 +414,20 @@ def main(
         Optional[list[ClassifierType]],
         typer.Option(help="Classifier type(s) to evaluate. Repeat to select several."),
     ] = None,
+    plot_cmmn_filter: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            help="Eval CMMN filter(s) to draw in the plots, e.g. 'None'. Repeat to "
+            "select several. Unset: draw all filters in the results file."
+        ),
+    ] = None,
+    plot_only: Annotated[
+        bool,
+        typer.Option(
+            help="Skip the evaluation and only redo the plots from the existing "
+            "summary results file."
+        ),
+    ] = False,
 ):
     """Evaluate the trained classifiers and ICLabel on the selected datasets.
 
@@ -424,17 +443,17 @@ def main(
     plot_dir.mkdir(parents=True, exist_ok=True)
     train_data_str = "normalized" if TRAIN_CMMN_FILTER == "normed-barycenter" else "raw"
 
-    all_results = pd.concat(
-        [
-            evaluate_dataset(d, feature_extractors, classifier_types, root)
-            for d in eval_datasets
-        ],
-        ignore_index=True,
-    )
-
     results_file = results_dir / f"mean_std_brain_f1_{train_data_str}.csv"
-    save_summary_results(all_results, results_file)
-    typer.echo(f"Saved results to {results_file}")
+    if not plot_only:
+        all_results = pd.concat(
+            [
+                evaluate_dataset(d, feature_extractors, classifier_types, root)
+                for d in eval_datasets
+            ],
+            ignore_index=True,
+        )
+        save_summary_results(all_results, results_file)
+        typer.echo(f"Saved results to {results_file}")
 
     # Plot from the merged results file, so that a narrowed run only updates its
     # own rows and the plots still show every feature extractor in the file.
@@ -453,7 +472,9 @@ def main(
         ["eval_dataset", "classifier_type", "validation_segment_len"]
     ].drop_duplicates()
     for d, c, sl in plot_keys.itertuples(index=False):
-        plot_feature_comparison(merged_results, d, c, sl, plot_dir, train_data_str)
+        plot_feature_comparison(
+            merged_results, d, c, sl, plot_dir, train_data_str, plot_cmmn_filter
+        )
 
 
 if __name__ == "__main__":

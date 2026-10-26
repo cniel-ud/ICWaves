@@ -126,6 +126,7 @@ def create_comparison_plot(
     add_title=True,
     xlim=None,
     ylim=None,
+    yticks=None,
     font_size=14,
 ):
     """
@@ -151,6 +152,8 @@ def create_comparison_plot(
             prediction window present in the data and the upper limit is 50.
         ylim: Optional (ymin, ymax) tuple to fix the y-axis range across figures
             for easier comparison. If None, the y-axis is autoscaled.
+        yticks: Optional sequence of y-axis tick positions (and labels) to use the
+            same ticks across figures. If None, matplotlib chooses them.
         font_size: Base font size (in points) for axis labels, tick labels,
             legend, and title. Increase for figures embedded in a 2-column paper.
 
@@ -304,6 +307,8 @@ def create_comparison_plot(
 
     if ylim is not None:
         ax.set_ylim(ylim)
+    if yticks is not None:
+        ax.set_yticks(yticks, labels=[f"{t:.1f}" for t in yticks])
 
     if add_title:
         # Create descriptive title
