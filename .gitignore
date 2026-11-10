@@ -12,3 +12,5 @@ __pycache__/
 # SHAP caches (large, regenerable by scripts/feature_importance.py)
 results/feature_importance/**/shap_cache.npz
 results/feature_importance/shap_cache.npz
+# macOS Finder metadata
+.DS_Store
