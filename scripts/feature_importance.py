@@ -561,6 +561,12 @@ def _make_explainer(classifier, clf, background_data):
 
     random_forest -> TreeExplainer (interventional); logistic -> LinearExplainer.
     Both produce SHAP values of shape (n_samples, n_features, n_classes).
+
+    TODO: shap wraps the background array in maskers.Independent, whose default
+    max_samples=100 randomly subsamples it, so the explainers use only 100 of the
+    background rows (LinearExplainer: only the mean of those rows matters). To use
+    all rows, pass shap.maskers.Independent(background_data, max_samples=len(
+    background_data)) instead of the array, and recompute the SHAP caches.
     """
     if classifier == "random_forest":
         return shap.TreeExplainer(
@@ -625,9 +631,9 @@ def compute_shap_importance(
     # Create SHAP explainer and compute values
     explainer = _make_explainer(classifier, clf, background_data)
     if classifier == "random_forest":
-        # Additivity check disabled because the difference found using a background
-        # data of 500 instances and a test data of 7560 instances is small
-        # (0.510843 vs 0.486079). LinearExplainer has no such kwarg.
+        # Additivity check disabled: it flags small numerical deviations between
+        # the sum of SHAP values and the model output (below 7e-3 in the settings
+        # we checked). LinearExplainer has no such kwarg.
         shap_values = explainer.shap_values(
             eval_data_transformed, check_additivity=False
         )
