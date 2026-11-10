@@ -16,7 +16,7 @@ Plot 2 - Negative SHAP Centroids:
    - Computes covariance between SHAP values (target class Brain) and y_true == Brain
    - Computes mean SHAP across samples for target class Brain
    - Drops features with mean SHAP >= 0
-   - Sorts remaining centroids by absolute covariance or min SHAP (most negative, descending) and selects top k
+   - Sorts remaining centroids by covariance or min SHAP (most negative, descending) and selects top k
 
 Classifier-specific SHAP explainer:
    - random_forest -> shap.TreeExplainer (interventional)
@@ -146,7 +146,7 @@ def analyze_brain_shap(
 
     # Apply mask based on sort_by
     if sort_by == "covariance":
-        filtered_values = np.abs(covariances)
+        filtered_values = covariances
         filtered_values = filtered_values.copy()
         filtered_values[~mask] = -np.inf
     else:  # magnitude
@@ -629,7 +629,7 @@ def main(
     Generates two Brain-class plots (positive / negative mean SHAP) for each
     selected (classifier, dataset) combination:
     - Plot 1: Positive mean SHAP centroids sorted by covariance or max SHAP
-    - Plot 2: Negative mean SHAP centroids sorted by absolute covariance or absolute min SHAP (most negative)
+    - Plot 2: Negative mean SHAP centroids sorted by covariance or min SHAP (most negative)
     """
     # Validate arguments
     if sort_by not in ["covariance", "magnitude"]:
