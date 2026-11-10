@@ -1,5 +1,18 @@
+"""Build the BoWav features of an evaluation dataset from its centroid assignments.
+
+For each classifier (logistic, random forest) and validation segment length
+(5 min with count pooling, 50 min with majority vote), the features are computed
+with the aggregation method of the trained classifier and saved to
+data/<dataset>/bowav/{full,test_segment}/<classifier>_bowav_valSegLen*_cmmn-None_idf.npz.
+The "full" files are the ones used by scripts/feature_importance.py.
+
+Usage:
+    python notebooks/idf_calibration/generate_test_bowav.py [emotion_study|cue|epic]
+"""
+
 # %%
 import os
+import sys
 
 os.environ["OMP_NUM_THREADS"] = "6"
 os.environ["MKL_NUM_THREADS"] = "6"
@@ -26,12 +39,13 @@ def sl2min(sl):
     return "50min" if sl == -1 else "5min"
 
 
-dataset = "epic"
+dataset = sys.argv[1] if len(sys.argv) > 1 else "emotion_study"
+assert dataset in ("emotion_study", "cue", "epic"), dataset
 minutes_per_ic = 10 if dataset == "epic" else None
 
 train_cmmn_filter = None
 use_idf = True
-root = Path.home() / "personal_repos/ICWaves"
+root = Path(__file__).resolve().parents[2]
 config_folder = root / "config/_private"
 for classifier in ["logistic", "random_forest"]:
     for valseglen in [300, -1]:
