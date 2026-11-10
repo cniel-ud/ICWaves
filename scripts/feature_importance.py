@@ -39,6 +39,7 @@ Usage:
 """
 
 import os
+import zipfile
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,7 +50,12 @@ import typer
 from icwaves.evaluation.evaluation import load_estimator
 from icwaves.evaluation.config import EvalConfig
 from icwaves.evaluation.utils import make_calibrate_idf_fn, get_base_results_filename
-from icwaves.file_utils import parse_config_file_args
+from icwaves.file_utils import (
+    parse_config_file_args,
+    _build_centroid_assignments_file,
+    _build_preprocessed_data_file,
+)
+from icwaves.sikmeans.shift_kmeans import _asignment_step
 
 os.environ["OMP_NUM_THREADS"] = "8"
 
@@ -188,6 +194,136 @@ def analyze_brain_shap(
     return pd.DataFrame(results)
 
 
+class ExampleSource:
+    """Lazy access to the windows of the evaluation ICs and their centroid
+    assignments, to draw example windows matched to a centroid.
+
+    Nothing is recomputed: the centroid assignments (n_ics, n_codebooks,
+    n_windows) are the ones used to build the BoWav features, and the windowed ICs
+    (n_ics, n_windows, window_length) are the preprocessed data of the evaluation
+    dataset. Both are memory-mapped, so only the sampled windows are read.
+    """
+
+    def __init__(self, eval_config, seed=0):
+        self.seed = seed
+        path = eval_config.path_to_centroid_assignments
+        self.assignments = np.load(
+            path / _build_centroid_assignments_file(eval_config), mmap_mode="r"
+        )
+        npz_path = eval_config.path_to_preprocessed_data / _build_preprocessed_data_file(
+            eval_config
+        )
+        with np.load(npz_path) as data:  # members are read lazily
+            self.labels = data["labels"]
+            self.expert_mask = data["expert_label_mask"].astype(bool)
+            self.subj_ind = data["subj_ind"]
+            self.zero_window_mask = (
+                data["zero_window_mask"] if "zero_window_mask" in data.files else None
+            )
+        self.windows = _memmap_npz_member(npz_path, "windowed_ics")
+
+        # One random test subject, shared by all the figures of the dataset. Only
+        # subjects with both a brain and a non-brain annotated IC are eligible.
+        # For EPIC, a "subject" is a 10-min EEG segment with its own ICA, containing
+        # both brain and artifact ICs. If no subject is eligible, the examples are
+        # drawn from all the annotated ICs of the dataset.
+        brain = self.expert_mask & (self.labels == 0)
+        nonbrain = self.expert_mask & (self.labels != 0)
+        eligible = sorted(
+            set(self.subj_ind[brain]).intersection(self.subj_ind[nonbrain])
+        )
+        # Same seed -> same subject for all classifiers of a given dataset
+        rng = np.random.default_rng(seed)
+        self.subject = int(rng.choice(eligible)) if eligible else None
+        self.pool = (
+            np.ones(len(self.labels), dtype=bool)
+            if self.subject is None
+            else self.subj_ind == self.subject
+        )
+
+    def sample(self, centroid_index, brain, codebooks, n_centroids=128):
+        """Random window of a (non-)brain annotated IC assigned to the centroid.
+
+        Returns a dict (ic, window, label, shift, samples) or None if no window of
+        the selected subject was assigned to the centroid.
+        """
+        j, c = divmod(centroid_index, n_centroids)
+        ic_mask = self.pool & self.expert_mask
+        ic_mask &= (self.labels == 0) if brain else (self.labels != 0)
+        ics = np.where(ic_mask)[0]
+        if len(ics) == 0:
+            return None
+        matched = np.argwhere(np.asarray(self.assignments[ics, j, :]) == c)
+        rng = np.random.default_rng([self.seed, centroid_index, int(brain)])
+        for k in rng.permutation(len(matched)):
+            ic, w = ics[matched[k, 0]], int(matched[k, 1])
+            if self.zero_window_mask is not None and self.zero_window_mask[ic, w]:
+                continue
+            samples = np.array(self.windows[ic, w])
+            if not np.any(samples):
+                continue
+            # Position of the best-matching centroid-length segment in the window
+            _, shift, _ = _asignment_step(samples[None, :], codebooks[j], "cosine", None)
+            return dict(
+                ic=int(ic),
+                window=w,
+                label=int(self.labels[ic]),
+                shift=int(np.ravel(shift)[0]),
+                samples=samples,
+            )
+        return None
+
+
+def _memmap_npz_member(npz_path, name):
+    """Memory-map an array stored (uncompressed) in an .npz file."""
+    with zipfile.ZipFile(npz_path) as z:
+        info = z.getinfo(f"{name}.npy")
+        assert info.compress_type == zipfile.ZIP_STORED, "npz must be uncompressed"
+    with open(npz_path, "rb") as f:
+        f.seek(info.header_offset + 26)
+        name_len, extra_len = np.frombuffer(f.read(4), dtype="<u2")
+        f.seek(info.header_offset + 30 + int(name_len) + int(extra_len))
+        version = np.lib.format.read_magic(f)
+        shape, fortran, dtype = np.lib.format._read_array_header(f, version)
+        offset = f.tell()
+    return np.memmap(
+        npz_path,
+        dtype=dtype,
+        mode="r",
+        offset=offset,
+        shape=shape,
+        order="F" if fortran else "C",
+    )
+
+
+def sample_examples(df, source, codebooks):
+    """Draw a brain and a non-brain example window for each centroid of df."""
+    examples = {}
+    for idx in df["centroid_index"].astype(int):
+        examples[idx] = {
+            "brain": source.sample(idx, True, codebooks),
+            "nonbrain": source.sample(idx, False, codebooks),
+        }
+    return examples
+
+
+def examples_to_frame(examples, source):
+    rows = []
+    for idx, ex in examples.items():
+        for kind, e in ex.items():
+            rows.append(
+                {
+                    "centroid_index": idx,
+                    "kind": kind,
+                    "subject": source.subject,
+                    "ic": None if e is None else e["ic"],
+                    "window": None if e is None else e["window"],
+                    "label": None if e is None else CLASS_LABELS[e["label"]],
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def plot_centroids(
     df,
     codebooks,
@@ -196,10 +332,16 @@ def plot_centroids(
     num_centroids,
     sampling_rate,
     psd_method="mtm",
+    examples=None,
+    subject=None,
 ):
     """Plot top centroids with time-domain waveforms and PSDs.
 
     Args:
+        examples: Optional {centroid_index: {"brain": ex, "nonbrain": ex}} (see
+            ExampleSource.sample). Adds two columns with an example window of a
+            brain and of a non-brain annotated IC matched to the centroid.
+        subject: Test subject the examples were drawn from (shown in the titles).
         sampling_rate: Sampling rate (Hz) of the centroids (dataset-dependent).
         psd_method: Method for PSD computation, either "mtm" (multitaper) or "welch"
     """
@@ -208,9 +350,9 @@ def plot_centroids(
 
     # Grid: k rows (one per centroid), 2 columns (time domain + PSD)
     n_rows = num_centroids
-    n_cols = 2
+    n_cols = 4 if examples is not None else 2
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 3 * n_rows))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 3 * n_rows))
     if n_rows == 1:
         axes = axes.reshape(1, -1)
 
@@ -282,6 +424,54 @@ def plot_centroids(
         if visible.size:
             margin = 0.05 * (visible.max() - visible.min())
             axes[i, 1].set_ylim(visible.min() - margin, visible.max() + margin)
+
+        if examples is not None:
+            for col, (kind, title) in zip(
+                (2, 3), (("brain", "brain"), ("nonbrain", "non-brain"))
+            ):
+                ax = axes[i, col]
+                ex = examples[idx][kind]
+                subj_str = "" if subject is None else f", subject {subject}"
+                if ex is None:
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "no matched window",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                    )
+                    ax.set_title(f"Example in {title} IC{subj_str}")
+                    ax.set_axis_off()
+                    continue
+                t = np.arange(len(ex["samples"])) / sampling_rate
+                ax.plot(t, ex["samples"], color="tab:gray", lw=0.8)
+                # Shaded: segment of the window matched to the centroid
+                seg_start = ex["shift"] / sampling_rate
+                seg_end = (ex["shift"] + len(waveform)) / sampling_rate
+                ax.axvspan(seg_start, seg_end, color="tab:blue", alpha=0.2)
+                # Centroid overlaid on the matched segment, rescaled by the
+                # least-squares gain (the cosine assignment ignores amplitude)
+                segment = ex["samples"][ex["shift"] : ex["shift"] + len(waveform)]
+                gain = np.dot(segment, waveform) / np.dot(waveform, waveform)
+                cos_sim = np.dot(segment, waveform) / (
+                    np.linalg.norm(segment) * np.linalg.norm(waveform)
+                )
+                ax.plot(
+                    t[ex["shift"] : ex["shift"] + len(waveform)],
+                    gain * waveform,
+                    color="tab:red",
+                    lw=1.0,
+                    label=f"centroid (scaled), cos = {cos_sim:.2f}",
+                )
+                ax.legend(loc="upper right", fontsize=7, framealpha=0.8)
+                ax.set_xlabel("Time (s)")
+                ic_class = CLASS_LABELS[ex["label"]]
+                ax.set_title(
+                    f"Example in {title} IC ({ic_class}){subj_str}, "
+                    f"IC {ex['ic']}, window {ex['window']}",
+                    fontsize=9,
+                )
 
     plt.tight_layout()
     plt.savefig(output_path)
@@ -472,6 +662,8 @@ def run_analysis(
     sample_size,
     psd_method,
     root,
+    examples=True,
+    seed=0,
     validation_segment=5,
 ):
     """Run the full SHAP feature-importance analysis for one (classifier,
@@ -526,6 +718,12 @@ def run_analysis(
     codebooks = load_codebooks(eval_config)
     sampling_rate = 500 if dataset == "cue" else 256
 
+    # Example windows: one random test subject per dataset, shared by the positive
+    # and negative figures (and by all classifiers).
+    source = ExampleSource(eval_config, seed) if examples else None
+    if source is not None:
+        typer.echo(f"Example windows drawn from test subject {source.subject}")
+
     # Define cache file path
     cache_file = output_path / "shap_cache.npz"
 
@@ -563,6 +761,14 @@ def run_analysis(
         / f"brain_positive_shap_{sort_by}_{psd_method}_centroid_analysis.csv",
         index=False,
     )
+    pos_examples = (
+        sample_examples(positive_df, source, codebooks) if source is not None else None
+    )
+    if pos_examples is not None:
+        examples_to_frame(pos_examples, source).to_csv(
+            output_path / f"brain_positive_shap_{sort_by}_{psd_method}_examples.csv",
+            index=False,
+        )
     plot_centroids(
         positive_df,
         codebooks,
@@ -571,6 +777,8 @@ def run_analysis(
         num_centroids,
         sampling_rate,
         psd_method,
+        pos_examples,
+        None if source is None else source.subject,
     )
 
     # Plot 2: Negative mean SHAP centroids
@@ -593,6 +801,14 @@ def run_analysis(
         / f"brain_negative_shap_{sort_by}_{psd_method}_centroid_analysis.csv",
         index=False,
     )
+    neg_examples = (
+        sample_examples(negative_df, source, codebooks) if source is not None else None
+    )
+    if neg_examples is not None:
+        examples_to_frame(neg_examples, source).to_csv(
+            output_path / f"brain_negative_shap_{sort_by}_{psd_method}_examples.csv",
+            index=False,
+        )
     plot_centroids(
         negative_df,
         codebooks,
@@ -601,6 +817,8 @@ def run_analysis(
         num_centroids,
         sampling_rate,
         psd_method,
+        neg_examples,
+        None if source is None else source.subject,
     )
 
     typer.echo(f"Analysis complete. Results saved to {output_path}")
@@ -628,6 +846,14 @@ def main(
     ),
     psd_method: str = typer.Option(
         "mtm", help="PSD computation method: 'mtm' (multitaper) or 'welch'"
+    ),
+    examples: bool = typer.Option(
+        True,
+        help="Add two columns with example windows of a brain and a non-brain "
+        "annotated IC matched to each centroid (random test subject).",
+    ),
+    seed: int = typer.Option(
+        0, help="Seed for the random choice of the test subject and example windows"
     ),
     validation_segment: int = typer.Option(
         5,
@@ -691,6 +917,8 @@ def main(
                 sample_size,
                 psd_method,
                 root,
+                examples,
+                seed,
                 validation_segment,
             )
 
