@@ -1,0 +1,9 @@
+classifier,valseg,dataset,auc_original,se_original,auc_corrected,se_corrected,delta,se_delta,n,prevalence
+random_forest,5min,cue,0.9292,0.0141,0.9196,0.0147,-0.0096,0.0076,389,0.6710
+random_forest,5min,epic,0.8088,0.0036,0.8472,0.0033,0.0383,0.0026,16316,0.7002
+random_forest,50min,cue,0.9374,0.0137,0.9360,0.0137,-0.0013,0.0049,389,0.6710
+random_forest,50min,epic,0.7950,0.0037,0.8408,0.0033,0.0458,0.0026,16316,0.7002
+logistic,5min,cue,0.9093,0.0162,0.8994,0.0167,-0.0098,0.0068,389,0.6710
+logistic,5min,epic,0.8211,0.0035,0.8548,0.0033,0.0336,0.0025,16316,0.7002
+logistic,50min,cue,0.9212,0.0154,0.9231,0.0154,0.0019,0.0058,389,0.6710
+logistic,50min,epic,0.8180,0.0035,0.8531,0.0033,0.0350,0.0022,16316,0.7002
