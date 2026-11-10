@@ -215,36 +215,23 @@ def plot_centroids(
         time_axis = np.arange(len(waveform)) / sampling_rate
         axes[i, 0].plot(time_axis, waveform)
         axes[i, 0].set_xlabel("Time (s)")
-        axes[i, 0].set_title(f"Centroid {idx} (Codebook: {CLASS_LABELS[codebook_idx]})")
+        axes[i, 0].set_title(
+            f"#{idx} {CLASS_LABELS[codebook_idx]} | "
+            f"cov {row['covariance']:.1e} | "
+            rf"$\bar{{\phi}}$ {row['mean_shap']:+.4f}",
+            fontsize=10,
+        )
 
-        # Use scientific notation for small rates
-        rate_brain = row["rate_in_brain"]
-        rate_not_brain = row["rate_not_brain"]
-
-        if rate_brain < 0.001:
-            brain_str = f"{rate_brain:.2e}"
-        else:
-            brain_str = f"{rate_brain:.3f}"
-
-        if rate_not_brain < 0.001:
-            not_brain_str = f"{rate_not_brain:.2e}"
-        else:
-            not_brain_str = f"{rate_not_brain:.3f}"
-
+        # Occurrence rate ratio (Brain / Not Brain)
+        rate_ratio = row["rate_in_brain"] / max(row["rate_not_brain"], 1e-12)
         axes[i, 0].text(
             0.02,
             0.98,
-            f"Cov: {row['covariance']:.4f}\n"
-            f"Min SHAP: {row['min_shap']:.4f}\n"
-            f"Max SHAP: {row['max_shap']:.4f}\n"
-            f"Mean SHAP: {row['mean_shap']:.4f}\n"
-            f"Rate in Brain: {brain_str}\n"
-            f"Rate in Not Brain: {not_brain_str}",
+            f"Rate ratio (brain / non-brain): {rate_ratio:.2f}",
             transform=axes[i, 0].transAxes,
             va="top",
             fontsize=8,
         )
-
         # PSD plot (right column)
         if psd_method == "mtm":
             # Thomson Multitaper Method
@@ -279,8 +266,13 @@ def plot_centroids(
         axes[i, 1].plot(freqs, psd_db)
         axes[i, 1].set_xlabel("Frequency (Hz)")
         axes[i, 1].set_ylabel("Power (dB/Hz)")
-        method_label = "MTM" if psd_method == "mtm" else "Welch"
-        axes[i, 1].set_title(f"PSD ({method_label}, Peak: {max_freq:.1f} Hz)")
+        axes[i, 1].set_title(f"PSD (Peak: {max_freq:.1f} Hz)")
+        axes[i, 1].set_xlim(0, 100)
+        visible = psd_db[freqs <= 100]
+        visible = visible[np.isfinite(visible)]
+        if visible.size:
+            margin = 0.05 * (visible.max() - visible.min())
+            axes[i, 1].set_ylim(visible.min() - margin, visible.max() + margin)
 
     plt.tight_layout()
     plt.savefig(output_path)
