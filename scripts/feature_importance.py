@@ -35,6 +35,7 @@ Usage:
     python scripts/feature_importance.py --classifier random_forest --dataset cue
     python scripts/feature_importance.py --classifier logistic --dataset epic --num-centroids 10
     python scripts/feature_importance.py --classifier all --dataset all --sort-by magnitude
+    python scripts/feature_importance.py --classifier all --dataset all --validation-segment 50
 """
 
 import os
@@ -64,14 +65,22 @@ CLASS_LABELS = [
     "Other",
 ]
 
-# Config-file stems (config/_private/<stem>.txt) per classifier. The 5-min
-# (valSegLen300 / count_pooling) BoWav classifiers are used for the analysis.
-CONFIG_STEMS = {
-    "logistic": "logistic_5min_cmmn-None_idf",
-    "random_forest": "random_forest_5min_cmmn-None_idf",
-}
+SUPPORTED_CLASSIFIERS = ["logistic", "random_forest"]
+# Validation segment length (minutes) the classifier was cross-validated with:
+# 5 (valSegLen300, count pooling) or 50 (valSegLenNone, majority vote).
+SUPPORTED_VALIDATION_SEGMENTS = [5, 50]
 
-SUPPORTED_CLASSIFIERS = list(CONFIG_STEMS.keys())
+
+def config_stem(classifier, validation_segment):
+    """Config-file stem (config/_private/<stem>.txt) of a trained classifier."""
+    return f"{classifier}_{validation_segment}min_cmmn-None_idf"
+
+
+def combo_dirname(classifier, dataset, validation_segment):
+    """Output folder name; the 5-min classifiers keep the original folder names."""
+    suffix = "" if validation_segment == 5 else f"_{validation_segment}min"
+    return f"{classifier}_{dataset}{suffix}"
+
 SUPPORTED_DATASETS = ["emotion_study", "cue", "epic"]
 
 # The IDF reweighting adapts the source-trained scaler to a *target* dataset.
@@ -463,16 +472,20 @@ def run_analysis(
     sample_size,
     psd_method,
     root,
+    validation_segment=5,
 ):
     """Run the full SHAP feature-importance analysis for one (classifier,
-    dataset) combination and write plots + CSVs under output_dir/<clf>_<ds>."""
+    dataset) combination and write plots + CSVs under output_dir/<clf>_<ds>
+    (with a _50min suffix for the 50-min validated classifiers)."""
     typer.echo(
-        f"\n=== {classifier} / {dataset} "
+        f"\n=== {classifier} / {dataset} / l_val={validation_segment} min "
         f"(sort_by={sort_by}, sample_size={sample_size}, psd_method={psd_method}) ==="
     )
 
     # Load the train_config from the classifier's config file
-    config_file = root / "config/_private" / f"{CONFIG_STEMS[classifier]}.txt"
+    config_file = (
+        root / "config/_private" / f"{config_stem(classifier, validation_segment)}.txt"
+    )
     train_config = parse_config_file_args(config_file, feature_extractor="bowav")
 
     # epic ICs are 10-min; cue/emotion_study use the default (50 min).
@@ -488,7 +501,9 @@ def run_analysis(
     )
 
     # Per-combination output directory
-    output_path = Path(output_dir) / f"{classifier}_{dataset}"
+    output_path = Path(output_dir) / combo_dirname(
+        classifier, dataset, validation_segment
+    )
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Load data
@@ -614,6 +629,11 @@ def main(
     psd_method: str = typer.Option(
         "mtm", help="PSD computation method: 'mtm' (multitaper) or 'welch'"
     ),
+    validation_segment: int = typer.Option(
+        5,
+        help="Validation segment length (minutes) of the classifier to explain: "
+        "5 (count pooling) or 50 (majority vote)",
+    ),
 ):
     """
     SHAP Feature Importance Analysis for BoWav classifiers.
@@ -630,6 +650,12 @@ def main(
 
     if psd_method not in ["mtm", "welch"]:
         typer.echo("Error: --psd-method must be 'mtm' or 'welch'")
+        raise typer.Exit(code=1)
+
+    if validation_segment not in SUPPORTED_VALIDATION_SEGMENTS:
+        typer.echo(
+            f"Error: --validation-segment must be one of {SUPPORTED_VALIDATION_SEGMENTS}"
+        )
         raise typer.Exit(code=1)
 
     classifiers = SUPPORTED_CLASSIFIERS if classifier == "all" else [classifier]
@@ -665,6 +691,7 @@ def main(
                 sample_size,
                 psd_method,
                 root,
+                validation_segment,
             )
 
     typer.echo("All analyses complete.")
