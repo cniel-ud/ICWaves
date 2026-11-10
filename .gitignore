@@ -7,3 +7,8 @@ __pycache__/
 .venv/
 /SLURM/
 /results/emotion_study/classifier/
+# Paper lives in Overleaf; keep the whole local paper/ dir out of git
+/paper/
+# SHAP caches (large, regenerable by scripts/feature_importance.py)
+results/feature_importance/**/shap_cache.npz
+results/feature_importance/shap_cache.npz
