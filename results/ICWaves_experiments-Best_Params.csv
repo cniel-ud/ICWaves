@@ -1,0 +1,9 @@
+Classifier,Feature,Validation Seg Len (min),CMMN filtered?,PSD norm fix?,clf__C,clf__l1_ratio,min_samples_split,expert_weight,agg_method,training_segment_length (s)
+Logistic Regression,bowav,5,No,NA,0.1,1,NA,16,count_pooling,300
+Logistic Regression,bowav,50,No,NA,1,1,NA,16,majority_vote,300
+Logistic Regression,psd_autocorr,5,No,Yes,0.01,1,NA,64,count_pooling,300
+Logistic Regression,psd_autocorr,50,No,Yes,0.01,1,NA,64,majority_vote,120
+Random Forest,bowav,5,No,NA,NA,NA,160,32,count_pooling,300
+Random Forest,bowav,50,No,NA,NA,NA,80,16,majority_vote,300
+Random Forest,psd_autocorr,5,No,Yes,NA,NA,160,64,count_pooling,120
+Random Forest,psd_autocorr,50,No,Yes,NA,NA,160,64,majority_vote,60
