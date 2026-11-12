@@ -75,7 +75,8 @@ class EvalConfig:
         elif self.eval_dataset == "cue":
             return list(range(1, 13))
         elif self.eval_dataset == "epic":
-            return list(range(1, 910))
+            # 910 ten-minute EEG segments, files subj-000.mat .. subj-909.mat
+            return list(range(0, 910))
 
     @property
     def path_to_train_output(self) -> Path:

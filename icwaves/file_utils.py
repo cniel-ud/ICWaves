@@ -1,3 +1,4 @@
+import hashlib
 import shlex
 from typing import Optional
 
@@ -81,6 +82,17 @@ def build_base_classifier_name(args):
 
 
 def list_to_base36(int_list):
+    """Encode a list of subject ids into a short string for cache file names.
+
+    Ids 1..34 are encoded as a 34-bit mask in base 36; other ids are ignored by
+    the mask. In particular, the mask cannot tell apart EPIC's 0..909 from
+    1..909, so when the list contains an id < 1 a suffix with the range and the
+    number of ids is appended (plus a hash of the ids if they are not
+    contiguous). Lists without ids < 1 keep their original names, so existing
+    cache files (e.g. Emotion Study 8..35, EPIC 1..909) are still found.
+    NOTE: ids > 34 are still ignored by the mask (kept for compatibility).
+    """
+    int_list = sorted(set(int(i) for i in int_list))
     # Create a 34-bit binary representation
     binary_str = ["0"] * 34
     for i in int_list:
@@ -93,6 +105,13 @@ def list_to_base36(int_list):
 
     # Convert integer to base-36
     base36_representation = base36_encode(integer_representation)
+
+    if int_list and int_list[0] < 1:
+        lo, hi = int_list[0], int_list[-1]
+        base36_representation += f"-{lo}to{hi}n{len(int_list)}"
+        if len(int_list) != hi - lo + 1:
+            digest = hashlib.md5(",".join(map(str, int_list)).encode()).hexdigest()
+            base36_representation += f"-{digest[:8]}"
 
     return base36_representation
 

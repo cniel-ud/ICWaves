@@ -81,7 +81,8 @@ def _get_windowed_ics_and_labels(args):
 
     cum_ic_ind = 0
     expert_label_mask = np.full(n_ics, False)
-    subj_ind = np.zeros(n_ics, dtype=int)
+    # -1: not assigned yet (subject ids can be 0, e.g. EPIC's subj-000)
+    subj_ind = -1 * np.ones(n_ics, dtype=int)
     # 7 ICLabel classes
     noisy_labels = np.zeros((n_ics, 7), dtype=np.float32)
     for file, subjID in tqdm(zip(file_list, args.subj_ids)):
@@ -122,6 +123,8 @@ def _get_windowed_ics_and_labels(args):
 
         logging.info("Done building data matrix, labels, and other metadata")
 
+    assert cum_ic_ind == n_ics and np.all(subj_ind >= 0)
+
     return DataBundle(
         data=windowed_ics,
         labels=labels,
@@ -143,7 +146,8 @@ def _get_ics_and_labels(args):
 
     cum_ic_ind = 0
     expert_label_mask = np.full(n_ics, False)
-    subj_ind = np.zeros(n_ics, dtype=int)
+    # -1: not assigned yet (subject ids can be 0, e.g. EPIC's subj-000)
+    subj_ind = -1 * np.ones(n_ics, dtype=int)
     # 7 ICLabel classes
     noisy_labels = np.zeros((n_ics, 7), dtype=np.float32)
     for file, subjID in tqdm(zip(file_list, args.subj_ids)):
@@ -173,6 +177,8 @@ def _get_ics_and_labels(args):
             cum_ic_ind += 1
 
     logging.info("Done building data matrix, labels, and other metadata")
+
+    assert cum_ic_ind == n_ics and np.all(subj_ind >= 0)
 
     return DataBundle(
         data=ics,
