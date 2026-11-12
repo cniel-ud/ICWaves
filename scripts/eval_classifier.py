@@ -24,6 +24,7 @@ Usage:
     python scripts/eval_classifier.py
     python scripts/eval_classifier.py --eval-dataset cue --eval-dataset epic
     python scripts/eval_classifier.py --feature-extractor bowav --classifier-type logistic
+    python scripts/eval_classifier.py --eval-dataset epic --eval-cmmn-filter None
 """
 
 import os
@@ -254,8 +255,13 @@ def evaluate_dataset(
     feature_extractors: list[str],
     classifier_types: list[str],
     root: Path,
+    eval_cmmn_filters: Optional[list[str]] = None,
 ) -> pd.DataFrame:
-    """Evaluate all the selected classifiers, and ICLabel, on eval_dataset."""
+    """Evaluate all the selected classifiers, and ICLabel, on eval_dataset.
+
+    eval_cmmn_filters: eval CMMN filters to evaluate, as strings ('None' for no
+    filter). None: all the filters of get_eval_cmmn_filter_options.
+    """
     validation_times = get_prediction_windows(eval_dataset)
     minutes_per_ic = get_minutes_per_ic(eval_dataset)
     config_folder = root / "config/_private"
@@ -270,9 +276,17 @@ def evaluate_dataset(
 
     dataset_results = []
     subj_ids = None
-    for eval_cmmn_filter in get_eval_cmmn_filter_options(
-        eval_dataset, TRAIN_CMMN_FILTER
-    ):
+    cmmn_filter_options = [
+        f
+        for f in get_eval_cmmn_filter_options(eval_dataset, TRAIN_CMMN_FILTER)
+        if eval_cmmn_filters is None or str(f) in eval_cmmn_filters
+    ]
+    if not cmmn_filter_options:
+        raise typer.BadParameter(
+            f"None of the eval CMMN filters {eval_cmmn_filters} is available for "
+            f"{eval_dataset}"
+        )
+    for eval_cmmn_filter in cmmn_filter_options:
         for feature_extractor in feature_extractors:
             # The data bundles only depend on the dataset, the eval CMMN filter,
             # and the feature extractor: load them at most once for all
@@ -339,22 +353,22 @@ def load_summary_results(results_file: Path) -> pd.DataFrame:
     return results
 
 
-def save_summary_results(results: pd.DataFrame, results_file: Path) -> None:
+def save_summary_results(
+    results: pd.DataFrame,
+    results_file: Path,
+    key_columns: list[str] = REPLACE_KEY_COLUMNS,
+) -> None:
     """Save results to results_file, keeping the rows not re-evaluated.
 
-    Rows of an existing results_file with the same REPLACE_KEY_COLUMNS values
+    Rows of an existing results_file with the same key_columns values
     as some row of results are replaced; all other rows are kept, so that runs
     on different datasets, feature extractors, or classifiers add up in the
     same file.
     """
     if results_file.exists():
         previous = load_summary_results(results_file)
-        evaluated = pd.MultiIndex.from_frame(
-            results[REPLACE_KEY_COLUMNS].drop_duplicates()
-        )
-        replaced = pd.MultiIndex.from_frame(previous[REPLACE_KEY_COLUMNS]).isin(
-            evaluated
-        )
+        evaluated = pd.MultiIndex.from_frame(results[key_columns].drop_duplicates())
+        replaced = pd.MultiIndex.from_frame(previous[key_columns]).isin(evaluated)
         results = pd.concat([previous[~replaced], results], ignore_index=True)
     results.to_csv(results_file, index=False)
 
@@ -421,6 +435,14 @@ def main(
             "select several. Unset: draw all filters in the results file."
         ),
     ] = None,
+    eval_cmmn_filter: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            help="Eval CMMN filter(s) to evaluate, e.g. 'None'. Repeat to select "
+            "several. Unset: evaluate all the filters. When set, only the summary "
+            "rows of the evaluated filters are replaced (ICLabel rows always are)."
+        ),
+    ] = None,
     plot_only: Annotated[
         bool,
         typer.Option(
@@ -447,12 +469,17 @@ def main(
     if not plot_only:
         all_results = pd.concat(
             [
-                evaluate_dataset(d, feature_extractors, classifier_types, root)
+                evaluate_dataset(
+                    d, feature_extractors, classifier_types, root, eval_cmmn_filter
+                )
                 for d in eval_datasets
             ],
             ignore_index=True,
         )
-        save_summary_results(all_results, results_file)
+        key_columns = REPLACE_KEY_COLUMNS + (
+            ["cmmn_filter"] if eval_cmmn_filter is not None else []
+        )
+        save_summary_results(all_results, results_file, key_columns)
         typer.echo(f"Saved results to {results_file}")
 
     # Plot from the merged results file, so that a narrowed run only updates its
